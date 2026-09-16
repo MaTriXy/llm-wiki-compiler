@@ -16,18 +16,33 @@ You don't need to set everything - only the variables relevant to your chosen pr
 |---|---|---|
 | `LLMWIKI_PROVIDER` | `anthropic` | Provider to use. One of: `anthropic`, `openai`, `ollama`, `minimax`, `copilot`, `claude-agent`, `codex-agent`, `orcarouter`, `atlascloud` (aliases: `atlas-cloud`, `atlas`) |
 | `LLMWIKI_MODEL` | Provider default | Model name to use. Overrides the provider's built-in default model. For `codex-agent`, unset delegates model choice to Codex and a set value is passed through with `--model` |
+| `LLMWIKI_EMBEDDINGS` | Enabled | Set to `off`, `false`, `0`, or `no` (case-insensitive) to skip all embedding refreshes, including compile, review approval, import, and `query --save`. Existing embedding and pending files are left untouched. |
 | `LLMWIKI_EMBEDDING_PROVIDER` | Active chat provider | Backend serving embeddings, independent of `LLMWIKI_PROVIDER`. One of `anthropic`, `claude-agent`, `openai`, `ollama`, `orcarouter` |
 | `LLMWIKI_EMBEDDING_MODEL` | Provider default | Embedding model to use. Applies when the effective embedding provider is `openai`, `ollama` or `orcarouter` - ignored for `anthropic` and `claude-agent`, even when `LLMWIKI_EMBEDDING_PROVIDER` names one of them explicitly |
 
+`LLMWIKI_EMBEDDINGS` controls embedding writes, not retrieval. While it is
+disabled, write paths do not read or change the embedding store (binary index
+or legacy `.llmwiki/embeddings.json`), `.llmwiki/pending-embeddings.json`, or
+`.llmwiki/quarantined-embeddings.json`. An existing pending marker may therefore
+remain visible in `lint` and `status`. Query and search commands can still read
+an existing embedding store, and they keep their normal embedding-provider
+validation.
+
+After you re-enable refreshes, run `llmwiki compile`. The compile reconciles
+missing and stale vectors even when no source changed. It does not regenerate
+source-derived pages in that case, and a healthy store is not rewritten.
+
 When you set `LLMWIKI_EMBEDDING_PROVIDER`, the named provider's own credential is required: `VOYAGE_API_KEY` for `anthropic` or `claude-agent`, `OPENAI_API_KEY` (or `OPENAI_EMBEDDINGS_API_KEY`) for `openai`, `ORCAROUTER_API_KEY` for `orcarouter`, and no key for `ollama`. Setting `OPENAI_EMBEDDINGS_BASE_URL` marks a self-hosted OpenAI-compatible endpoint that needs no key, so `OPENAI_API_KEY` is not required in that case. This check only runs when `LLMWIKI_EMBEDDING_PROVIDER` is set - leaving it unset keeps today's behavior unchanged.
 
-The check runs at startup, before any compile or query work begins, so a misspelled provider name or a missing key fails immediately instead of part-way through a run.
+The check runs at startup, before any compile or query work begins, so a misspelled provider name or a missing key fails immediately instead of part-way through a run. Compile skips embedding-only checks when refreshes are disabled, but still validates the provider used to generate pages.
 
-`codex-agent` is the exception to the default embedding-provider value: because
-Codex cannot embed, it requires `LLMWIKI_EMBEDDING_PROVIDER` to be set
-explicitly. A missing or unusable embedding backend fails actionably rather
-than silently degrading. The keyless combination is `codex-agent` chat plus
-`ollama` embeddings.
+`codex-agent` is the exception to the default embedding-provider value. Because
+Codex cannot embed, commands that consume or produce embeddings require
+`LLMWIKI_EMBEDDING_PROVIDER` to be set explicitly. A missing or unusable
+embedding backend fails actionably rather than silently degrading. Compile does
+not require one when `LLMWIKI_EMBEDDINGS` disables refreshes. The keyless
+combination with embeddings enabled is `codex-agent` chat plus `ollama`
+embeddings.
 
 When `codex-agent` is selected explicitly through `--provider` or a
 shell-exported `LLMWIKI_PROVIDER`, llmwiki does not open the project `.env`
@@ -41,7 +56,7 @@ providers retain the existing shell-over-`.env` precedence.
 
 ### Changing the embedding backend rebuilds the index
 
-The embedding index records which provider, model, and endpoint produced its vectors. Changing any of them invalidates the index, and the next `llmwiki compile` re-embeds every page.
+The embedding index records which provider, model, and endpoint produced its vectors. Changing the effective `LLMWIKI_EMBEDDING_PROVIDER`, `LLMWIKI_EMBEDDING_MODEL`, or embedding endpoint invalidates the index. The next non-review `llmwiki compile` with refreshes enabled can re-embed the entire eligible wiki, even when no source changed. This incurs embedding-provider requests and potential costs without regenerating source-derived pages. Quarantined pages remain excluded until you explicitly re-queue them; see [retry recovery](#embedding-retries-and-quarantine).
 
 This matters because vectors from different backends are not comparable even when the model name matches - a local server answering to `text-embedding-3-small` does not produce the same vectors as cloud OpenAI, and `nomic-embed-text` served by Ollama does not match the same model served over an OpenAI-compatible endpoint. Until the index is rebuilt, `llmwiki query` reports the index as outdated and falls back to lexical ranking rather than ranking against a mixed index.
 
@@ -173,6 +188,32 @@ Model names are namespaced by publisher (e.g. `qwen/qwen3.5-35b-a3b`, the defaul
   Batching controls requests independently of storage. Small stores keep `.llmwiki/embeddings.json`; stores exceeding its 64 MiB limit automatically use `.llmwiki/embeddings.bin` without repeating embedding requests.
 </Note>
 
+Enabled non-review compiles scan eligible pages and the store for missing or
+stale embeddings even when their source delta is empty. This also applies when
+you have never used `LLMWIKI_EMBEDDINGS`. An unchanged, healthy store makes no
+embedding-provider calls and is not rewritten. See [compile reconciliation](/cli/compile#embedding-reconciliation).
+
+`LLMWIKI_EMBED_STRICT` applies to automatically discovered work too: if embedding
+generation fails, an otherwise unchanged compile exits non-zero after recording
+retry state. Without strict mode, it warns and continues. Disabling refreshes
+with `LLMWIKI_EMBEDDINGS` skips generation entirely, including in strict mode.
+
+### Embedding retries and quarantine
+
+Explicit changes and automatically discovered missing or stale vectors share a
+durable retry budget in `.llmwiki/pending-embeddings.json`. After five failed
+refresh attempts, llmwiki warns and moves the page into
+`.llmwiki/quarantined-embeddings.json`. Later automatic scans exclude it, allowing
+other pages to embed. These files use bounded, root-confined reads and atomic
+writes; neither is read or changed while refreshes are disabled.
+
+After fixing the provider or page, edit its source and compile again, or re-save
+the page through its normal write workflow, to re-queue it with a fresh budget.
+Changing only embedding configuration does not clear quarantine. To retry all
+quarantined pages without regenerating source pages, remove
+`.llmwiki/quarantined-embeddings.json` from your project and run `llmwiki compile`
+with refreshes enabled. This resets their retry budget and may incur costs.
+
 ### Embedding storage
 
 Binary storage keeps metadata and Float32 vectors in one atomically replaced
@@ -189,9 +230,9 @@ An unreadable or corrupt binary index produces `embedding-store-unavailable`
 and degraded retrieval rather than silently reading that older snapshot.
 The context command uses its existing `embedding-store-missing` warning code
 for this condition, meaning no usable store, not necessarily no file on disk.
-Repair requires an embedding update with changed or pending eligible pages;
-an unchanged no-op compile does not repair the index. Rebuilding an unavailable
-index embeds the live eligible corpus again and can incur provider costs.
+An enabled non-review `llmwiki compile` discovers the missing vectors even when
+no sources changed. Rebuilding an unavailable index embeds the live eligible
+corpus again, except quarantined pages, and can incur provider costs.
 
 Unsetting the flag does not convert binary back to JSON. Before downgrading to
 a release without binary support, back up and move both derived index files

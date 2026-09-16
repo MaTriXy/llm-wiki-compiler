@@ -123,9 +123,9 @@ file is dropped. The pass uses no model calls.
 
 ## Incremental behaviour
 
-Compile is hash-based and incremental. Each source file's content is fingerprinted on ingest; on subsequent compiles, only sources whose content hash has changed are re-processed through the LLM. Sources that haven't changed are skipped entirely - no API calls, no rewrites. This means re-running `llmwiki compile` after editing a single source touches only the pages that source contributed to, even in a large wiki.
+Compile is hash-based and incremental. Each source file's content is fingerprinted on ingest; on subsequent compiles, only sources whose content hash has changed are re-processed through the LLM. When sources and generation settings are unchanged, compile skips extraction and page generation: it makes no chat-model calls and does not regenerate those pages. Embedding reconciliation still runs as described below.
 
-The same incremental logic applies to embeddings: chunk-level embeddings are updated only for pages whose underlying content changed.
+Embedding reuse depends on page content and the active embedding configuration, independently of source compilation state.
 
 Within a single run, both phases call the LLM in parallel: concept extraction across changed sources and page generation across merged concepts both run under one shared concurrency cap. The default is 5 simultaneous calls. On a cold start or a large refresh, raise it with `--concurrency` or [`LLMWIKI_COMPILE_CONCURRENCY`](/configuration/environment-variables#compile) to cut wall-clock; lower it if your provider rate-limits the run. The same flag is available on `llmwiki refresh`, `llmwiki watch`, and `llmwiki quickstart`.
 
@@ -138,6 +138,28 @@ Compile sends page and chunk embeddings to the provider in batches rather than o
 <Note>
   The summary only prints when embeddings actually run. With no embedding backend configured (for example, the default `anthropic` provider without `VOYAGE_API_KEY`), compile prints `Skipped embeddings update` instead and semantic search is not built.
 </Note>
+
+## Embedding reconciliation
+
+Every non-review compile with embeddings enabled scans eligible live pages and
+the embedding store, even when no sources changed and even if you have never
+disabled embeddings. It backfills missing vectors and refreshes stale vectors
+without regenerating source-derived pages. A healthy index with unchanged
+embedding configuration requires no embedding-provider calls or store writes.
+
+Changing the effective embedding model, provider, or endpoint can require a full
+re-embed of the eligible wiki on an otherwise unchanged compile. This sends page
+and chunk text to the embedding provider and can incur provider costs.
+
+Set `LLMWIKI_EMBEDDINGS=off` to skip embedding writes, including this scan. After
+removing the setting, run `llmwiki compile` to reconcile the index. Existing
+vectors remain available to retrieval while refreshes are disabled.
+
+Failed reconciliation uses the same five-attempt limit as changed-page refreshes.
+After the limit, the page is quarantined and unchanged compiles stop retrying it.
+With `LLMWIKI_EMBED_STRICT=1`, an embedding-generation failure also fails an
+otherwise unchanged compile. See the [embedding environment reference](/configuration/environment-variables#embeddings)
+for failure handling and quarantine recovery.
 
 ## What compile produces
 

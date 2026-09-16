@@ -198,6 +198,9 @@ export const JOURNAL_PRESTATE_MAX_BYTES = 16 * 1024 * 1024; // 16 MiB
  */
 export const PENDING_EMBEDDINGS_FILE = ".llmwiki/pending-embeddings.json";
 
+/** Durable exclusions from automatic reconciliation after the retry limit. */
+export const QUARANTINED_EMBEDDINGS_FILE = ".llmwiki/quarantined-embeddings.json";
+
 /**
  * Resource cap on the pending-embeddings marker file. `.llmwiki` is
  * local/sync-controllable (a synced checkout or a teammate can replace the
@@ -544,6 +547,9 @@ export const EMBED_BATCH_CAP_FALLBACK = 512;
 
 /** Env var: override the embedding batch size (positive integer, clamped to cap). */
 export const ENV_EMBED_BATCH_SIZE = "LLMWIKI_EMBED_BATCH_SIZE";
+
+/** Env var: use a disabled value to skip refreshes without touching pending state. */
+export const ENV_EMBEDDINGS = "LLMWIKI_EMBEDDINGS";
 
 /** Env var: when set, a failed embedding refresh exits non-zero (for CI). */
 export const ENV_EMBED_STRICT = "LLMWIKI_EMBED_STRICT";
