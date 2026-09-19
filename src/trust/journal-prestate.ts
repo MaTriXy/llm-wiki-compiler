@@ -49,16 +49,13 @@ export class JournalAggregateBudgetExceededError extends Error {
   }
 }
 
-/** Canonical-base64 shape: standard alphabet, whole quads, correct padding. */
-const CANONICAL_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-
 /**
- * True only for CANONICAL base64: the shape regex refuses whitespace, foreign
- * alphabets, and bad padding; the decode→re-encode round trip then refuses
- * non-canonical trailing bits (e.g. `"AB=="` decodes but re-encodes `"AA=="`).
+ * True only for CANONICAL base64: exact decode→re-encode equality refuses
+ * whitespace, foreign alphabets, bad padding and non-canonical trailing bits.
+ * Avoid repeated-group regular expressions: valid multi-megabyte journal
+ * entries can exhaust their backtracking stack before recovery begins.
  */
 export function isCanonicalBase64(content: string): boolean {
-  if (!CANONICAL_BASE64.test(content)) return false;
   return Buffer.from(content, "base64").toString("base64") === content;
 }
 

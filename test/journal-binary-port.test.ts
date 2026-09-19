@@ -16,6 +16,17 @@ beforeEach(async () => { root = await makeTrustRoot("binary-port-"); });
 afterEach(async () => { await cleanupTrustRoot(root); });
 
 describe("binary-safe journal promotion", () => {
+  it("replays a multi-megabyte binary prestate without exhausting the stack", async () => {
+    const bytes = Buffer.alloc(4 * 1024 * 1024, 0xff);
+    const target = path.join(root, WIKI, "large-image.bin");
+    await writeFile(target, bytes);
+    const batch = await journal.openBatch(root, { maxAggregatePreStateBytes: bytes.length });
+    await journal.recordBinaryPreState(batch, target, { maxPreStateBytes: bytes.length });
+    await writeFile(target, "interrupted replacement");
+    await journal.replayJournal(root);
+    expect(await readFile(target)).toEqual(bytes);
+  });
+
   it("restores arbitrary bytes after a crash, without UTF-8 conversion", async () => {
     const target = path.join(root, WIKI, "image.bin");
     await writeFile(target, BINARY);
