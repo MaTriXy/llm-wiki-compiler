@@ -71,7 +71,10 @@ function buildPageSlugSet(
 
 /** Find [[Title]] wikilinks that don't match any existing wiki page. */
 export async function checkBrokenWikilinks(root: string): Promise<LintResult[]> {
-  const pages = await collectAllPages(root);
+  // WIKI-WIDE: a link is a link in any entity kind, and the generic-only walk
+  // meant a profile project's broken links were never checked at all. The §4.6
+  // fix plan takes the same scope — the two must agree (rules-shared.ts).
+  const pages = await collectAllPages(root, "wiki-wide");
   const existingSlugs = buildPageSlugSet(pages);
   const pendingSlugs = await listLinkResolvablePendingSlugs(root);
   const results: LintResult[] = [];

@@ -28,6 +28,7 @@ import {
   type WorkflowEvent,
   type WorkflowRunStatus,
 } from "./types.js";
+import { assertWorkspaceId } from "../preparations/paths.js";
 
 /** The run fields that MUST each be a JSON array for the record to be trusted. */
 const RUN_ARRAY_FIELDS = ["stageLog", "events", "satisfiedGates", "knownStageIds"] as const;
@@ -48,6 +49,11 @@ function hasValidStateVersion(run: Record<string, unknown>): boolean {
 /** True only when `value` is a 64-char lowercase-hex digest. */
 function isHexDigest(value: unknown): boolean {
   return typeof value === "string" && HEX_DIGEST_PATTERN.test(value);
+}
+
+/** True only for the public `sha256:<hex>` digest form. */
+function isShaDigest(value: unknown): boolean {
+  return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
 }
 
 /** True only when `value` is a plain object (not an array, not null, not a scalar). */
@@ -115,6 +121,47 @@ function hasValidOwner(run: Record<string, unknown>): boolean {
   return run.owner === undefined || typeof run.owner === "string";
 }
 
+/** Validate the optional closed product process/workspace authority object. */
+function hasValidProcessAuthority(run: Record<string, unknown>): boolean {
+  const value = run.processAuthority;
+  if (value === undefined) return true;
+  if (!isPlainObject(value)) return false;
+  const authority = value as Record<string, unknown>;
+  const keys = Object.keys(authority).sort();
+  const expected = ["processDefinitionDigest", "productId", "runtimeAuthorityDigest", "schemaVersion", "workspaceCompositionDigest", "workspaceId"];
+  if (keys.join("\0") !== expected.sort().join("\0")) return false;
+  try {
+    assertWorkspaceId(authority.workspaceId);
+  } catch {
+    return false;
+  }
+  return authority.schemaVersion === 1 && typeof authority.productId === "string"
+    && isHexDigest(String(authority.runtimeAuthorityDigest).replace(/^sha256:/, ""))
+    && isHexDigest(String(authority.processDefinitionDigest).replace(/^sha256:/, ""))
+    && isHexDigest(String(authority.workspaceCompositionDigest).replace(/^sha256:/, ""));
+}
+
+/** Validate the optional closed refusal record and its run-status coupling. */
+function hasValidRefusal(run: Record<string, unknown>): boolean {
+  const value = run.refusal;
+  if (value === undefined) return run.status !== "refused";
+  if (run.status !== "refused" || !isPlainObject(value)) return false;
+  const refusal = value as Record<string, unknown>;
+  const expected = ["evidenceRef", "predecessorStateVersion", "processDefinitionDigest", "reasonCode", "refusedAt"];
+  if (Object.keys(refusal).sort().join("\0") !== expected.join("\0")) return false;
+  return hasValidRefusalFields(refusal);
+}
+
+/** Validate the scalar members of a shape-closed refusal record. */
+function hasValidRefusalFields(refusal: Record<string, unknown>): boolean {
+  const predecessor = refusal.predecessorStateVersion;
+  const digest = String(refusal.processDefinitionDigest).replace(/^sha256:/, "");
+  const reason = typeof refusal.reasonCode === "string" && isSlugSafe(refusal.reasonCode);
+  const evidence = typeof refusal.evidenceRef === "string" && refusal.evidenceRef.length > 0;
+  const version = Number.isSafeInteger(predecessor) && (predecessor as number) >= 0;
+  return reason && evidence && isNonEmptyString(refusal.refusedAt) && version && isHexDigest(digest);
+}
+
 /**
  * True when `pendingOutput` is ABSENT or a well-shaped intent marker (an object
  * with string `stageId`/`opId`). A malformed marker would otherwise corrupt the
@@ -125,7 +172,18 @@ function hasValidPendingOutput(run: Record<string, unknown>): boolean {
   if (pending === undefined) return true;
   if (typeof pending !== "object" || pending === null) return false;
   const p = pending as Record<string, unknown>;
-  return typeof p.stageId === "string" && typeof p.opId === "string";
+  return typeof p.stageId === "string" && typeof p.opId === "string" && validLifecycleIntent(p.lifecycle);
+}
+
+/** Legacy bare intents remain readable; only exact new lifecycle proofs recover. */
+function validLifecycleIntent(input: unknown): boolean {
+  if (input === undefined) return true;
+  if (typeof input !== "object" || input === null) return false;
+  const value = input as Record<string, unknown>;
+  const digest = /^sha256:[0-9a-f]{64}$/;
+  return typeof value.requestDigest === "string" && digest.test(value.requestDigest)
+    && typeof value.postimageDigest === "string" && digest.test(value.postimageDigest)
+    && (value.decision === "allow" || value.decision === "allow-with-warning");
 }
 
 /**
@@ -139,9 +197,60 @@ function isValidRunEvent(event: unknown): boolean {
   const e = event as Record<string, unknown>;
   return (
     typeof e.type === "string" &&
+    (e.subjectDigest === undefined || isShaDigest(e.subjectDigest)) &&
     Number.isInteger(e.stateVersionBefore) &&
     Number.isInteger(e.stateVersionAfter)
   );
+}
+
+/** Validate one core-minted verifier receipt's closed structural fields. */
+function isValidVerifierReceipt(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  const receipt = value as Record<string, unknown>;
+  const expected = ["boundArtifactRefs", "boundValues", "liveTargets", "mintedAt",
+    "normalizedEnvelope", "normalizedEnvelopeDigest", "outputStageId", "predecessorChainRoot",
+    "processDefinitionDigest", "profileDigest", "rawArtifactRef", "runId", "schemaVersion",
+    "verifierId", "verifierImplementationDigest", "workflowDigest", "workflowId",
+    "workspaceCompositionDigest", "workspaceId"];
+  if (Object.keys(receipt).sort().join("\0") !== expected.sort().join("\0")) return false;
+  return hasValidReceiptScalars(receipt) && hasValidReceiptCollections(receipt);
+}
+
+/** Validate the fixed scalar identities of a verifier receipt. */
+function hasValidReceiptScalars(receipt: Record<string, unknown>): boolean {
+  const strings = ["verifierId", "rawArtifactRef", "workflowId", "runId", "workspaceId",
+    "outputStageId", "mintedAt"];
+  const digests = ["verifierImplementationDigest", "normalizedEnvelopeDigest",
+    "processDefinitionDigest", "workspaceCompositionDigest", "predecessorChainRoot"];
+  return receipt.schemaVersion === 1 && strings.every((key) => isNonEmptyString(receipt[key]))
+    && digests.every((key) => isShaDigest(receipt[key]))
+    && isHexDigest(receipt.workflowDigest) && isHexDigest(receipt.profileDigest);
+}
+
+/** Validate the bounded collection shapes of a verifier receipt. */
+function hasValidReceiptCollections(receipt: Record<string, unknown>): boolean {
+  if (!isPlainObject(receipt.boundValues) || !Array.isArray(receipt.boundArtifactRefs)
+    || !Array.isArray(receipt.liveTargets)) return false;
+  const values = Object.values(receipt.boundValues as Record<string, unknown>);
+  return values.every((item) => typeof item === "string")
+    && receipt.boundArtifactRefs.every((item: unknown) => typeof item === "string")
+    && receipt.liveTargets.every(isValidLiveTarget);
+}
+
+/** Validate one live-target row without relying on callback narrowing. */
+function isValidLiveTarget(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  const target = value as Record<string, unknown>;
+  return typeof target.pageId === "string" && isShaDigest(target.contentDigest);
+}
+
+/** Validate the optional stage-keyed verifier-receipt map. */
+function hasValidVerifierReceipts(run: Record<string, unknown>): boolean {
+  if (run.verifierReceipts === undefined) return true;
+  if (!isPlainObject(run.verifierReceipts)) return false;
+  const receipts = run.verifierReceipts as Record<string, unknown>;
+  return Object.entries(receipts).every(([stageId, receipt]) =>
+    isSlugSafe(stageId) && isValidVerifierReceipt(receipt));
 }
 
 /**
@@ -172,6 +281,9 @@ export function hasValidRunShape(run: Record<string, unknown>): boolean {
     hasValidRunScalars(run) &&
     hasValidStateVersion(run) &&
     hasValidOwner(run) &&
+    hasValidProcessAuthority(run) &&
+    hasValidRefusal(run) &&
+    hasValidVerifierReceipts(run) &&
     hasValidPendingOutput(run)
   );
 }

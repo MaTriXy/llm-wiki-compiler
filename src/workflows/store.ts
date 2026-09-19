@@ -318,7 +318,7 @@ async function persistRunJson(root: string, runId: string, json: string): Promis
 
 /**
  * Return a minimized copy of a TERMINAL run that drops the large caller-controlled
- * `inputs`/`outputs` blobs (a terminal run's inputs/outputs are historical),
+ * `inputs`/`outputs`/verifier-receipt blobs (terminal evidence is historical),
  * keeping status/runId/digests/stageLog/events. A `fields-truncated` marker is
  * appended via {@link appendTerminalEvent} so the loss is auditable, never silent.
  * The marker append also compacts the event trail if needed, so the result is
@@ -328,10 +328,11 @@ async function persistRunJson(root: string, runId: string, json: string): Promis
  */
 function minimizeTerminalRun(run: WorkflowRun): WorkflowRun {
   const at = new Date().toISOString();
-  const cleared: WorkflowRun = { ...run, inputs: {}, outputs: {} };
+  const { verifierReceipts: _receipts, ...withoutReceipts } = run;
+  const cleared: WorkflowRun = { ...withoutReceipts, inputs: {}, outputs: {} };
   return appendTerminalEvent(cleared, {
     type: "fields-truncated", at, actorKind: "system",
-    detail: "inputs/outputs cleared to fit the run byte cap on termination",
+    detail: "inputs/outputs/verifier receipts cleared to fit the run byte cap on termination",
   });
 }
 
@@ -360,13 +361,18 @@ function terminalTombstone(run: WorkflowRun): WorkflowRun {
     type: "fields-truncated", at, actorKind: "system", detail: TOMBSTONE_DETAIL,
     stateVersionBefore: run.stateVersion, stateVersionAfter: run.stateVersion + 1,
   };
-  return {
+  const tombstone: WorkflowRun = {
     schemaVersion: run.schemaVersion, runId: run.runId, workflowId: run.workflowId,
     workflowDigest: run.workflowDigest, profileDigest: run.profileDigest,
     status: run.status, currentStage: null, stateVersion: run.stateVersion + 1,
     startedAt: run.startedAt, updatedAt: at,
     stageLog: [], knownStageIds: [], satisfiedGates: [], inputs: {}, outputs: {},
     events: [genesis, marker],
+  };
+  return {
+    ...tombstone,
+    ...(run.processAuthority === undefined ? {} : { processAuthority: run.processAuthority }),
+    ...(run.refusal === undefined ? {} : { refusal: run.refusal }),
   };
 }
 

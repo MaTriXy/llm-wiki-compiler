@@ -45,6 +45,7 @@ import { lookupAction } from "./actions.js";
 import { readRun } from "./store.js";
 import { ActionDeniedError, ActionInputError, ActionRunWorkflowMismatchError, RunUnavailableError } from "./errors.js";
 import { assertRunOwnership } from "./with-lock.js";
+import { RuntimeCaptureError, deepCaptureData } from "../utils/runtime-capture.js";
 import {
   confirmHumanGateInteractively,
   nonInteractiveHumanGateIo,
@@ -55,7 +56,7 @@ import { resumeWorkflow } from "./resume.js";
 import { advanceWorkflow } from "./advance.js";
 import { cancelWorkflow } from "./cancel.js";
 import { failWorkflow } from "./fail.js";
-import { approveGate } from "./gate.js";
+import { approveGate, resolveGateChallenge } from "./gate.js";
 import { submitStageOutput } from "./stage-output.js";
 import { buildActionStageOutput } from "./action-stage-output.js";
 import type { WorkflowArtifactOrigin } from "./artifact-output.js";
@@ -182,11 +183,14 @@ async function dispatchGate(root: string, def: WorkflowActionDef, normalized: Re
   const parsed = parseGate(def.gate as string);
   if (parsed === null) throw new ActionDeniedError(def.label, "cli", "malformed gate");
   const runId = await scopedRunId(root, def, normalized, true);
+  const challenge = await resolveGateChallenge(root, runId, parsed.id);
   if (parsed.kind === "human") {
-    if (!(await confirmHumanGateInteractively(parsed.id, io))) {
+    if (!(await confirmHumanGateInteractively(parsed.id, io, challenge.subjectDigest))) {
       throw new ActionDeniedError(def.label, "cli", "human gate not interactively confirmed");
     }
-    return approveGate(root, runId, parsed.id, { actorKind: "human" });
+    return approveGate(root, runId, parsed.id, {
+      actorKind: "human", expectedSubjectDigest: challenge.subjectDigest,
+    });
   }
   return approveGate(root, runId, parsed.id, { actorKind: "agent" });
 }
@@ -247,6 +251,11 @@ function artifactOriginForSurface(surface: ActionSurface): WorkflowArtifactOrigi
   return surface === "mcp" ? "workflow-mcp" : "workflow";
 }
 
+/** Carry a declared start workspace into the product-process start seam. */
+function startProcessOptions(normalized: Record<string, unknown>): { workspaceId?: string } {
+  return typeof normalized.workspaceId === "string" ? { workspaceId: normalized.workspaceId } : {};
+}
+
 /**
  * Dispatch the action to its EXISTING run-lifecycle op. `start` mints a run from
  * the normalized inputs; `resume`/`advance`/`cancel`/`fail`/`gate` act on the inputs'
@@ -259,7 +268,9 @@ function artifactOriginForSurface(surface: ActionSurface): WorkflowArtifactOrigi
 async function dispatchOperation(root: string, def: WorkflowActionDef, normalized: Record<string, unknown>, io: HumanGateIo, surface: ActionSurface): Promise<unknown> {
   switch (def.operation) {
     case "start":
-      return startWorkflow(root, def.workflow, normalized);
+      return startWorkflow(
+        root, def.workflow, normalized, undefined, {}, startProcessOptions(normalized),
+      );
     case "resume":
       return resumeWorkflow(root, await scopedRunId(root, def, normalized, true));
     case "advance":
@@ -274,6 +285,39 @@ async function dispatchOperation(root: string, def: WorkflowActionDef, normalize
       return submitStageOutput(root, await scopedRunId(root, def, normalized, true), buildActionStageOutput(def, normalized), { origin: artifactOriginForSurface(surface) });
     case "status":
       return dispatchStatus(root, def, normalized);
+  }
+}
+
+/**
+ * Snapshot the caller's inputs as an immutable data-only tree, or refuse.
+ *
+ * DEEP, NOT ONE LEVEL, and that is the difference between a fix and a
+ * half-measure: `coerceField` returns a declared `string[]` BY REFERENCE, so a
+ * top-level copy leaves the array aliased and a caller mutating an element after
+ * the call still changes what the run durably records. Measured before it was
+ * written — `["original"]` became `["substituted"]` on disk.
+ *
+ * NO LEGITIMATE INPUT IS NEWLY REFUSED, and this is a subset argument rather
+ * than a survey of today's callers: {@link validateActionInputs} accepts only
+ * `string`, `number`, `boolean`, `string[]` and `entityRef`, every one of which
+ * is plain data, and it rejects any undeclared key outright. So the values that
+ * can survive validation were always a subset of what deep capture admits; what
+ * changes is only that accessors, proxies and non-plain prototypes are refused
+ * BEFORE they are invoked rather than after.
+ *
+ * The refusal is {@link ActionInputError} because that is what this boundary
+ * already raises for an input it will not accept. It carries the action id
+ * rather than the action's label — the label lives in the profile, and the whole
+ * point of this call is that it happens before the profile is read.
+ */
+function captureActionInputs(actionId: string, inputs: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return deepCaptureData(inputs) as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof RuntimeCaptureError) {
+      throw new ActionInputError(actionId, "inputs must be a plain object of data values");
+    }
+    throw error;
   }
 }
 
@@ -311,10 +355,18 @@ export async function runAction(
   surface: ActionSurface,
   humanGateIo: HumanGateIo = nonInteractiveHumanGateIo(),
 ): Promise<ActionRunResult> {
+  // CAPTURED IN THE SYNCHRONOUS PROLOGUE, BEFORE THE FIRST AWAIT (D-10-9). This
+  // answers two independent questions and both were open: WHEN the caller's
+  // object is read, and HOW. The profile load below opened a window in which the
+  // caller could rewrite its own object — measured, a run started with
+  // `{count: 1}` recorded `count: 2` — and the own-key gate in
+  // `validateActionInputs` then read each field with a plain `[[Get]]`, so an
+  // accessor executed. Answering one of those does not touch the other.
+  const captured = captureActionInputs(actionId, inputs);
   const { profile } = await loadProfile(root);
   const declared = lookupAction(profile, actionId);
   const def = { ...declared, label: actionLabelForPresentation(profile, declared.label) };
-  const normalized = validateActionInputs(declared, inputs);
+  const normalized = validateActionInputs(declared, captured);
   const effective = effectivePermission(def.permissions[surface], await loadLocalGrant(root, surface), surface);
   await enforceAuthority(root, def, effective, surface);
   const result = await dispatchOperation(root, def, normalized, humanGateIo, surface);

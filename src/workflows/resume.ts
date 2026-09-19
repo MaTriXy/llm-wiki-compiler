@@ -17,7 +17,8 @@
  * ({@link clearStageForRetry}). Otherwise `advance`'s `stageSatisfied` would read the
  * STALE output + gate and COMPLETE the stage WITHOUT re-doing the write, re-running
  * the Trust Guard, or re-requiring the gate approval — replaying a one-time human
- * approval across the retry. After the clear, `advance` re-parks the stage
+ * approval across the retry. Subject-bound human approval is retained: its
+ * exact subject is reverified before any later mutation. After the clear, `advance` re-parks the stage
  * (`awaiting-output`/`awaiting-gate`) so the write must be re-submitted and the gate
  * re-obtained.
  */
@@ -45,7 +46,8 @@ function markCurrentStageRunning(run: WorkflowRun): WorkflowRun {
  * retry: drop its applied output (`outputs[currentStage]`), remove its gate (if the
  * stage declares one) from `satisfiedGates`, and clear any `pendingOutput` intent
  * for it. So the next `advance` no longer sees the stage as satisfied — the write
- * must be re-submitted (re-running the Trust Guard) and the gate re-obtained. A run
+ * must be re-submitted (re-running the Trust Guard). A subject-bound human gate
+ * keeps its existing approval, which the write path re-verifies. A run
  * with no current stage is returned unchanged.
  *
  * @param run - The failed run being resumed (its log already restored to `running`).
@@ -55,7 +57,9 @@ function markCurrentStageRunning(run: WorkflowRun): WorkflowRun {
 function clearStageForRetry(run: WorkflowRun, stage: WorkflowStageDef): WorkflowRun {
   if (run.currentStage === null) return run;
   const { [run.currentStage]: _staleOutput, ...outputs } = run.outputs;
-  const satisfiedGates = run.satisfiedGates.filter((gate) => gate !== stage.gate);
+  const approval = [...run.events].reverse().find((event) => event.type === "gate-approved" && event.stageId === stage.id);
+  const preserveApproval = stage.gate?.startsWith("human:") === true && approval?.subjectDigest !== undefined;
+  const satisfiedGates = run.satisfiedGates.filter((gate) => gate !== stage.gate || preserveApproval);
   const clearedPending = run.pendingOutput?.stageId === run.currentStage;
   const { pendingOutput: _drop, ...rest } = run;
   return { ...(clearedPending ? rest : run), outputs, satisfiedGates };
@@ -79,7 +83,7 @@ function clearStageForRetry(run: WorkflowRun, stage: WorkflowStageDef): Workflow
  */
 export async function resumeWorkflow(root: string, runId: string): Promise<WorkflowRun> {
   const run = await withRunLock(root, runId, async (locked) => {
-    if (locked.status === "completed" || locked.status === "cancelled") {
+    if (locked.status === "completed" || locked.status === "cancelled" || locked.status === "refused") {
       throw new RunNotActiveError(runId, locked.status);
     }
     if (locked.status !== "failed") return locked; // running/pending → informational no-op

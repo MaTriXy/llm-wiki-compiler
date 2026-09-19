@@ -96,7 +96,8 @@
  * {@link WorkflowRun.outputs}.
  */
 
-import { acquireLockBlocking, releaseLock } from "../utils/lock.js";
+import { releaseLock } from "../utils/lock.js";
+import { acquireMutationLockBlocking } from "../operation-bundles/lock-gate.js";
 import { planPageMutation, type PlanResult } from "../trust/planner.js";
 import type { RelationPlannedMutation, LifecycleTransitionPlannedMutation } from "../trust/planner.js";
 import { applyApprovedMutationsLocked } from "../trust/executor.js";
@@ -108,6 +109,9 @@ import { readRun, writeRun } from "./store.js";
 import { resolveCurrentStage } from "./advance.js";
 import { maybeAutoProject } from "./projection.js";
 import { isTerminalStatus, assertRunOwnership } from "./with-lock.js";
+import { assertCurrentWorkflowProcessAuthority } from "./process-authority.js";
+import { assertApprovedSubjectCurrent } from "./subject-gate.js";
+import { recoverLifecycleOutput, prepareLifecycleIntent } from "./lifecycle-output-recovery.js";
 import { markRunFailedLocked } from "./fail.js";
 import { isHardDenial } from "./hard-denial.js";
 import {
@@ -127,6 +131,9 @@ import {
   type SubmitResult,
 } from "./stage-output-internals.js";
 import { applyArtifactOutput } from "./artifact-output.js";
+import { recordHumanInputLocked, type HumanInputStageOutput } from "./human-input.js";
+import { HumanInputValidationError } from "./human-input-schema.js";
+import { deepCaptureData, RuntimeCaptureError } from "../utils/runtime-capture.js";
 import type { ArtifactStageOutput, WorkflowArtifactOrigin, SubmitStageOutputOptions } from "./artifact-output.js";
 import type { TrustDecision } from "../trust/decision.js";
 import type { ApplyResult } from "../trust/apply-result.js";
@@ -134,6 +141,10 @@ import type { WorkflowRun } from "./types.js";
 import type { WorkflowStageDef } from "../profile/types.js";
 import type { AppendRelationInput } from "../relations/store.js";
 import type { EntityId } from "../profile/types.js";
+import {
+  recordProductOperationOutputLocked, replayProductOperationOutputLocked,
+  type ProductOperationStageOutput,
+} from "./product-operation-output.js";
 
 /** A page output: write `body` to the entity page `entityType/slug`. */
 export interface PageStageOutput {
@@ -159,7 +170,21 @@ export interface LifecycleStageOutput {
 }
 
 /** The typed output a caller submits to advance a write-declaring stage. */
-export type StageOutput = PageStageOutput | RelationStageOutput | LifecycleStageOutput | ArtifactStageOutput;
+export type StageOutput = PageStageOutput | RelationStageOutput | LifecycleStageOutput | ArtifactStageOutput
+  | HumanInputStageOutput | ProductOperationStageOutput;
+
+/** Snapshot caller-owned member bytes before the first lock await. */
+function captureStageOutput(output: StageOutput): StageOutput {
+  if (output.kind === "product-operation") {
+    return deepCaptureData(output) as ProductOperationStageOutput;
+  }
+  if (output.kind !== "artifact" || output.memberFiles === undefined) return output;
+  return {
+    kind: "artifact", artifactType: output.artifactType, slug: output.slug,
+    memberFiles: output.memberFiles.map((member) => ({ fileName: member.fileName, bytes: Buffer.from(member.bytes) })),
+    ...(output.productPreparationRunId === undefined ? {} : { productPreparationRunId: output.productPreparationRunId }),
+  };
+}
 
 // The artifact arm's public types live in `artifact-output.js`; `SubmitResult` and the
 // shared under-lock apply engine live in `stage-output-internals.js`. `SubmitResult` is
@@ -349,12 +374,13 @@ async function applyLifecycleOutput(
     evidence: output.evidence,
   };
   const base = { entityType: output.entityType, slug: output.slug, toState: output.toState };
+  const lifecycleIntent = await prepareLifecycleIntent(root, output);
   let decision: TrustDecision = "allow";
   const recorded = await preflightApplyRecord(root, run, stage, { ...base, decision: WORST_CASE_DECISION }, async () => {
     const [result] = await applyApprovedMutationsLocked(root, [mutation]);
     decision = result?.kind === "lifecycle-transition" ? result.decision : "allow";
     return { decision, outputRef: { ...base, decision } };
-  });
+  }, lifecycleIntent);
   return { run: recorded, applied: true, decision };
 }
 
@@ -444,6 +470,13 @@ function dispatchOutput(
   projectId: string,
   origin: WorkflowArtifactOrigin,
 ): Promise<SubmitResult> {
+  if (output.kind === "human-input") {
+    if (stage.humanInput === undefined) throw new HumanInputValidationError(stage.id, "stage does not declare human input");
+    return recordHumanInputLocked(root, run, stage.id, stage.humanInput, output.input);
+  }
+  if (output.kind === "product-operation") {
+    return recordProductOperationOutputLocked(root, run, stage, output);
+  }
   if (output.kind === "page") return submitPageOutput(root, runId, run, stage, output, projectId);
   if (output.kind === "relation") return applyRelationOutput(root, runId, run, stage, output, projectId);
   if (output.kind === "lifecycle-transition") return applyLifecycleOutput(root, runId, run, stage, output, projectId);
@@ -553,12 +586,20 @@ export async function submitStageOutput(
   output: StageOutput,
   opts: SubmitStageOutputOptions = {},
 ): Promise<SubmitResult> {
-  await acquireLockBlocking(root, opts.lockOptions ?? {});
+  let captured = captureStageOutput(output);
+  if (output.kind === "human-input") {
+    try { captured = deepCaptureData(output) as StageOutput; }
+    catch (error) {
+      if (error instanceof RuntimeCaptureError) throw new HumanInputValidationError("input", "must be a plain data object");
+      throw error;
+    }
+  }
+  await acquireMutationLockBlocking(root, "ordinary", opts.lockOptions ?? {});
   const origin = opts.origin ?? "workflow";
   let result: SubmitResult | undefined;
   let autoFailed: AutoFailedSubmitError | undefined;
   try {
-    result = await submitUnderLock(root, runId, output, origin);
+    result = await submitUnderLock(root, runId, captured, origin);
   } catch (err) {
     if (!(err instanceof AutoFailedSubmitError)) throw err; // recoverable guard: lock released in finally, propagate
     autoFailed = err;
@@ -590,11 +631,47 @@ async function submitUnderLock(root: string, runId: string, output: StageOutput,
   const read = await readRun(root, runId);
   if (read.status !== "ok") throw new RunUnavailableError(runId, read.status === "absent" ? "absent" : read.detail);
   assertRunOwnership(read.run); // M1: only the owning caller may submit a stage output
+  await assertCurrentWorkflowProcessAuthority(root, read.run);
   if (isTerminalStatus(read.run.status)) throw new RunNotActiveError(runId, read.run.status);
   const { stage, projectId } = await resolveCurrentStage(root, read.run);
-  // An artifact-only stage (no page/relation/lifecycle `writes` but a non-empty
-  // `artifactWrites`) advances by submitting its artifact — so it is NOT write-less.
-  if (stage.writes.length === 0 && (stage.artifactWrites ?? []).length === 0) throw new StageHasNoWritesError(runId, stage.id);
-  assertOutputNotApplied(runId, read.run, stage);
+  assertStageAcceptsOutput(runId, stage, output);
+  if (output.kind === "lifecycle-transition") {
+    return submitLifecycleUnderLock(root, read.run, stage, output, projectId, origin);
+  }
+  if (output.kind === "product-operation" && Object.hasOwn(read.run.outputs, stage.id)) {
+    return replayProductOperationOutputLocked(root, read.run, stage, output);
+  }
+  if (output.kind !== "human-input") assertOutputNotApplied(runId, read.run, stage);
   return dispatchOrAutoFail(root, runId, read.run, stage, output, projectId, origin);
+}
+
+/** Recover the same lifecycle intent before revalidating a still-unapplied subject. */
+async function submitLifecycleUnderLock(root: string, run: WorkflowRun, stage: WorkflowStageDef,
+  output: LifecycleStageOutput, projectId: string, origin: WorkflowArtifactOrigin): Promise<SubmitResult> {
+  const settled = await recoverLifecycleOutput(root, run, stage, output);
+  if (settled !== null) return settled;
+  await assertApprovedSubjectCurrent(root, run, stage);
+  const { pendingOutput: _pending, ...retry } = run;
+  assertOutputNotApplied(run.runId, retry, stage);
+  return dispatchOrAutoFail(root, run.runId, retry, stage, output, projectId, origin);
+}
+
+/** Ensure the output kind matches the current stage's declared contract. */
+function assertStageAcceptsOutput(runId: string, stage: WorkflowStageDef, output: StageOutput): void {
+  assertStageHasOutputContract(runId, stage, output.kind);
+  if (stage.humanInput !== undefined && output.kind !== "human-input") {
+    throw new HumanInputValidationError(stage.id, "stage requires a human-input output");
+  }
+  const productArtifact = output.kind === "artifact" && output.productPreparationRunId !== undefined;
+  if (stage.productAction !== undefined && output.kind !== "product-operation" && !productArtifact) {
+    throw new Error(`stage '${stage.id}' requires a product-operation output`);
+  }
+}
+
+/** Refuse stages that declare no way to accept this output. */
+function assertStageHasOutputContract(runId: string, stage: WorkflowStageDef, kind: StageOutput["kind"]): void {
+  const direct = stage.writes.length > 0 || (stage.artifactWrites ?? []).length > 0;
+  const humanInput = stage.humanInput !== undefined && kind === "human-input";
+  const productOperation = stage.productAction !== undefined && kind === "product-operation";
+  if (!direct && !humanInput && !productOperation) throw new StageHasNoWritesError(runId, stage.id);
 }

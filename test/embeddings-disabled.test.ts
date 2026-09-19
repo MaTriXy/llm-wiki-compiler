@@ -88,7 +88,7 @@ describe("LLMWIKI_EMBEDDINGS", () => {
 
     const result = await updateEmbeddingsLockedCore(root, [PAGE_ID]);
 
-    expect(result).toEqual({ embedded: [], eligible: [] });
+    expect(result).toEqual({ embedded: [], eligible: [], pruned: [] });
     expect(getProvider).not.toHaveBeenCalled();
     expect(await readFile(storePath, "utf-8")).toBe(storeContent);
   });

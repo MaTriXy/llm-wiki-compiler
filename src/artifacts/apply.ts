@@ -17,6 +17,7 @@ import { loadNonDefaultProfile } from "../profile/block.js";
 import { isTrustedWriteGranted } from "../workflows/trusted-write.js";
 import { openBatch, recordPreState, commitBatch } from "../trust/journal.js";
 import { preflightEventAppend } from "../events/store.js";
+import type { OperationBinding } from "../utils/operation-binding.js";
 import type { ArtifactPlannedMutation } from "../trust/planner.js";
 import type { ArtifactRef } from "./ref.js";
 import type { TrustDecision } from "../trust/decision.js";
@@ -64,7 +65,7 @@ async function isAlreadyApplied(root: string, paths: ArtifactPathsV1, m: Artifac
  * @param mutation - The planned artifact mutation (intent only; not trusted).
  * @returns The persisted {@link ArtifactRef} and the composed live-write decision.
  */
-export async function applyArtifactLocked(root: string, supplied: ArtifactPlannedMutation): Promise<{ ref: ArtifactRef; decision: TrustDecision }> {
+export async function applyArtifactLocked(root: string, supplied: ArtifactPlannedMutation, binding?: OperationBinding): Promise<{ ref: ArtifactRef; decision: TrustDecision }> {
   // SNAPSHOT the member bytes before anything else awaits: the plan hashes
   // them and the write lands them, and both must see the SAME frozen bytes
   // even if the caller mutates its buffers mid-flight (see members.ts).
@@ -79,7 +80,7 @@ export async function applyArtifactLocked(root: string, supplied: ArtifactPlanne
   if (!isTrustedWriteGranted(loaded.profile.profileId)) throw new ArtifactWriteRefusedError(mutation.artifactType);
   const paths = artifactPaths(root, mutation.artifactType, mutation.slug, def.fileName);
   if (def.members !== undefined) {
-    return applyMembersLocked({ root, profile: loaded.profile, def, mutation, body, decision, paths });
+    return applyMembersLocked({ root, profile: loaded.profile, def, mutation, body, decision, paths, binding });
   }
   await assertTargetsRegularOrAbsent(root, paths.expectedDir, [paths.bytesPath, paths.manifestPath]); // BEFORE journaling — see file overview
   const { ref, manifest } = refAndManifest(mutation, def.contentKind, hashArtifactBody(body), body) as { ref: ArtifactRef; manifest: ArtifactManifest };
@@ -91,6 +92,6 @@ export async function applyArtifactLocked(root: string, supplied: ArtifactPlanne
   await recordPreState(batch, paths.manifestPath);
   await writeArtifactFiles(root, paths, body, manifest);
   await commitBatch(batch);
-  await emitArtifactEvent(root, event);
+  await emitArtifactEvent(root, event, binding);
   return { ref, decision };
 }

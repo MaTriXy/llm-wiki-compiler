@@ -200,10 +200,12 @@ describe("#/workflows — the CLI that unparks a run", () => {
     );
   });
 
-  it("offers no button, link, or form — nothing that implies the viewer can act", async () => {
+  it("offers read-only detail links but no mutating buttons or forms", async () => {
     const main = await mountWorkflows(RUNS);
     expect(main.querySelector(".list-row button")).toBeNull();
-    expect(main.querySelector(".list-row a")).toBeNull();
+    const links = Array.from(main.querySelectorAll(".list-row a"));
+    expect(links.length).toBeGreaterThan(0);
+    expect(links.every(link => /^#\/workflows\/[^/]+\/runs\/[^/]+$/.test(link.getAttribute("href") ?? ""))).toBe(true);
     expect(main.querySelector(".list-row form")).toBeNull();
   });
 

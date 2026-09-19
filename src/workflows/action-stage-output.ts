@@ -52,6 +52,10 @@ function requireString(def: WorkflowActionDef, normalized: Record<string, unknow
  * @throws {ActionInputError} On a missing required field.
  */
 export function buildActionStageOutput(def: WorkflowActionDef, normalized: Record<string, unknown>): StageOutput {
+  if (def.submitKind === "human-input") {
+    const { runId: _runId, ...input } = normalized;
+    return { kind: "human-input", input };
+  }
   if (def.inputSchema && Object.hasOwn(def.inputSchema, "artifactType")) {
     return {
       kind: "artifact",

@@ -86,7 +86,9 @@ export function nonInteractiveHumanGateIo(): HumanGateIo {
  * @param io - The injected terminal IO (production: `process.stdin`/`process.stdout`).
  * @returns `true` only when an interactive operator retyped the token correctly.
  */
-export async function confirmHumanGateInteractively(gateId: string, io: HumanGateIo): Promise<boolean> {
+export async function confirmHumanGateInteractively(
+  gateId: string, io: HumanGateIo, subjectDigest?: string,
+): Promise<boolean> {
   if (!io.stdinIsTty || !io.stdoutIsTty) {
     io.write(
       `Refusing to approve human gate ${JSON.stringify(gateId)}: a human gate requires ` +
@@ -95,8 +97,10 @@ export async function confirmHumanGateInteractively(gateId: string, io: HumanGat
     return false;
   }
   const token = mintConfirmToken();
+  const subject = subjectDigest === undefined ? "" : `Review subject: ${subjectDigest}\n`;
   io.write(
     `Human gate ${JSON.stringify(gateId)} requires human confirmation.\n` +
+      subject +
       `Type this token to confirm you are a human at this terminal: ${token}\n> `,
   );
   const answer = await io.readLine();

@@ -18,18 +18,13 @@ import { isTrustedWriteGranted } from "./trusted-write.js";
 import { writeRun, serializeRunWithinCap } from "./store.js";
 import { TrustGateRequiresGrantError } from "./errors.js";
 import type { TrustDecision } from "../trust/decision.js";
-import type { WorkflowRun } from "./types.js";
+import type { WorkflowRun, PendingStageOutput } from "./types.js";
 import type { WorkflowStageDef } from "../profile/types.js";
 
 /** The result of submitting a stage output. */
-export interface SubmitResult {
-  /** The run as persisted after the submission. */
-  run: WorkflowRun;
-  /** Whether the write landed LIVE (true only on an `allow`/`allow-with-warning`). */
-  applied: boolean;
-  /** The composed Trust Guard decision for the write. */
-  decision: TrustDecision;
-}
+export type SubmitResult =
+  | { run: WorkflowRun; applied: true; decision: TrustDecision | "accepted" }
+  | { run: WorkflowRun; applied: false; decision: TrustDecision };
 
 /**
  * The longest a {@link TrustDecision} literal can be (`"allow-with-warning"`) —
@@ -55,7 +50,7 @@ function satisfyTrustGate(gates: string[], stage: WorkflowStageDef): string[] {
 function projectAppliedRun(
   run: WorkflowRun,
   stage: WorkflowStageDef,
-  decision: TrustDecision,
+  decision: TrustDecision | "accepted",
   outputRef: Record<string, unknown>,
 ): WorkflowRun {
   const at = new Date().toISOString();
@@ -66,6 +61,20 @@ function projectAppliedRun(
     outputs: { ...bumped.outputs, [stage.id]: outputRef },
     satisfiedGates: satisfyTrustGate(bumped.satisfiedGates, stage),
   };
+}
+
+/** Record a previously authenticated external operation without replaying it. */
+export async function recordSettledStageOutput(
+  root: string,
+  run: WorkflowRun,
+  stage: WorkflowStageDef,
+  outputRef: Record<string, unknown>,
+  decision: TrustDecision | "accepted" = "accepted",
+): Promise<WorkflowRun> {
+  const recorded = projectAppliedRun(run, stage, decision, outputRef);
+  serializeRunWithinCap(recorded);
+  await writeRun(root, recorded);
+  return recorded;
 }
 
 /**
@@ -84,8 +93,8 @@ function stageOutputOpId(run: WorkflowRun, stage: WorkflowStageDef): string {
  * VISIBLE marker the next submit fails closed on. The marker write does NOT advance
  * `stateVersion`, keeping the {@link stageOutputOpId} stable across recovery.
  */
-async function persistOutputIntent(root: string, run: WorkflowRun, stage: WorkflowStageDef): Promise<void> {
-  const pendingOutput = { stageId: stage.id, opId: stageOutputOpId(run, stage) };
+async function persistOutputIntent(root: string, run: WorkflowRun, stage: WorkflowStageDef, lifecycle?: PendingStageOutput["lifecycle"]): Promise<void> {
+  const pendingOutput = { stageId: stage.id, opId: stageOutputOpId(run, stage), ...(lifecycle === undefined ? {} : { lifecycle }) };
   await writeRun(root, { ...run, pendingOutput });
 }
 
@@ -119,11 +128,12 @@ export async function preflightApplyRecord(
   stage: WorkflowStageDef,
   worstCaseRef: Record<string, unknown>,
   apply: () => Promise<AppliedFacts>,
+  lifecycle?: PendingStageOutput["lifecycle"],
 ): Promise<WorkflowRun> {
   // (1) PRE-VALIDATE the upper-bound candidate — throws (event/byte cap) before apply.
   serializeRunWithinCap(projectAppliedRun(run, stage, WORST_CASE_DECISION, worstCaseRef));
   // (2) persist the INTENT marker so a crash mid-apply is visible, not silent.
-  await persistOutputIntent(root, run, stage);
+  await persistOutputIntent(root, run, stage, lifecycle);
   // (3) apply the external mutation only after intent is durably recorded.
   const { decision, outputRef } = await applyOrClearIntent(root, run, apply);
   // (4) substitute the real facts (each ≤ its placeholder), CLEARING the intent.

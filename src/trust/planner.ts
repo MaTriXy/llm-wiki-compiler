@@ -183,6 +183,14 @@ export interface PlanPageInput {
   /** Whether the surface stages risky writes for human review. */
   reviewRouted: boolean;
   /**
+   * Plan the REMOVAL of the target rather than a write.
+   *
+   * The mandatory content checks still run over `body` — a caller must hand the
+   * bytes it expects to remove — so a delete is planned under the same
+   * decision machinery as a write rather than through a bypass.
+   */
+  deleting?: boolean;
+  /**
    * Whether an existing target is an intended overwrite (`update`) rather than a
    * collision. A legitimate upserting caller (review-approve, compile recompile)
    * passes `true`; a strict create-only caller passes `false` (the default).
@@ -266,6 +274,8 @@ interface PageFloorInput {
   origin: string;
   reviewRouted: boolean;
   allowOverwrite?: boolean;
+  /** Plan the target's REMOVAL rather than a write; see {@link PlanPageInput}. */
+  deleting?: boolean;
 }
 
 /**
@@ -298,7 +308,7 @@ async function planPageWith(
   const exists = await targetAlreadyExists(input.root, input.targetPath);
   const mutation: PagePlannedMutation = {
     kind: "page",
-    operation: exists ? "update" : "create",
+    operation: input.deleting === true ? "delete" : exists ? "update" : "create",
     target: buildTarget(),
     body: input.body,
     provenance: { origin: input.origin, decision, reviewRouted: input.reviewRouted },

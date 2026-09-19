@@ -26,7 +26,14 @@
     "@fontsource/jetbrains-mono"
   ],
   "ignoreExports": [
-    { "file": "src/utils/output.ts", "exports": ["getQuiet"] }
+    { "file": "src/utils/output.ts", "exports": ["getQuiet"] },
+    { "file": "src/preparations/orphan-scan.ts", "exports": ["scanPreparationOrphans"] },
+    { "file": "src/capability-providers/runtime/result-admission.ts", "exports": ["EvidenceRefV1"] },
+    { "file": "src/operation-bundles/manifest-store.ts", "exports": ["ManifestCreateResult"] },
+    { "file": "src/operation-bundles/stage.ts", "exports": ["StageFaultsForTest"] },
+    { "file": "src/operation-bundles/run-store.ts", "exports": ["appendAbandonedTransitionLocked"] },
+    { "file": "test/preparation-recovery-fixture.ts", "exports": ["readRun"] },
+    { "file": "test/preparations/cancel-settlement-fixture.ts", "exports": ["readRun"] }
   ],
   "overrides": [
     {

@@ -22,6 +22,7 @@ import {
   type EmbeddingWarning,
 } from "../utils/embeddings-load.js";
 import type { EmbeddingStoreV3 } from "../utils/embeddings-store.js";
+import * as output from "../utils/output.js";
 import {
   loadSelectedPagesByPageId,
   loadPageRecordPairsByPageId,
@@ -95,8 +96,10 @@ export async function pickSearchRefs(root: string, question: string): Promise<Se
   if (outcome.store) {
     const semantic = await selectViaEmbeddings(root, outcome.store, question, profile);
     // Stale entries are a read-path signal regardless of hit count, so enrich the
-    // warnings BEFORE branching — the all-stale/zero-hits fallback must keep it.
-    warnings = withStaleWarning(base, semantic.stalePageIds);
+    // warnings BEFORE branching — the all-stale/zero-hits fallback must keep it;
+    // an embedding-degrade warning rides the same channel.
+    const withDegrade = semantic.warning ? [...base, semantic.warning] : base;
+    warnings = withStaleWarning(withDegrade, semantic.stalePageIds);
     if (semantic.refs.length > 0) return { refs: dedupeRefs(semantic.refs), warnings };
   }
   const { refs } = await selectFallbackRefs(root, question, "search", profile);
@@ -107,6 +110,8 @@ export async function pickSearchRefs(root: string, question: string): Promise<Se
 interface SemanticSelection {
   refs: SelectedPageRef[];
   stalePageIds: PageId[];
+  /** Set when the embedding call failed and selection degraded to zero refs. */
+  warning?: SearchWarning;
 }
 
 /**
@@ -126,23 +131,45 @@ export function withStaleWarning(base: SearchWarning[], stalePageIds: PageId[]):
   ];
 }
 
-/** Run the chunk-then-page v3 pipeline against a loaded v3 store. */
+/**
+ * Run the chunk-then-page v3 pipeline against a loaded v3 store. NEVER throws
+ * — the same degrade-and-continue contract the query pipeline has: an
+ * embedding failure (e.g. a keyless embedder while a v3 store is present)
+ * degrades to zero refs with an `embedding-degraded` warning, so the caller
+ * falls through to the LLM/index fallback — which needs no embedder — instead
+ * of aborting the whole search. One catch spans both legs because both share
+ * the same embedder: after the chunk leg's embed threw, the page leg's cannot
+ * succeed.
+ */
 async function selectViaEmbeddings(
   root: string,
   store: EmbeddingStoreV3,
   question: string,
   profile: LoadedProfile,
 ): Promise<SemanticSelection> {
-  const { hits: chunkHits, stalePageIds: chunkStale } =
-    await findRelevantChunksV3(root, store, "search", question, CHUNK_TOP_K, profile);
-  if (chunkHits.length > 0) {
-    const refs = chunkHits.map((c) => ({ pageId: c.pageId, slug: c.slug, title: "", kind: "chunk" as const }));
-    return { refs, stalePageIds: chunkStale };
+  try {
+    const { hits: chunkHits, stalePageIds: chunkStale } =
+      await findRelevantChunksV3(root, store, "search", question, CHUNK_TOP_K, profile);
+    if (chunkHits.length > 0) {
+      const refs = chunkHits.map((c) => ({ pageId: c.pageId, slug: c.slug, title: "", kind: "chunk" as const }));
+      return { refs, stalePageIds: chunkStale };
+    }
+    const { hits: pageHits, stalePageIds: pageStale } =
+      await findRelevantPagesV3(root, store, "search", question, EMBEDDING_TOP_K, profile);
+    const refs = pageHits.map((p) => ({ pageId: p.pageId, slug: p.slug, title: p.title, kind: "page" as const }));
+    return { refs, stalePageIds: pageStale };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    output.status("!", output.dim(`Semantic retrieval unavailable (${message}); falling back.`));
+    return {
+      refs: [],
+      stalePageIds: [],
+      warning: {
+        code: "embedding-degraded",
+        message: `Semantic retrieval embedding failed (${message}); degraded to LLM/index fallback selection.`,
+      },
+    };
   }
-  const { hits: pageHits, stalePageIds: pageStale } =
-    await findRelevantPagesV3(root, store, "search", question, EMBEDDING_TOP_K, profile);
-  const refs = pageHits.map((p) => ({ pageId: p.pageId, slug: p.slug, title: p.title, kind: "page" as const }));
-  return { refs, stalePageIds: pageStale };
 }
 
 /** Render a surface candidate as a selector bullet keyed by its QUALIFIED pageId. */
@@ -171,10 +198,13 @@ export async function selectFallbackRefs(
   question: string,
   surface: "search" | "context",
   profile: LoadedProfile,
+  pageScope?: readonly string[],
 ): Promise<{ refs: SelectedPageRef[]; reasoning: string }> {
   const namespaces = ["concepts", "queries", ...Object.keys(profile.profile.entities)];
   const dirs = buildNamespaceDirs(profile.profile);
-  const candidates = await buildSurfaceEligibleCandidates(root, surface, namespaces, dirs, profile);
+  const eligible = await buildSurfaceEligibleCandidates(root, surface, namespaces, dirs, profile);
+  // D-GROUNDING-SCOPE: a scoped caller may only be offered in-scope pages, here too.
+  const candidates = pageScope === undefined ? eligible : eligible.filter((candidate) => pageScope.includes(candidate.pageId));
   if (candidates.length === 0) {
     return { refs: [], reasoning: "No eligible pages." };
   }

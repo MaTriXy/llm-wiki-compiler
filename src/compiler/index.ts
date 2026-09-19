@@ -21,7 +21,8 @@ import {
 import {
   slugify,
 } from "../utils/markdown.js";
-import { acquireLock, releaseLock } from "../utils/lock.js";
+import { releaseLock } from "../utils/lock.js";
+import { acquireMutationLock } from "../operation-bundles/lock-gate.js";
 import {
   parseConcepts,
 } from "./prompts.js";
@@ -47,6 +48,7 @@ import { generateMOC } from "./obsidian.js";
 import { qualifiedPageId } from "../utils/page-id.js";
 import { refreshEmbeddingsDrainingPending } from "../utils/embeddings-refresh.js";
 import { listCandidates } from "./candidates.js";
+import { selectCandidateEntriesForMutation } from "./candidate-selection.js";
 import {
   applyCompilePageWritesLocked,
 } from "./compile-write.js";
@@ -118,7 +120,7 @@ export async function compileAndReport(
 ): Promise<CompileResult> {
   output.header("llmwiki compile");
 
-  const locked = await acquireLock(root);
+  const locked = await acquireMutationLock(root, "ordinary");
   if (!locked) {
     output.status("!", output.error("Could not acquire lock. Try again later."));
     return {
@@ -137,6 +139,9 @@ export async function compileAndReport(
     if (recovery.status === "unsafe") {
       throw new JournalUnsafeError("pre-compile journal recovery unsafe");
     }
+    // Live compilation reconciles candidate records. Refuse malformed mutation
+    // authority before paying for extraction or generation, not after LLM calls.
+    if (!options.review) await selectCandidateEntriesForMutation(root, () => true);
     // The policy is established for the WHOLE run, before change detection, so
     // the modifier digest it contributes is visible to the invalidation check
     // rather than only to the prompt builders further down.

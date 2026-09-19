@@ -11,6 +11,7 @@ import { Command } from "commander";
 import ingestCommand from "./commands/ingest.js";
 import ingestSessionCommand from "./commands/ingest-session.js";
 import viewCommand from "./commands/view.js";
+import visualizeCommand, { type VisualizeOptions } from "./commands/visualize.js";
 import compileCommand from "./commands/compile.js";
 import { rmCommand } from "./commands/rm.js";
 import queryCommand from "./commands/query.js";
@@ -46,6 +47,9 @@ import { registerReviewCommands } from "./cli/review-commands.js";
 import { registerEvalCommands } from "./cli/eval-commands.js";
 import { registerWorkflowCommands } from "./cli/workflow-commands.js";
 import { registerConnectorCommands } from "./cli/connector-commands.js";
+import { registerOperationCommands } from "./cli/operation-commands.js";
+import { registerProductCommands } from "./cli/product-commands.js";
+import { registerPreparationCommands } from "./cli/preparation-commands.js";
 import {
   addProviderOption,
   applyProviderOption,
@@ -216,6 +220,7 @@ registerRulesCommand(program, requireProvider);
 
 addProviderOption(program.command("query <question>").description("Ask a question against the wiki"))
   .option("--save", "Save the answer as a wiki page")
+  .option("--review", "With --save, propose a review candidate instead of applying the answer")
   .option("--debug", "Print which pages and chunks were selected and their scores")
   .option(
     "--lang <code>",
@@ -225,7 +230,7 @@ addProviderOption(program.command("query <question>").description("Ask a questio
   .action(
     async (
       question: string,
-      options: ProviderOption & { save?: boolean; debug?: boolean; lang?: string; verbose?: boolean },
+      options: ProviderOption & { save?: boolean; review?: boolean; debug?: boolean; lang?: string; verbose?: boolean },
     ) => {
       try {
         applyProviderOption(options);
@@ -257,11 +262,32 @@ addProviderOption(program.command("watch").description("Watch sources/ and auto-
   });
 
 program
+  .command("visualize")
+  .description("Create Obsidian graph configuration and Canvas knowledge maps without overwriting edits")
+  .option("--focus <nodeId>", "Centre the canvas on one node, e.g. papers/alpha")
+  .option("--depth <hops>", "Hops around --focus (default 1)")
+  .action(async (options: VisualizeOptions) => {
+    try {
+      process.exitCode = await visualizeCommand(process.cwd(), options);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
   .command("lint")
   .description("Run rule-based quality checks against the wiki")
-  .action(async () => {
+  .option("--tiered", "Separate broken content, model judgements, and stale derived views")
+  .option("--fix-preview", "Preview deterministic repairs without applying them")
+  .option("--fix-propose <n>", "Propose the nth previewed repair for review; applies nothing")
+  .action(async (options: { tiered?: boolean; fixPreview?: boolean; fixPropose?: string }) => {
     try {
-      await lintCommand();
+      await lintCommand({
+        tiered: options.tiered,
+        fixPreview: options.fixPreview,
+        ...(options.fixPropose === undefined ? {} : { fixPropose: Number(options.fixPropose) }),
+      });
     } catch (err) {
       console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
       process.exit(1);
@@ -295,6 +321,9 @@ registerWorkflowCommands(program);
 registerArtifactCommands(program);
 
 registerConnectorCommands(program);
+registerOperationCommands(program);
+registerProductCommands(program);
+registerPreparationCommands(program);
 
 program
   .command("export")

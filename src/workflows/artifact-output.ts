@@ -26,17 +26,22 @@ import {
   type SubmitResult,
 } from "./stage-output-internals.js";
 import type { ArtifactPlannedMutation } from "../trust/planner.js";
+import type { ArtifactMemberFileInput } from "../artifacts/members.js";
 import type { BlockingLockOptions } from "../utils/lock.js";
 import type { TrustDecision } from "../trust/decision.js";
 import type { WorkflowRun } from "./types.js";
 import type { WorkflowStageDef } from "../profile/types.js";
+import { productPreparationRef } from "./product-operation-output.js";
 
 /** An artifact output: write `body` as the typed artifact `artifactType/slug`. */
 export interface ArtifactStageOutput {
   kind: "artifact";
   artifactType: string;
   slug: string;
-  body: string;
+  body?: string;
+  memberFiles?: readonly ArtifactMemberFileInput[];
+  /** Reviewed evidence-only product preparation that authorized this artifact. */
+  productPreparationRunId?: string;
 }
 
 /**
@@ -94,9 +99,23 @@ async function assertArtifactImmutable(root: string, output: ArtifactStageOutput
   if (existing.kind !== "ok") {
     throw new WorkflowArtifactUnverifiableError(output.artifactType, output.slug, existing.kind);
   }
-  if (existing.manifest.sha256 !== hashArtifactBody(output.body)) {
+  if (output.memberFiles !== undefined) {
     throw new WorkflowArtifactChangedError(output.artifactType, output.slug, existing.manifest.sha256);
   }
+  if (existing.manifest.sha256 !== hashArtifactBody(output.body ?? "")) {
+    throw new WorkflowArtifactChangedError(output.artifactType, output.slug, existing.manifest.sha256);
+  }
+}
+
+/** Build the closed body-or-members mutation shape accepted by artifact authority. */
+function artifactMutation(output: ArtifactStageOutput, origin: WorkflowArtifactOrigin): ArtifactPlannedMutation {
+  if ((output.body === undefined) === (output.memberFiles === undefined)) {
+    throw new Error("artifact output requires exactly one of body or memberFiles");
+  }
+  const base = { kind: "artifact" as const, artifactType: output.artifactType, slug: output.slug, origin };
+  return output.body === undefined
+    ? { ...base, body: "", memberFiles: output.memberFiles!.map((member) => ({ fileName: member.fileName, bytes: Buffer.from(member.bytes) })) }
+    : { ...base, body: output.body };
 }
 
 /**
@@ -120,8 +139,13 @@ export async function applyArtifactOutput(
   requireArtifactInScope(runId, stage, output.artifactType);
   guardTrustGatedNonPageWrite(runId, stage, projectId, "artifact");
   await assertArtifactImmutable(root, output); // M2: never overwrite already-written bytes through the workflow arm
-  const mutation: ArtifactPlannedMutation = { kind: "artifact", artifactType: output.artifactType, slug: output.slug, body: output.body, origin };
-  const base = { artifactType: output.artifactType, slug: output.slug };
+  const mutation = artifactMutation(output, origin);
+  const productPreparation = stage.productAction === undefined ? undefined
+    : await productPreparationRef(root, run, stage, output.productPreparationRunId ?? "");
+  const base = {
+    artifactType: output.artifactType, slug: output.slug,
+    ...(productPreparation === undefined ? {} : { productPreparation }),
+  };
   let decision: TrustDecision = "allow";
   const recorded = await preflightApplyRecord(root, run, stage, { ...base, sha256: WORST_CASE_SHA256, decision: WORST_CASE_DECISION }, async () => {
     const [result] = await applyApprovedMutationsLocked(root, [mutation]);

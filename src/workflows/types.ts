@@ -17,7 +17,7 @@
  */
 
 /** Lifecycle status of a workflow run (or of one stage within it). */
-export type WorkflowRunStatus = "pending" | "running" | "completed" | "cancelled" | "failed";
+export type WorkflowRunStatus = "pending" | "running" | "completed" | "cancelled" | "failed" | "refused";
 
 /** The set of known statuses, for fail-closed validation of untrusted records. */
 export const WORKFLOW_RUN_STATUSES: readonly WorkflowRunStatus[] = [
@@ -26,6 +26,7 @@ export const WORKFLOW_RUN_STATUSES: readonly WorkflowRunStatus[] = [
   "completed",
   "cancelled",
   "failed",
+  "refused",
 ];
 
 /**
@@ -61,6 +62,7 @@ export type WorkflowActorKind = "human" | "agent" | "system";
 export type WorkflowEventType =
   | "workflow-start" | "stage-advanced" | "gate-approved" | "stage-output"
   | "run-cancelled" | "run-failed" | "run-resumed" | "workflow-adapted"
+  | "run-refused"
   | "events-truncated" | "fields-truncated";
 
 /** One recorded workflow lifecycle event (in-record audit trail). */
@@ -81,6 +83,8 @@ export interface WorkflowEvent {
   decision?: string;
   /** Optional human-readable detail about the event. */
   detail?: string;
+  /** Exact verified subject approved by a subject-bound gate. */
+  subjectDigest?: string;
   /** run.stateVersion immediately before this event. */
   stateVersionBefore: number;
   /** run.stateVersion immediately after this event. */
@@ -100,6 +104,8 @@ export interface PendingStageOutput {
   stageId: string;
   /** Deterministic op id of the in-flight external write (for reconciliation). */
   opId: string;
+  /** Exact lifecycle request and expected bytes, captured after subject verification. */
+  lifecycle?: { requestDigest: string; postimageDigest: string; decision: "allow" | "allow-with-warning" };
 }
 
 /** Per-stage progress status (distinct from the run-level status). */
@@ -122,6 +128,54 @@ export interface StageLogEntry {
   status: StageStatus;
 }
 
+/** Immutable product process and workspace authority sealed at run creation. */
+export interface WorkflowProcessAuthorityV1 {
+  schemaVersion: 1;
+  productId: string;
+  runtimeAuthorityDigest: string;
+  processDefinitionDigest: string;
+  workspaceId: string;
+  workspaceCompositionDigest: string;
+}
+
+/** Irreversible product-declared disposition attached to a refused run. */
+export interface WorkflowRefusalV1 {
+  reasonCode: string;
+  evidenceRef: string;
+  refusedAt: string;
+  predecessorStateVersion: number;
+  processDefinitionDigest: string;
+}
+
+/** One live page whose exact bytes a verifier receipt binds. */
+export interface VerifierLiveTargetV1 {
+  pageId: string;
+  contentDigest: string;
+}
+
+/** A core-minted receipt proving one process-pinned verifier accepted evidence. */
+export interface VerifierReceiptV1 {
+  schemaVersion: 1;
+  verifierId: string;
+  verifierImplementationDigest: string;
+  rawArtifactRef: string;
+  normalizedEnvelope: unknown;
+  normalizedEnvelopeDigest: string;
+  boundValues: Record<string, string>;
+  boundArtifactRefs: string[];
+  liveTargets: VerifierLiveTargetV1[];
+  workflowId: string;
+  workflowDigest: string;
+  runId: string;
+  profileDigest: string;
+  processDefinitionDigest: string;
+  workspaceId: string;
+  workspaceCompositionDigest: string;
+  outputStageId: string;
+  predecessorChainRoot: string;
+  mintedAt: string;
+}
+
 /** A durable, core-owned workflow run record (the source of truth for a run). */
 export interface WorkflowRun {
   /** Record schema version; reads fail closed when this exceeds the known version. */
@@ -134,6 +188,10 @@ export interface WorkflowRun {
   workflowDigest: string;
   /** Digest of the whole profile at start time (drift detection). */
   profileDigest: string;
+  /** Present only for a product whose active package declares a process. */
+  processAuthority?: WorkflowProcessAuthorityV1;
+  /** Present only when the run ended in the irreversible `refused` state. */
+  refusal?: WorkflowRefusalV1;
   /** The stage ids known at start (used to classify later config drift). */
   knownStageIds: string[];
   /** Current lifecycle status of the run. */
@@ -162,6 +220,8 @@ export interface WorkflowRun {
    * this is an honest, documented limitation, not a silent surprise.
    */
   outputs: Record<string, unknown>;
+  /** Core-minted, process-pinned verifier receipts keyed by producing stage id. */
+  verifierReceipts?: Record<string, VerifierReceiptV1>;
   /**
    * An in-flight stage-output intent marker, present ONLY between a stage-output's
    * intent persist and its post-apply record. A non-absent value on a fresh submit

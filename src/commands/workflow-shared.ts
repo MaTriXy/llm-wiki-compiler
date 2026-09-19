@@ -29,11 +29,16 @@ export interface WorkflowStartOptions {
  * the FIRST `=` so values may themselves contain `=`. A pair with no `=` (or an
  * empty key) is malformed.
  *
+ * EXPORTED IN ITS THROWING FORM for the `product` group, which answers a bad
+ * flag with a typed refusal envelope rather than by exiting. One grammar, two
+ * reporting styles — a second splitter is how `--input` comes to mean one thing
+ * on one command group and another thing on the next.
+ *
  * @param pairs - Raw `key=value` strings from `--input`.
  * @returns The parsed inputs record.
  * @throws {Error} When any pair lacks a `=` or has an empty key.
  */
-function parseInputs(pairs: string[]): Record<string, unknown> {
+export function parseInputPairs(pairs: readonly string[]): Record<string, unknown> {
   const inputs: Record<string, unknown> = {};
   for (const pair of pairs) {
     const eq = pair.indexOf("=");
@@ -53,7 +58,7 @@ function parseInputs(pairs: string[]): Record<string, unknown> {
  */
 export function parseInputsOrExit(pairs: string[]): Record<string, unknown> {
   try {
-    return parseInputs(pairs);
+    return parseInputPairs(pairs);
   } catch (err) {
     console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
     process.exit(1);
@@ -81,6 +86,28 @@ export function parseJsonObject(json: string): Record<string, unknown> | null {
 }
 
 /**
+ * Parse `--input-json` into a bounded JSON OBJECT of typed inputs, THROWING on
+ * anything else. Rejects oversized text, malformed JSON, an over-deep object,
+ * and non-object JSON (an array/scalar/`null`) alike.
+ *
+ * EXPORTED IN ITS THROWING FORM for the `product` group — see
+ * {@link parseInputPairs} for why both flags share one grammar.
+ *
+ * @param json - The raw `--input-json` string.
+ * @returns The parsed inputs record.
+ * @throws {Error} When the text is unbounded, malformed, too deep, or not an object.
+ */
+export function parseInputJsonObject(json: string): Record<string, unknown> {
+  // BOUND the raw text BEFORE JSON.parse (memory DoS), then DEPTH-bound the
+  // parsed object BEFORE it reaches any stringify/canonicalize (stack overflow).
+  assertRawInputJsonWithinBounds(json);
+  const parsed = parseJsonObject(json);
+  if (parsed === null) throw new Error("--input-json must be a JSON object");
+  assertInputDepthWithinBounds(parsed);
+  return parsed;
+}
+
+/**
  * Parse `--input-json` into a JSON OBJECT of typed inputs, or print an error and
  * exit 1 BEFORE any core call. Rejects non-object JSON (an array/scalar/`null`)
  * and malformed JSON alike, so a bad `--input-json` never reaches the core.
@@ -91,13 +118,7 @@ export function parseJsonObject(json: string): Record<string, unknown> | null {
 export function parseInputJsonOrExit(json: string | undefined): Record<string, unknown> {
   if (json === undefined) return {};
   try {
-    // BOUND the raw text BEFORE JSON.parse (memory DoS), then DEPTH-bound the
-    // parsed object BEFORE it reaches any stringify/canonicalize (stack overflow).
-    assertRawInputJsonWithinBounds(json);
-    const parsed = parseJsonObject(json);
-    if (parsed === null) throw new Error("--input-json must be a JSON object");
-    assertInputDepthWithinBounds(parsed);
-    return parsed;
+    return parseInputJsonObject(json);
   } catch (err) {
     console.error(`\x1b[31mError:\x1b[0m ${err instanceof Error ? err.message : err}`);
     process.exit(1);
@@ -115,6 +136,7 @@ function statusDetailParts(status: RunStatus): string[] {
     { value: status.run, render: () => `status=${status.run?.status}` },
     { value: status.awaitingGate, render: () => `awaiting-gate: ${status.awaitingGate}` },
     { value: status.awaitingOutput, render: () => "awaiting-output" },
+    { value: status.needsHumanInput, render: () => `needs-human-input: ${status.humanInputSchemaId}` },
     { value: status.problem, render: () => `problem: ${status.problem}` },
   ];
   return rows.filter((row) => Boolean(row.value)).map((row) => row.render());
@@ -153,6 +175,9 @@ function submitCommand(status: RunStatus): string {
  * structured fields stay; this is an extra hint line.
  */
 function nextHintOf(status: RunStatus): string | null {
+  if (status.needsHumanInput === true) {
+    return `next: workflow submit ${status.runId} --kind human-input --output-file <path>`;
+  }
   if (status.awaitingGate !== undefined && status.awaitingTrustGate !== true) {
     return `next: workflow gate approve ${status.runId} ${status.awaitingGate}`;
   }

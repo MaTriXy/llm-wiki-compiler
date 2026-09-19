@@ -34,6 +34,17 @@ export {
 } from "./utils/provider-guard.js";
 
 export { createWiki } from "./sdk/wiki.js";
+export { startViewer, type StartViewerOptions } from "./viewer/server.js";
+export type {
+  ViewerDeps, LiveStageProjectionProvider, LiveStageProjectionResult,
+  VerifiedStageFactsV1, VerifiedExperimentStateV1, RunProjectionAnchor,
+  WorkflowRunProjectionEnvelope, WorkflowRunProblem, StageProjection,
+  StageGateProjection, StageGateState, StageOutputRef,
+  StageVerificationFailureV1, VerifiedFactPanelV1,
+} from "./viewer/workflow-run-projection.js";
+export type { RecordIntentV1 } from "./operation-bundles/record-intent.js";
+export type { PreparedEffectRefV1 } from "./operation-bundles/prepare-record.js";
+export type { SdkOperationOptions, WikiOperationSurface, RecordPreparationResultV1 } from "./sdk/operations-facade.js";
 export type { Wiki, CreateWikiOptions, SdkCompileOptions, ContextPackOptions } from "./sdk/types.js";
 
 // Result/input types for the Wiki facade methods, re-exported so typed
@@ -128,3 +139,77 @@ export type {
   LoadedProfile,
   SlugSafe,
 } from "./profile/types.js";
+
+// Experimental integration contracts retained from the internal implementation.
+export { parseFrontmatter, slugify } from "./utils/markdown.js";
+export { collectViewerPages, resolveBareSlug } from "./viewer/collect.js";
+export type { ArtifactMemberEntry } from "./artifacts/members.js";
+export { isTrustedWriteGranted } from "./workflows/trusted-write.js";
+export { startProductWorkflow } from "./workflows/start.js";
+export { captureVerifiedMemberArtifact } from "./artifacts/capture-member.js";
+export { assertRunWorkspace, WorkflowProcessAuthorityError } from "./workflows/process-authority.js";
+export { refuseWorkflow, WorkflowRefusalError } from "./workflows/refuse.js";
+export { HumanInputValidationError } from "./workflows/human-input-schema.js";
+export type { HumanInputStageOutput, HumanInputRefV1 } from "./workflows/human-input.js";
+export type { WorkflowProcessAuthorityV1, WorkflowRefusalV1, WorkflowRun } from "./workflows/types.js";
+export { atomicWrite, AtomicWriteCollisionError, AtomicWriteCommittedCleanupError, type AtomicWriteOptions, type AtomicWriteNoReplaceDurableOptions } from "./utils/atomic-write.js";
+export type { SdkPreparationOptions, SdkStagePreparationInput } from "./sdk/types.js";
+export type { CancelResultV1 as PreparationCancelResult, FailResultV1 as PreparationFailResult, ListResultV1 as PreparationListResult, PreparationGrant, PreparationLifecyclePendingState as PreparationLifecycleState, PreparationRunRowV1 as PreparationRunRow, PreparationRunState, PreviewResultV1 as PreparationPreviewResult, RecoveryResultV1 as PreparationRecoveryResult, StageResultV1 as PreparationStageResult } from "./preparations/service.js";
+export { PrincipalAuthorityError } from "./preparations/service.js";
+export type { SdkProductActionInput, SdkProductResumeInput, WikiProductSurface } from "./sdk/types.js";
+export type { CompiledActionSummaryV1 as ProductActionSummary, ProductInvokeResultV1 as ProductInvokeResult, ProductPreviewResultV1 as ProductPreviewResult } from "./products/service.js";
+export { locatePreparationManifest, readPreparationInitialInput, resolvePreparationRun, readPreparationRunForManifest } from "./preparations/service-run-lookup.js";
+export { classifyExecutionOwnerLiveness } from "./preparations/attempts/lease.js";
+export { scanPreparationInventory } from "./preparations/capacity.js";
+export type { PreparationInitialInputLookupV1, PreparationManifestLookupV1, PreparationRunLookupV1 } from "./preparations/service-run-lookup.js";
+export { readPreparationEvidenceBytes } from "./preparations/evidence-store.js";
+export type { PreparationManifestV1 } from "./preparations/manifest-parse.js";
+export { preparationManifestDigest } from "./preparations/manifest-parse.js";
+export type { PhaseSummaryV1 as PreparationPhaseSummary } from "./preparations/run-types.js";
+export { observeOperationBundle } from "./operation-bundles/observe.js";
+export type { OperationBundleObservationV1, OperationBundleMutationV1, OperationPageObservationV1 } from "./operation-bundles/observe.js";
+export type { EvidenceRefV1 as PreparationEvidenceRef } from "./preparations/types.js";
+export { runPreparation } from "./preparations/runner.js";
+export type { RunPreparationInputV1 as RunPreparationInput, RunPreparationResultV1 as RunPreparationResult, PreparationMaterializerV1 as PreparationMaterializer } from "./preparations/runner.js";
+export { formatArtifactRef, parseArtifactRef } from "./artifacts/ref.js";
+export { readVerifiedArtifactBody } from "./artifacts/read-verified.js";
+export { resolveArtifactRef } from "./artifacts/resolve.js";
+export { artifactPaths, memberLeafPath, readArtifactMemberBytes } from "./artifacts/store.js";
+export { loadProfile } from "./profile/load.js";
+export { isSlugSafe } from "./profile/identity.js";
+export type { ProfileTemplatePackage } from "./profile/templates/types.js";
+export { confineUnderRoot } from "./utils/path-confine.js";
+export { resolveConfinedPrivateDir } from "./utils/private-dir.js";
+export { releaseLock } from "./utils/lock.js";
+export { acquireMutationLockBlocking } from "./operation-bundles/lock-gate.js";
+export { recomputeCompositionLock } from "./operations-packs/composition-lock.js";
+export { parseOperationsPack } from "./operations-packs/parse.js";
+export type { PackRecipeV2 } from "./operations-packs/recipe-types.js";
+export type { WorkspaceOperationsPackV2 } from "./operations-packs/types.js";
+export { HOST_DECLARED_CONTRACT_SET, defaultHostCompatibility } from "./products/compatibility.js";
+export { assertProductDigest } from "./products/ids.js";
+export type { Sha256Digest } from "./products/ids.js";
+export { recomputePackageDigest, recomputeRuntimeAuthorityDigest } from "./products/packages/verify.js";
+export type { PackageMemberKind, PackageMemberRefV1, ProductPackageManifestV1 } from "./products/types.js";
+export { transitionLifecycle } from "./trust/lifecycle-transition.js";
+export { readRun } from "./workflows/store.js";
+export { startWorkflowLocked } from "./workflows/start.js";
+export { assertRunOwnership } from "./workflows/with-lock.js";
+export { assertCurrentWorkflowProcessAuthority } from "./workflows/process-authority.js";
+export { predecessorChainRoot, readLiveTargetDigest, mintVerifierReceipt } from "./workflows/verifier-receipt.js";
+export { createVerifierRegistry, verifierImplementationDigest, type HostVerifierImplementationV1 } from "./workflows/verifier-registry.js";
+export { resolveGateChallenge } from "./workflows/gate.js";
+export { approveHumanGateInteractively } from "./workflows/approve-human-interactively.js";
+export { currentActorIdentity } from "./workflows/actor-identity.js";
+export { resolveCurrentStage } from "./workflows/advance.js";
+export { assertProductOperationOutputCurrent, assertProductStageOutputCurrent } from "./workflows/product-operation-output.js";
+export { DEV_PROVIDER_BOUNDS, derivePinForPayload, devEffectiveGrantRequest, devGrantScope, devModelInvokeAuthority, devProviderInvocation, devSourceReadAuthority, installDevProvider, issueDevProviderGrant } from "./capability-providers/host/index.js";
+export type { DevGrantRequestContextV1, DevInvocationHostV1, InstallDevProviderRequestV1, InstalledDevProviderV1, IssueDevGrantRequestV1, IssuedDevGrantV1, ProviderBackendChannelV1, ProviderHostBackendV1, ProviderLaunchDescriptorV1 } from "./capability-providers/host/index.js";
+export { resolveAuthorizedProviderPaths } from "./capability-providers/packages/paths.js";
+export { canonicalBytes, canonicalDigest } from "./profile/templates/signing/canonical.js";
+export { resolveProviderEntrypoint, providerLaunchEnv } from "./capability-providers/host/entrypoint.js";
+export { hostModelQuoteDigest } from "./capability-providers/brokers/model.js";
+export type { HostModelBrokerV1, HostModelQuoteObservationV1, HostModelQuoteRequestV1 } from "./capability-providers/brokers/model.js";
+export { confinedFetch, confinedFetchRequest } from "./connectors/confined-fetch.js";
+export type { FetchLimits, ConfinedFetchSeams, ConfinedFetchResult, ConfinedFetchRequest, ConfinedFetchMethod } from "./connectors/confined-fetch.js";
+export { scaffoldConfinedDirectories, ensureConfinedDirectory, type ScaffoldDirectoriesResultV1 } from "./utils/confined-scaffold.js";

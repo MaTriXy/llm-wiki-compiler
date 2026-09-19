@@ -144,7 +144,11 @@ function buildRunRow(run) {
  */
 function buildRunHead(run) {
   const head = el("div", "workflow-head");
-  head.appendChild(el("span", "list-title", workflowNameOf(run)));
+  const title = el("a", "list-title", workflowNameOf(run));
+  if (typeof run.workflow === "string" && typeof run.runId === "string") {
+    title.href = "#/workflows/" + encodeURIComponent(run.workflow) + "/runs/" + encodeURIComponent(run.runId);
+  }
+  head.appendChild(title);
   head.appendChild(el("span", "workflow-run-id", String(run.runId ?? "")));
   return head;
 }

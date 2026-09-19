@@ -13,7 +13,9 @@
 
 import { loadProfile } from "../profile/load.js";
 import { lookupWorkflowDef, UnknownWorkflowError } from "./start.js";
-import type { WorkflowStageDef } from "../profile/types.js";
+import type {
+  HumanInputDescriptorV1, SubjectGateDescriptorV1, WorkflowStageDef,
+} from "../profile/types.js";
 
 /** One stage's declared contract, surfaced to the `show` operation. */
 export interface WorkflowStageDetail {
@@ -23,8 +25,12 @@ export interface WorkflowStageDetail {
   reads: string[];
   /** Declared entity-type ids this stage writes. */
   writes: string[];
+  /** Declarative operator-input contract, when this stage parks for input. */
+  humanInput?: HumanInputDescriptorV1;
   /** The stage's `<kind>:<id>` gate, when declared. */
   gate?: string;
+  /** Verified predecessor subject required by the gate. */
+  subjectGate?: SubjectGateDescriptorV1;
   /** Prior stage ids this stage was renamed FROM, when declared. */
   previousIds?: string[];
 }
@@ -47,7 +53,9 @@ function toStageDetail(stage: WorkflowStageDef): WorkflowStageDetail {
     id: stage.id,
     reads: stage.reads,
     writes: stage.writes,
+    ...(stage.humanInput !== undefined ? { humanInput: stage.humanInput } : {}),
     ...(stage.gate !== undefined ? { gate: stage.gate } : {}),
+    ...(stage.subjectGate !== undefined ? { subjectGate: stage.subjectGate } : {}),
     ...(stage.previousIds !== undefined ? { previousIds: stage.previousIds } : {}),
   };
 }

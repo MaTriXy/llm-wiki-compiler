@@ -46,7 +46,7 @@ describe("OKF refresh drains the pending-embeddings marker", () => {
     // Core succeeds for every id it is asked to embed (always eligible+embedded).
     const okSpy = vi
       .spyOn(embeddings, "updateEmbeddingsLockedCore")
-      .mockImplementation(async (_root, ids) => ({ embedded: ids, eligible: ids }));
+      .mockImplementation(async (_root, ids) => ({ embedded: ids, eligible: ids, pruned: [] }));
 
     await refreshAfterImport(root, [IMPORTED_ID]);
 

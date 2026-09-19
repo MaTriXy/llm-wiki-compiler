@@ -17,7 +17,7 @@
 /** The reserved set described in the file header. Sorted, frozen. */
 export const RESERVED_CORE_VERBS: ReadonlySet<string> = new Set([
   "artifact", "cache", "compile", "connector", "context", "eval", "export", "import",
-  "ingest", "ingest-session", "lint", "next", "profile", "query",
+  "ingest", "ingest-session", "lint", "next", "operation", "preparation", "product", "profile", "query",
   "quickstart", "recover", "refresh", "review", "rm", "rules", "schema", "serve",
-  "state", "status", "template", "view", "watch", "workflow",
+  "state", "status", "template", "view", "visualize", "watch", "workflow",
 ]);

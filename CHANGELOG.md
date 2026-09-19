@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Local `1.4.0-dev.20260919` integration candidate: generic domain SDK record
+  preparation/observation/retirement, operation-bundle authority and recovery,
+  preparation lifecycle, configurable operation packs and capability providers.
+  The SDK does not expose operator apply. Standalone product-process packages
+  remain separate; public builtin ontology templates are preserved.
+- Live workflow projection, retained stage outputs and PDF delivery integrated
+  with the public viewer, restricted to loopback. Legacy experiment projection
+  inputs remain compatible; new providers use generic fact panels.
+- Migration safeguards: candidate authority preflight before generation,
+  operation-aware lint proposal locking, confined reset deletion, and refusal of
+  legacy compaction when it would discard operation-bound relation history.
+
 - Advisory pre-approval citation reports with `eval --candidates`. Fast mode
   inventories current evidence; full mode reuses the citation judge on a bounded
   sample. Reports identify exact draft revisions and unavailable/changed evidence

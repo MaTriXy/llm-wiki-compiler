@@ -7,6 +7,8 @@
  * types are imported directly from their owning modules so consumers
  * who need deeper access can follow the same import path.
  */
+import type { PackProviderInvocationV1 } from "../operations-packs/runtime/runner-input.js";
+import type { SdkOperationOptions, WikiOperationSurface } from "./operations-facade.js";
 
 import type { CompileResult, IngestResult, QueryResult } from "../utils/types.js";
 import type { IngestTextInput } from "../commands/ingest.js";
@@ -40,6 +42,81 @@ import type { ArtifactHealth } from "../artifacts/resolve.js";
 import type { VerifiedArtifactBodyV1 } from "../artifacts/read-verified.js";
 import type { ArtifactSelectorV1, ArtifactDiscoveryV1 } from "../artifacts/discover.js";
 import type { ArtifactMemberFileInput } from "../artifacts/members.js";
+import type {
+  CancelResultV1, FailResultV1, GateDecision, GateResultV1, HandoffResultV1,
+  ListResultV1, PauseResultV1, PreparationGrant, PreparationHandoffObligationsV1,
+  PreviewResultV1, PruneResultV1, RecoveryResultV1, ResumeResultV1, ShowResultV1,
+  StageResultV1, SweepResultV1,
+} from "../preparations/service.js";
+import type { PackActionInputValueV2 } from "../operations-packs/types.js";
+// Through the product layer (not the preparation substrate) so the SDK adapter
+// stays within the preparation-service boundary; it re-exports the ref type.
+import type { WorkflowParentRefV1 } from "../products/service.js";
+import type { ProductInvokeResultV1, ProductPreviewResultV1 } from "../products/service.js";
+
+/**
+ * @experimental
+ * SDK input for {@link WikiProductSurface.preview} / `.invoke`.
+ *
+ * `action` is the canonical action id OR an alias token the ACTIVE product's
+ * pack exposes on the SDK surface — an alias resolves to the same canonical
+ * action and the same surface, so the two forms compile a byte-identical plan.
+ */
+export interface SdkProductActionInput {
+  /** The workspace the durable run is recorded under. Carries no authority. */
+  workspaceId: string;
+  /** The action id, or an alias token exposed on the SDK surface. */
+  action: string;
+  /** Declared action input; omitted, every field falls to its declared default. */
+  input?: Record<string, PackActionInputValueV2>;
+  /**
+   * OPTIONAL outer-workflow parent this invocation serves (P6). Carries no
+   * authority; it is deep-captured and grafted into the canonical plan so a
+   * workflow coordinator can bind each stage's preparation to its journey run.
+   */
+  workflowParent?: WorkflowParentRefV1;
+}
+
+/**
+ * @experimental
+ * The product-action surface exposed as `createWiki().product`.
+ *
+ * TWO VERBS, THE PROPOSE HALF OF PROPOSE/APPROVE. `preview` is grant-free and
+ * writes no project byte. `invoke` requires the `preparation.run` grant, because
+ * it stages a durable preparation and drives it to a Milestone A handoff bundle —
+ * it applies nothing, and the handoff CARRIES the compiled intent drafts as
+ * evidence for a separate approval. That approval — `apply` — is a local-operator
+ * action today (`llmwiki product apply`), not on this surface: approving charges
+ * an operation grant `CreateWikiOptions` cannot carry.
+ */
+export interface WikiProductSurface {
+  /** Report what invoking this action WOULD do, writing no project byte. */
+  preview(input: SdkProductActionInput): Promise<ProductPreviewResultV1>;
+  /** Stage and drive this action to its Milestone A handoff bundle. */
+  invoke(input: SdkProductActionInput): Promise<ProductInvokeResultV1>;
+  /**
+   * Continue a run this action invoked and left suspended at a gate. The same
+   * drive `invoke` performs, re-entered: the run's OWN sealed input is
+   * recompiled and must reproduce its sealed plan, so a resume can neither
+   * smuggle new input nor continue under a different action. Costs the same
+   * `preparation.run` grant invoking does — resuming drives.
+   */
+  resume(input: SdkProductResumeInput): Promise<ProductInvokeResultV1>;
+}
+
+/**
+ * @experimental
+ * SDK input for {@link WikiProductSurface.resume}: the suspended run and the
+ * action token it was invoked through (the recompile guard's identity).
+ */
+export interface SdkProductResumeInput {
+  /** The workspace the durable run is recorded under. Carries no authority. */
+  workspaceId: string;
+  /** The action id or alias token the run was invoked through. */
+  action: string;
+  /** The suspended run to continue. */
+  runId: string;
+}
 
 /**
  * @experimental
@@ -69,14 +146,97 @@ export type SdkWriteArtifactInput = {
   /** Artifact slug (the identifier within its type). */
   slug: string;
 } & (
-  | { body: string; memberFiles?: undefined }
-  | { body?: undefined; memberFiles: readonly ArtifactMemberFileInput[] }
+  | {
+    /** Raw artifact body bytes (a single-file type). Hashed as-is; no encoding is inferred. */
+    body: string;
+    memberFiles?: undefined;
+  }
+  | {
+    /**
+     * The member leaves of a MEMBER-BEARING type (bytes only): core hashes
+     * each, renders the canonical manifest, and derives the ref from it. A
+     * `body` is refused for such a type, and `memberFiles` for any other.
+     */
+    memberFiles: readonly ArtifactMemberFileInput[];
+    body?: undefined;
+  }
 );
 
 /** Options for `createWiki`. */
 export interface CreateWikiOptions {
   /** Absolute or relative path to the project root. Normalized once inside `createWiki`. */
   root: string;
+  /**
+   * @experimental
+   * The preparation identity and grants this embedder acts under. Omit it and
+   * the SDK can read preparations but not mutate them — an `sdk` principal
+   * holds exactly the grants it was given, and a missing one fails closed.
+   */
+  preparation?: SdkPreparationOptions;
+  /** Experimental host-assigned record preparation authority. Never approval/apply. */
+  operations?: SdkOperationOptions;
+}
+
+/**
+ * @experimental
+ * The host-assigned preparation authority for an SDK embedder.
+ *
+ * There is deliberately NO `surface` field: the facade stamps `sdk` itself. A
+ * caller that could name its own surface could claim `cli`, and a `cli`
+ * principal holds the whole local-operator grant set by transport.
+ */
+export interface SdkPreparationOptions {
+  /**
+   * The embedder's ability to execute PROVIDER phases.
+   *
+   * llmwiki SHIPS NO PROVIDER BACKEND, so this is the only way a provider phase
+   * can run: an embedder that installs providers supplies its own invocation
+   * and the pack runtime routes provider phases to it. Omitting it — the
+   * default — leaves provider phases settling `failed`, which is the honest
+   * state of a host that cannot launch one.
+   *
+   * SUPPLYING IT WIDENS NOTHING. The plan's sealed executor still decides WHICH
+   * provider runs; the leg refuses any request that names another.
+   */
+  providerInvocation?: PackProviderInvocationV1;
+  /**
+   * The identity recorded as the actor on anything this embedder writes.
+   *
+   * EMBEDDER-CHOSEN AND NOT AUTHORITATIVE. Nothing authenticates it and nothing
+   * grants anything on the strength of it — an embedder may name itself
+   * `cli-operator` and gain nothing by it, because `surface` is the only field
+   * authority is read from and the facade stamps that itself. Treat it as a
+   * label for reading transition records, not as an identity claim.
+   */
+  id?: string;
+  /**
+   * The grants this embedder holds. Narrower than the local operator by
+   * default — an empty set — and never widened by any other input.
+   *
+   * Read as an OWN property: an inherited `grants` is not read as though the
+   * embedder had supplied it. The array is copied at construction, so mutating
+   * it afterwards grants nothing.
+   */
+  grants?: readonly PreparationGrant[];
+}
+
+/**
+ * @experimental
+ * SDK input for {@link Wiki.stagePreparation}.
+ *
+ * Both documents are TEXT rather than parsed objects, deliberately: the service
+ * parses them through the same duplicate-key-rejecting, size- and depth-bounded
+ * reader the CLI uses, so the two surfaces accept and refuse exactly the same
+ * documents. Handing over an already-parsed value would quietly buy this surface
+ * different acceptance semantics.
+ */
+export interface SdkStagePreparationInput {
+  /** The plan document, as JSON text. */
+  planDocument: string;
+  /** The bytes the plan's declared initial input set hashes to, as JSON text. */
+  seedDocument: string;
+  /** The control-transition budget this run is allowed. Defaults to 16. */
+  controlTransitionAllowance?: number;
 }
 
 /** Compile options exposed through the SDK. A public subset of the core CompileOptions shape. */
@@ -197,7 +357,7 @@ export interface Wiki {
    * facade in v1 — only `save` and `debug` are surfaced. Callers needing
    * per-token streaming should use `generateAnswer` directly.
    */
-  query(question: string, options?: { save?: boolean; debug?: boolean }): Promise<QueryResult>;
+  query(question: string, options?: { save?: boolean; debug?: boolean; pageScope?: readonly string[] }): Promise<QueryResult>;
   /** Fetch a single page by directory and slug. No LLM required. */
   getPage(ref: PageRef): Promise<Page | null>;
   /** List wiki pages with optional filters and cursor-based pagination. No LLM required. */
@@ -461,14 +621,15 @@ export interface Wiki {
   resumeWorkflow(runId: string): Promise<WorkflowRun>;
   /**
    * @experimental
-   * Submit a typed `output` (`page` / `relation` / `lifecycle-transition`) to a
+   * Submit a typed output (`page`, `relation`, `lifecycle-transition`,
+   * `artifact`, or declarative `human-input`) to a
    * run's current write-declaring stage, routing the write through the
    * scope-gated planner→executor seam under the project lock. A stage may write
    * ONLY the entity types it declares (`StageWriteScopeError` otherwise). An
    * `allow`/`allow-with-warning` lands the write live (`applied:true`) and
    * satisfies a `trust:` gate; a blocked page write stages for review
    * (`applied:false`); a `deny` / relation / lifecycle denial throws. Rejects a
-   * no-writes stage (`StageHasNoWritesError`) and a terminal/absent run
+   * no-output stage (`StageHasNoWritesError`) and a terminal/absent run
    * (`RunNotActiveError`/`RunUnavailableError`). No LLM required.
    *
    * Foundation API — the shape may change in a future minor release.
@@ -557,10 +718,260 @@ export interface Wiki {
    * Foundation API — the shape may change in a future minor release.
    */
   verifyArtifact(ref: ArtifactRef): Promise<{ health: ArtifactHealth }>;
-
-  /** Read exact verified bytes; requires an active profile declaring artifact types. */
+  /**
+   * @experimental
+   * Read a hash-pinned artifact's VERIFIED body bytes — what `verifyArtifact`
+   * deliberately omits. Resolves + verifies through the same confined reader,
+   * and returns the bytes ONLY on a fully-`ok` verdict, cryptographically
+   * re-bound to the pinned ref's sha256. A coordinator uses this to re-verify a
+   * checkpoint body or an exact result artifact on resume. Generic — no product
+   * vocabulary. Same profile gate as {@link verifyArtifact}.
+   *
+   * @throws {ArtifactVerifyUnavailableError} Same conditions as verifyArtifact.
+   * Foundation API — the shape may change in a future minor release.
+   */
   readVerifiedArtifactBody(ref: ArtifactRef): Promise<VerifiedArtifactBodyV1>;
-
-  /** Recover an exact verified ref; unavailable is not proof that no write occurred. */
+  /** Discover after rehashing bytes; no operation authority is implied.
+   * Invalid selectors and unavailable active profiles reject. Valid lookup failures return unavailable. */
   discoverArtifact(selector: ArtifactSelectorV1): Promise<ArtifactDiscoveryV1>;
+  /**
+   * @experimental
+   * Stage a plan document as a durable preparation run — the SDK mirror of
+   * `llmwiki preparation stage`, through the same service.
+   *
+   * Requires the `preparation.run` grant. An embedder that named none gets a
+   * {@link PrincipalAuthorityError} with code `missing-grant` and nothing is
+   * written; a refused stage returns `{ status: "refused", reason }` and leaves
+   * no partial run either. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  stagePreparation(input: SdkStagePreparationInput): Promise<StageResultV1>;
+  /**
+   * @experimental
+   * Report what {@link stagePreparation} WOULD do, writing no project byte — the
+   * SDK mirror of `llmwiki preparation preview`.
+   *
+   * Read-only and GRANT-FREE, as `list` and `show` are: it takes no lock, writes
+   * no byte, and reaches no path the caller names — the plan and seed arrive as
+   * strings the embedder already holds. It routes through the substrate's own
+   * forced dry-run path, so a check added to staging is a check preview inherits.
+   *
+   * It answers `previewed` and names NO run. The substrate reports `staged` on
+   * its dry-run path — that is what staging would have answered — but the
+   * identity in that answer belongs to a run this call did not create, so it
+   * never reaches an embedder. It takes no lock. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  previewPreparation(input: SdkStagePreparationInput): Promise<PreviewResultV1>;
+  /**
+   * @experimental
+   * Enumerate preparation runs and the problems observed while reading them —
+   * the SDK mirror of `llmwiki preparation list`.
+   *
+   * Read-only and grant-free: it takes no lock and writes no byte. A run that
+   * could not be READ stays in the listing with a null state and a `detail`
+   * saying why, because dropping it would read as "does not exist". No LLM
+   * required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  listPreparations(): Promise<ListResultV1>;
+  /**
+   * @experimental
+   * Drive one planned preparation run to the terminal `failed` state — the SDK
+   * mirror of `llmwiki preparation fail`.
+   *
+   * Requires the `preparation.run` grant, and refuses (rather than throwing) for
+   * every domain reason: an unknown or unreadable run, a state that cannot reach
+   * `failed`, a live execution owner, or a busy project lock. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  failPreparation(runId: string): Promise<FailResultV1>;
+  /**
+   * @experimental
+   * Request cancellation of one preparation run — the SDK mirror of
+   * `llmwiki preparation cancel`.
+   *
+   * Requires the `preparation.cancel` grant. It TAKES NO PROJECT LOCK, by
+   * design: cancellation must land when a run is wedged, which is exactly when
+   * every locked operation refuses. It publishes intent and settles nothing — a
+   * lock-holding orchestrator validates state and drives the run to its honest
+   * terminal — so a successful call means the request is durable, not that the
+   * run has stopped. The requester recorded is the identity this facade was
+   * constructed with, never an argument. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  cancelPreparation(runId: string): Promise<CancelResultV1>;
+  /**
+   * @experimental
+   * Describe ONE preparation run — the SDK mirror of `llmwiki preparation show`.
+   *
+   * GRANT-FREE, exactly as `listPreparations` is: it takes no lock, writes no
+   * byte, and reports REFERENCES — evidence digests and the bound plan's digest,
+   * never the objects behind them. It distinguishes `refused` (a settled fact
+   * about the store: no such run, or not a project) from `unavailable` (a fact
+   * about this observer: something could not be read), because only the second
+   * is worth retrying. The execution owner's liveness is reported uncollapsed,
+   * including whether observing it again could ever answer differently. No LLM
+   * required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  showPreparation(runId: string): Promise<ShowResultV1>;
+  /**
+   * @experimental
+   * Hold one preparation run at a durable safe checkpoint — the SDK mirror of
+   * `llmwiki preparation pause`.
+   *
+   * Requires the `preparation.run` grant. It refuses while an attempt is IN
+   * FLIGHT rather than interrupting one, because `paused` means every active
+   * attempt already reached a checkpoint; the refusal names the exit that fits
+   * the executor's state — wait, cancel, or recover. Pausing a run that is
+   * already paused reports `already-paused` rather than refusing an idempotent
+   * retry. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  pausePreparation(runId: string): Promise<PauseResultV1>;
+  /**
+   * @experimental
+   * Return one paused preparation run to `running` — the SDK mirror of
+   * `llmwiki preparation resume`, and the exit that makes
+   * {@link pausePreparation} safe to call.
+   *
+   * Requires the SAME `preparation.run` grant as pausing, and that equality is
+   * the guarantee rather than a convenience: a paused run is escapable by a
+   * principal holding `preparation.run` and nothing more. No destructive grant
+   * and no cancellation route is needed, or counts. Resuming a run that is
+   * already running reports `already-running` rather than refusing an idempotent
+   * retry. A run parked for RECOVERY is not resumed here — it is refused with the
+   * verb that applies, because recovery re-drives a stranded attempt while resume
+   * only lifts an operator's own pause. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  resumePreparation(runId: string): Promise<ResumeResultV1>;
+  /**
+   * @experimental
+   * Park one STRANDED preparation run and report the project's outstanding
+   * lifecycle maintenance — the SDK mirror of `llmwiki preparation recover`.
+   *
+   * Requires the `preparation.recovery` grant. A run whose executor process is
+   * still LIVE is busy rather than stranded and is refused untouched; a run
+   * already parked reports `already-parked` rather than refusing an idempotent
+   * retry. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  recoverPreparation(runId: string): Promise<RecoveryResultV1>;
+  /**
+   * @experimental
+   * Record one host-authored gate decision on a preparation run — the SDK
+   * mirror of `llmwiki preparation gate`.
+   *
+   * IT RECORDS AUTHORITY AND PERFORMS NOTHING. A recorded approval is consumed
+   * later by the operation that owns the work the gate governs; this call never
+   * starts an effect, resumes a phase, or moves the run. The grant it requires
+   * is the one the gate KIND costs, and the kind is read from the run's own
+   * plan — so an embedder holding `preparation.gate.decide` can decide a review
+   * gate and is refused an effect gate. Refuses (rather than throwing) for every
+   * domain reason: an unknown run, a gate the plan does not declare, a state
+   * that cannot carry a decision, or a busy project lock. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  gatePreparation(input: SdkGatePreparationInput): Promise<GateResultV1>;
+  /**
+   * @experimental
+   * Stage one settled preparation run into its immutable Milestone A operation
+   * bundle. There is no CLI mirror: the obligation set below is host-authored
+   * typed material with no textual operator form.
+   *
+   * Requires the `preparation.run` grant — handoff STAGES the bundle and does
+   * not approve or apply it. The flow is crash-idempotent: a call that finds a
+   * durable `handoff-started` record resumes the EXACT same creation and returns
+   * `resumed` rather than minting a second bundle. No LLM required.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  handoffPreparation(
+    runId: string, obligations: PreparationHandoffObligationsV1,
+  ): Promise<HandoffResultV1>;
+
+  /**
+   * @experimental
+   * Reclaim one retention-eligible terminal preparation run's exact bytes — the
+   * SDK mirror of `llmwiki preparation prune`.
+   *
+   * Requires the `preparation.quarantine` grant, which is DELIBERATELY not the
+   * `preparation.run` grant that creates and drives runs: destroying a run's
+   * bytes irreversibly is a decision a host makes separately from letting an
+   * embedder work with runs at all. An embedder that named no grants can neither
+   * prune nor sweep.
+   *
+   * It refuses rather than throwing for every project-state answer: a run inside
+   * its thirty-day retention floor, a non-terminal run, a busy lock, or
+   * unfinished destructive work this prune does not own.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  prunePreparation(runId: string): Promise<PruneResultV1>;
+
+  /**
+   * @experimental
+   * Reclaim the bytes of every preparation whose run is PROVABLY absent — the
+   * SDK mirror of `llmwiki preparation sweep`.
+   *
+   * Requires the `preparation.quarantine` grant. It takes no argument: its
+   * target is the project's own registry, and the exact unfinished unit it may
+   * resume is decided under the project lock rather than named by the caller.
+   * `nothing-to-sweep` is a SUCCESS — the ordinary answer for a healthy project
+   * — and is distinct from the refusal returned when the key could not be read
+   * and orphan owners therefore could not be classified.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  sweepPreparations(): Promise<SweepResultV1>;
+
+  /**
+   * @experimental
+   * Invoke or preview an ACTIVATED product's actions — the WOP V3 product
+   * surface.
+   *
+   * The project must have a product activated; there is no fallback to the
+   * legacy profile path, so a project in legacy mode refuses rather than
+   * guessing. Authority is the preparation authority: `product.preview` is
+   * grant-free, `product.invoke` requires `preparation.run`.
+   *
+   * Foundation API — the shape may change in a future minor release.
+   */
+  product: WikiProductSurface;
+  /** Experimental prepare/observe/retire surface; apply remains a separate operator action. */
+  operations: WikiOperationSurface;
+}
+
+/**
+ * @experimental
+ * SDK input for {@link Wiki.gatePreparation}.
+ *
+ * It names the gate and the choice, and NOTHING the proof binds. Every digest a
+ * gate proof carries — plan, phase, input, effect, authority — is recomputed by
+ * the host from the run's authenticated manifest, and the gate KIND that selects
+ * the required grant is read from the same place. An embedder that could present
+ * any of them could bind an approval to bytes the operator never saw, or pick
+ * the cheaper of three grants for a gate the plan declared as the dearer one.
+ */
+export interface SdkGatePreparationInput {
+  /** The run whose gate is being decided. */
+  runId: string;
+  /** The gate id the run's own plan declares. */
+  gateId: string;
+  /** The exact choice, from the three closed decisions. */
+  decision: GateDecision;
+  /** An optional bounded reason code recorded on the proof. */
+  reasonCode?: string;
 }

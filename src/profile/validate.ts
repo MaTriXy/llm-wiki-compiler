@@ -58,6 +58,48 @@ import { SOURCES_DIR, LLMWIKI_DIR, EXPORT_DIR, CONCEPTS_DIR, QUERIES_DIR, WORKFL
 import { isValidArtifactFileName, MAX_ARTIFACT_BYTES } from "../artifacts/name.js";
 import { getConnectorDef } from "../connectors/registry.js";
 import { assertMembersDef } from "./validate-artifact-members.js";
+import { validateHumanInputDescriptor } from "./validate-human-input.js";
+
+/** Validate the mutually exclusive human-input and product-action contracts. */
+function validateStageExecutor(
+  wf: string, stage: WorkflowStageDef, entities: Record<string, EntityTypeDef>, artifactTypes: Set<string>,
+): void {
+  assert(stage.productAction === undefined || /^[a-z0-9][a-z0-9.-]*$/.test(stage.productAction),
+    `workflow '${wf}' stage '${stage.id}' productAction is malformed`);
+  validateHumanInputDescriptor(stage.humanInput, entities, artifactTypes, `workflow '${wf}' stage '${stage.id}' humanInput`);
+  assert(stage.humanInput === undefined || (stage.writes.length === 0 && (stage.artifactWrites ?? []).length === 0
+    && stage.productAction === undefined),
+    `workflow '${wf}' stage '${stage.id}' humanInput cannot also declare writes, artifactWrites, or productAction`);
+}
+
+/** Validate one stage gate and require a trust-gated output contract. */
+function validateStageGate(wf: string, stage: WorkflowStageDef): void {
+  if (stage.gate === undefined) return;
+  const kind = parseGrammarGate(stage.gate);
+  assert(kind !== null, `workflow '${wf}' stage '${stage.id}' has a malformed gate '${stage.gate}'`);
+  if (kind !== "trust") return;
+  const producesOutput = stage.writes.length > 0 || (stage.artifactWrites ?? []).length > 0
+    || stage.productAction !== undefined;
+  assert(producesOutput, `workflow '${wf}' stage '${stage.id}' has a 'trust:' gate but declares no writes or artifactWrites — a trust gate is satisfiable only by a stage output`);
+}
+
+/** Validate a subject gate against one earlier artifact-producing stage. */
+function validateSubjectGate(
+  wf: string, stage: WorkflowStageDef, priorStages: WorkflowStageDef[], artifactTypes: Set<string>,
+): void {
+  if (stage.subjectGate === undefined) return;
+  assert(stage.gate?.startsWith("human:") === true,
+    `workflow '${wf}' stage '${stage.id}' subjectGate requires a human gate`);
+  const source = priorStages.find((prior) => prior.id === stage.subjectGate?.outputStageId);
+  assert(source !== undefined,
+    `workflow '${wf}' stage '${stage.id}' subjectGate outputStageId must name an earlier stage`);
+  assert(artifactTypes.has(stage.subjectGate.artifactType),
+    `workflow '${wf}' stage '${stage.id}' subjectGate artifactType is not declared`);
+  assert(source?.artifactWrites?.includes(stage.subjectGate.artifactType) === true,
+    `workflow '${wf}' stage '${stage.id}' subjectGate artifactType is not produced by its output stage`);
+  assert(/^[a-z0-9][a-z0-9-]*(?:\/v[0-9]+)?$/.test(stage.subjectGate.verifierId),
+    `workflow '${wf}' stage '${stage.id}' subjectGate verifierId is malformed`);
+}
 
 export { ProfileValidationError } from "./errors.js";
 
@@ -491,20 +533,18 @@ function validateStageArtifactWrites(wf: string, stage: WorkflowStageDef, artifa
  * `human:`/`agent:` gates are satisfied by approval regardless of output, so
  * they stay valid with no writes/artifactWrites.
  */
-function validateStage(wf: string, stage: WorkflowStageDef, seen: Set<string>, entities: Set<string>, artifactTypes: Set<string>): void {
+function validateStage(
+  wf: string, stage: WorkflowStageDef, seen: Set<string>, priorStages: WorkflowStageDef[],
+  entities: Record<string, EntityTypeDef>, artifactTypes: Set<string>,
+): void {
   assert(isSlugSafe(stage.id), `workflow '${wf}' stage id '${stage.id}' must be slug-safe`);
   assert(!seen.has(stage.id), `workflow '${wf}' has a duplicate stage id '${stage.id}'`);
   seen.add(stage.id);
-  validateStageEndpoints(wf, stage, entities);
+  validateStageEndpoints(wf, stage, new Set(Object.keys(entities)));
   validateStageArtifactWrites(wf, stage, artifactTypes);
-  if (stage.gate !== undefined) {
-    const kind = parseGrammarGate(stage.gate);
-    assert(kind !== null, `workflow '${wf}' stage '${stage.id}' has a malformed gate '${stage.gate}'`);
-    if (kind === "trust") {
-      const producesOutput = stage.writes.length > 0 || (stage.artifactWrites ?? []).length > 0;
-      assert(producesOutput, `workflow '${wf}' stage '${stage.id}' has a 'trust:' gate but declares no writes or artifactWrites — a trust gate is satisfiable only by a stage output`);
-    }
-  }
+  validateStageExecutor(wf, stage, entities, artifactTypes);
+  validateStageGate(wf, stage);
+  validateSubjectGate(wf, stage, priorStages, artifactTypes);
 }
 
 /**
@@ -588,7 +628,11 @@ function validateWorkflows(
     assert(isSlugSafe(wf), `workflow key '${wf}' must be slug-safe`);
     assert(!RESERVED_CORE_VERBS.has(wf), `workflow id '${wf}' is reserved — it collides with a core CLI verb`);
     const seen = new Set<string>();
-    for (const stage of def.stages) validateStage(wf, stage, seen, declared, declaredArtifactTypes);
+    const priorStages: WorkflowStageDef[] = [];
+    for (const stage of def.stages) {
+      validateStage(wf, stage, seen, priorStages, entities, declaredArtifactTypes);
+      priorStages.push(stage);
+    }
     assertStagePreviousIds(wf, def, seen);
     validateProjectionFile(wf, def);
   }

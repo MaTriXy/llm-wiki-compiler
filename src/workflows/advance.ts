@@ -34,12 +34,14 @@ import { UnknownWorkflowError, lookupWorkflowDef } from "./start.js";
 import { RunNotActiveError, RunUnavailableError } from "./errors.js";
 import { withRunLock, isTerminalStatus } from "./with-lock.js";
 import { maybeAutoProject } from "./projection.js";
+import { assertCurrentWorkflowProcessAuthority } from "./process-authority.js";
+import { assertProductStageOutputCurrent } from "./product-operation-output.js";
 import type { BlockingLockOptions } from "../utils/lock.js";
 import type { StageStatus, WorkflowRun } from "./types.js";
 import type { WorkflowDef, WorkflowStageDef } from "../profile/types.js";
 
 /** The result of advancing a run by one stage. */
-export type AdvanceOutcome = "advanced" | "completed" | "awaiting-gate" | "awaiting-output";
+export type AdvanceOutcome = "advanced" | "completed" | "awaiting-gate" | "awaiting-output" | "needs-human-input";
 
 /** A persisted run plus the outcome of the advance that produced it. */
 export interface AdvanceResult {
@@ -91,7 +93,9 @@ function gateSatisfied(run: WorkflowRun, stage: WorkflowStageDef): boolean {
  * check would park such a stage forever.
  */
 function outputRecorded(run: WorkflowRun, stage: WorkflowStageDef): boolean {
-  return (stage.writes.length === 0 && (stage.artifactWrites ?? []).length === 0) || Object.hasOwn(run.outputs, stage.id);
+  const requiresOutput = stage.writes.length > 0 || (stage.artifactWrites ?? []).length > 0
+    || stage.humanInput !== undefined || stage.productAction !== undefined;
+  return !requiresOutput || Object.hasOwn(run.outputs, stage.id);
 }
 
 /**
@@ -198,10 +202,16 @@ export async function resolveCurrentStage(root: string, run: WorkflowRun): Promi
 export async function advanceWorkflow(root: string, runId: string, lockOptions: BlockingLockOptions = {}): Promise<AdvanceResult> {
   const result = await withRunLock<AdvanceResult>(root, runId, async (run) => {
     if (isTerminalStatus(run.status)) throw new RunNotActiveError(runId, run.status);
+    await assertCurrentWorkflowProcessAuthority(root, run);
     const { def, stage } = await resolveCurrentStage(root, run);
-    if (stageSatisfied(run, stage)) return completeAndStep(root, run, def, stage.id);
+    if (stageSatisfied(run, stage)) {
+      if (stage.productAction !== undefined) await assertProductStageOutputCurrent(root, run, stage);
+      return completeAndStep(root, run, def, stage.id);
+    }
     const parked = await parkAwaitingGate(root, run, stage.id);
-    return { run: parked, outcome: awaitsHumanGate(run, stage) ? "awaiting-gate" : "awaiting-output" };
+    const outcome = stage.humanInput !== undefined ? "needs-human-input"
+      : awaitsHumanGate(run, stage) ? "awaiting-gate" : "awaiting-output";
+    return { run: parked, outcome };
   }, lockOptions);
   await maybeAutoProject(root, result.run);
   return result;

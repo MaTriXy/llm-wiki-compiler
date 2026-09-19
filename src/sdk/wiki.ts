@@ -44,6 +44,9 @@ import { runOkfExport } from "../export/okf/run.js";
 import { runOkfImport } from "../import/run.js";
 import { buildStagingFacade } from "./staging-facade.js";
 import { buildWorkflowFacade } from "./workflow-facade.js";
+import { buildPreparationFacade } from "./preparation-facade.js";
+import { buildProductFacade } from "./product-facade.js";
+import { buildOperationsFacade } from "./operations-facade.js";
 import { applyApprovedMutations } from "../trust/executor.js";
 import { loadNonDefaultProfile } from "../profile/block.js";
 import { resolveArtifactRef, declaresArtifactTypes, ArtifactVerifyUnavailableError, type ArtifactHealth } from "../artifacts/resolve.js";
@@ -89,6 +92,7 @@ export function createWiki(options: CreateWikiOptions): Wiki {
   }
 
   return {
+    operations: buildOperationsFacade(root, runQuiet, options),
     ingest: ({ source }) => runQuiet(() => ingestSource(root, source)),
 
     ingestText: (input) => runQuiet(() => ingestTextSource(root, input)),
@@ -222,5 +226,31 @@ export function createWiki(options: CreateWikiOptions): Wiki {
 
     // @experimental workflow slice — factored into workflow-facade.ts.
     ...buildWorkflowFacade(root, runQuiet),
+
+    // @experimental preparation slice — factored into preparation-facade.ts.
+    // The embedder's preparation identity and grants are read HERE, at
+    // construction, and never from a method argument: an `sdk` principal holds
+    // exactly the grants it was given, so an embedder that names none can read
+    // preparations and not mutate them.
+    //
+    // `Object.hasOwn`, not `options.preparation`. The plain read walks the
+    // prototype chain, so with `Object.prototype.preparation` planted a caller
+    // who passed `{ root }` alone was handed a full grant set — the fail-closed
+    // default silently inverted. Own-property only, so an absent option is
+    // absent.
+    ...buildPreparationFacade(
+      root, runQuiet,
+      Object.hasOwn(options, "preparation") ? options.preparation : undefined,
+    ),
+
+    // @experimental product slice — factored into product-facade.ts. It reads
+    // the SAME own-property preparation options the preparation facade does,
+    // and for the same reason: `product.invoke` stages and drives a durable
+    // preparation, so it must cost the `preparation.run` grant staging costs.
+    // An embedder that named none can preview a product action and not run one.
+    ...buildProductFacade(
+      root, runQuiet,
+      Object.hasOwn(options, "preparation") ? options.preparation : undefined,
+    ),
   };
 }

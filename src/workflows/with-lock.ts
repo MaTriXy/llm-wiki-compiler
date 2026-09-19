@@ -16,12 +16,14 @@
  * the write decision). The helper just guarantees the lock + fail-closed read.
  */
 
-import { acquireLockBlocking, releaseLock, type BlockingLockOptions } from "../utils/lock.js";
+import { releaseLock, type BlockingLockOptions } from "../utils/lock.js";
+import { acquireMutationLockBlocking } from "../operation-bundles/lock-gate.js";
 import { appendRunEvent, appendTerminalEvent } from "./events.js";
 import { readRun, writeRun, writeTerminalRun } from "./store.js";
 import { RunOwnerMismatchError, RunUnavailableError } from "./errors.js";
 import { currentActorIdentity } from "./actor-identity.js";
 import type { WorkflowEvent, WorkflowRun } from "./types.js";
+import { assertCurrentWorkflowProcessAuthority } from "./process-authority.js";
 
 /**
  * Enforce run OWNERSHIP (M1) — THE single source consulted by EVERY mutating
@@ -70,12 +72,13 @@ export async function withRunLock<T>(
   body: (run: WorkflowRun) => Promise<T>,
   lockOptions: BlockingLockOptions = {},
 ): Promise<T> {
-  await acquireLockBlocking(root, lockOptions);
+  await acquireMutationLockBlocking(root, "ordinary", lockOptions);
   try {
     const read = await readRun(root, runId);
     if (read.status === "absent") throw new RunUnavailableError(runId, "absent");
     if (read.status === "unavailable") throw new RunUnavailableError(runId, read.detail);
     assertRunOwnership(read.run);
+    await assertCurrentWorkflowProcessAuthority(root, read.run);
     return await body(read.run);
   } finally {
     await releaseLock(root);
@@ -137,7 +140,7 @@ export async function commitTerminalEvent(
 }
 
 /** The run statuses that are terminal (no further lifecycle action). */
-const TERMINAL_STATUSES = ["completed", "cancelled", "failed"] as const;
+const TERMINAL_STATUSES = ["completed", "cancelled", "failed", "refused"] as const;
 
 /** True when `status` is a terminal run status. */
 export function isTerminalStatus(status: WorkflowRun["status"]): boolean {

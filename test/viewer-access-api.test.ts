@@ -53,6 +53,16 @@ describe("content HTTP API", () => {
     expect(content.status).toBe(403);
     expect(content.body).not.toContain("remote secret");
   });
+  it.each([
+    "/api/workflows/build/runs/run-1",
+    "/api/workflows/build/runs/run-1/stage/draft/output",
+    "/api/workflows/build/runs/run-1/pdf",
+  ])("denies remote workflow content through %s before reading the run", async pathname => {
+    await start("0.0.0.0");
+    const response = await lanRequest(handle!.port, pathname);
+    expect(response.status).toBe(403);
+    expect(JSON.parse(response.body)).toMatchObject({ error: { code: "loopback_only" } });
+  });
 });
 
 /** Match the LAN bind's required Host header without relying on fetch overriding it. */

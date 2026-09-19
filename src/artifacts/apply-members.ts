@@ -19,6 +19,7 @@ import type { ArtifactPlannedMutation } from "../trust/planner.js";
 import type { TrustDecision } from "../trust/decision.js";
 import { openBatch, recordPreState, recordBinaryPreState, commitBatch } from "../trust/journal.js";
 import { preflightEventAppend } from "../events/store.js";
+import type { OperationBinding } from "../utils/operation-binding.js";
 import { confineUnderRoot } from "../utils/path-confine.js";
 import { listConfinedDirBounded } from "../utils/confined-dir.js";
 import type { ArtifactRef } from "./ref.js";
@@ -43,6 +44,7 @@ export interface MembersWriteV1 {
   body: string;
   decision: TrustDecision;
   paths: ArtifactPathsV1;
+  binding?: OperationBinding;
 }
 
 /**
@@ -151,6 +153,6 @@ export async function applyMembersLocked(write: MembersWriteV1): Promise<{ ref: 
   // rewrite lands them under the surviving spelling.
   const landed = await resolveArtifactRef(root, write.profile, ref);
   if (landed.health !== "ok") throw new ArtifactMembersDivergedError(mutation.slug, landed.health);
-  await emitArtifactEvent(root, event);
+  await emitArtifactEvent(root, event, write.binding);
   return { ref, decision: write.decision };
 }

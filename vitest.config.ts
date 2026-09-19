@@ -1,9 +1,21 @@
 import { defineConfig, configDefaults } from "vitest/config";
+import { fileURLToPath } from "node:url";
 
 const TEST_TIMEOUT_MS = 30_000;
 const HOOK_TIMEOUT_MS = 60_000;
 
 export default defineConfig({
+  // In-repository tests exercise source. Packed consumers still import the
+  // installed compiler peer by name; this resolver is not shipped at runtime.
+  resolve: {
+    alias: [
+      { find: /^llm-wiki-compiler$/, replacement: fileURLToPath(new URL("./src/index.ts", import.meta.url)) },
+      ...["llmwiki-dev-backend", "llmwiki-limited-isolation-backend"].map(name => ({
+        find: new RegExp("^" + name + "$"),
+        replacement: fileURLToPath(new URL("./packages/" + name + "/src/index.ts", import.meta.url)),
+      })),
+    ],
+  },
   test: {
     globals: true,
     testTimeout: TEST_TIMEOUT_MS,

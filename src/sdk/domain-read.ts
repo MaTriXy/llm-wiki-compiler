@@ -5,14 +5,11 @@
  * These observations neither lock future mutations nor confer write authority.
  */
 import path from "node:path";
-import { loadProfile } from "../profile/load.js";
 import { isInsideDir, safeRealpath } from "../utils/path-confine.js";
 import { openConfinedLeaf, readConfirmedBufferOrElse, resolveExpectedReal } from "../utils/confined-read.js";
 
 /** Observe the active profile digest, including the built-in default, without writing. */
-export async function activeProfileDigest(root: string): Promise<string> {
-  return (await loadProfile(root)).digest;
-}
+export { activeProfileDigest } from "../profile/load.js";
 
 /** Byte-exact read outcome; unavailable is never evidence that a target is absent. */
 export type ConfinedCappedRead =

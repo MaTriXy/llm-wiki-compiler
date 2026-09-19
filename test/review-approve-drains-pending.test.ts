@@ -54,7 +54,7 @@ describe("review approve drains the pending-embeddings marker", () => {
     // Core succeeds for every id it is asked to embed (it always is eligible+embedded).
     const okSpy = vi
       .spyOn(embeddings, "updateEmbeddingsLockedCore")
-      .mockImplementation(async (_root, ids) => ({ embedded: ids, eligible: ids }));
+      .mockImplementation(async (_root, ids) => ({ embedded: ids, eligible: ids, pruned: [] }));
 
     await reviewApproveCommand(candidate.id);
 

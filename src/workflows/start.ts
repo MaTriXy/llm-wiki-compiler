@@ -16,15 +16,19 @@
  */
 
 import { loadProfile } from "../profile/load.js";
-import { acquireLockBlocking, releaseLock, type BlockingLockOptions } from "../utils/lock.js";
+import { releaseLock, type BlockingLockOptions } from "../utils/lock.js";
+import { acquireMutationLockBlocking } from "../operation-bundles/lock-gate.js";
 import { workflowDefDigest } from "../profile/workflow-digest.js";
 import { mintRunId, writeRun, runExists, readRun, listRuns, WorkflowRunIdCollisionError } from "./store.js";
 import { isTerminalStatus } from "./with-lock.js";
 import { currentActorIdentity } from "./actor-identity.js";
-import { assertInputDepthWithinBounds } from "./input-bounds.js";
+import { WorkflowInputBoundsError, assertInputDepthWithinBounds } from "./input-bounds.js";
+import { RuntimeCaptureError, deepCaptureData } from "../utils/runtime-capture.js";
 import { MAX_WORKFLOW_INPUTS_BYTES, MAX_MINT_ATTEMPTS, MAX_ACTIVE_WORKFLOW_RUNS, MAX_TOTAL_WORKFLOW_RUNS } from "../utils/constants.js";
 import { WORKFLOW_RUN_SCHEMA_VERSION, type WorkflowRun } from "./types.js";
 import type { WorkflowDef } from "../profile/types.js";
+import { resolveWorkflowProcessAuthority } from "./process-authority.js";
+import type { WorkflowProcessAuthorityV1 } from "./types.js";
 
 /** Raised when a workflow id is not declared in the active profile. */
 export class UnknownWorkflowError extends Error {
@@ -48,6 +52,31 @@ export class WorkflowInputsTooLargeError extends Error {
   ) {
     super(`workflow inputs are too large: ${bytes} bytes exceeds the cap of ${MAX_WORKFLOW_INPUTS_BYTES}`);
     this.name = "WorkflowInputsTooLargeError";
+  }
+}
+
+/**
+ * Snapshot the caller's inputs as an immutable data-only tree, or refuse.
+ *
+ * DEEP, NOT ONE LEVEL. A top-level own-data copy leaves every nested array and
+ * object aliased to the caller's, and this path records the inputs VERBATIM —
+ * there is no schema between the caller and the durable record — so an aliased
+ * element is a value the run reports having been started with and was not.
+ *
+ * The refusal is {@link WorkflowInputBoundsError}, which is what this boundary
+ * already raises for caller inputs whose SHAPE it will not accept.
+ */
+function captureStartInputs(inputs: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return deepCaptureData(inputs) as Record<string, unknown>;
+  } catch (error) {
+    // ONLY THE CAPTURE'S OWN REFUSAL becomes a typed input rejection; anything
+    // else is a fault and stays a throw, so a genuine failure is never reported
+    // as "your inputs are the wrong shape".
+    if (error instanceof RuntimeCaptureError) {
+      throw new WorkflowInputBoundsError("inputs must be a plain object of data values");
+    }
+    throw error;
   }
 }
 
@@ -221,10 +250,11 @@ function buildPendingRun(args: {
   def: WorkflowDef;
   profileDigest: string;
   inputs: Record<string, unknown>;
+  processAuthority?: WorkflowProcessAuthorityV1;
 }): WorkflowRun {
   const now = new Date().toISOString();
   const stageIds = args.def.stages.map((stage) => stage.id);
-  return {
+  const run: WorkflowRun = {
     schemaVersion: WORKFLOW_RUN_SCHEMA_VERSION,
     runId: args.runId,
     workflowId: args.workflowId,
@@ -243,6 +273,7 @@ function buildPendingRun(args: {
     events: [{ type: "workflow-start", at: now, actorKind: "system", stateVersionBefore: 0, stateVersionAfter: 0 }],
     satisfiedGates: [],
   };
+  return args.processAuthority === undefined ? run : { ...run, processAuthority: args.processAuthority };
 }
 
 /**
@@ -280,24 +311,65 @@ export async function startWorkflow(
   inputs: Record<string, unknown>,
   mintId: (workflowId: string) => string = mintRunId,
   lockOptions: BlockingLockOptions = {},
+  processOptions: { workspaceId?: string; required?: boolean } = {},
 ): Promise<WorkflowRun> {
-  assertStartInputsWithinBounds(inputs);
-  await acquireLockBlocking(root, lockOptions);
+  // CAPTURED IN THE SYNCHRONOUS PROLOGUE, BEFORE THE FIRST AWAIT (D-10-9) — and
+  // the first await here is the BLOCKING LOCK below, not the profile read, so
+  // the window a caller could rewrite its object in was as long as the project
+  // lock stayed contended. Measured before the fix: a run started with
+  // `{count: 1}` recorded `count: 2`, an array element rewritten after the call
+  // reached disk, and an own accessor was invoked SIX times with its value
+  // durably recorded.
+  //
+  // BEFORE THE BOUNDS CHECK TOO, so the caps are enforced against the snapshot
+  // rather than against an object that can still move underneath them.
+  const captured = captureStartInputs(inputs);
+  const requestedWorkspaceId = processOptions.workspaceId;
+  const requiresProductProcess = processOptions.required === true;
+  assertStartInputsWithinBounds(captured);
+  await acquireMutationLockBlocking(root, "ordinary", lockOptions);
   try {
-    const loaded = await loadProfile(root);
-    const def = lookupWorkflowDef(loaded.profile.workflows, workflowId);
-    if (def === undefined) throw new UnknownWorkflowError(workflowId);
-    await assertRunQuota(root);
-    const run = buildPendingRun({
-      runId: await mintFreshRunId(root, workflowId, mintId),
-      workflowId,
-      def,
-      profileDigest: loaded.digest,
-      inputs,
+    // Await inside the try so a rejection is owned before the finally awaits
+    // lock release; returning the bare promise can leak a transient unhandled
+    // rejection and releases the project lock before the locked start settles.
+    return await startWorkflowLocked(root, workflowId, captured, mintId, {
+      workspaceId: requestedWorkspaceId, required: requiresProductProcess,
     });
-    await writeRun(root, run);
-    return run;
   } finally {
     await releaseLock(root);
   }
+}
+
+/**
+ * Start a run while the caller already holds the project lock.
+ * This narrow seam lets a product atomically bind a predecessor reservation to
+ * successor creation without manufacturing workflow state.
+ */
+export async function startWorkflowLocked(
+  root: string, workflowId: string, inputs: Record<string, unknown>,
+  mintId: (workflowId: string) => string = mintRunId,
+  processOptions: { workspaceId?: string; required?: boolean } = {},
+): Promise<WorkflowRun> {
+  const captured = captureStartInputs(inputs);
+  assertStartInputsWithinBounds(captured);
+  const loaded = await loadProfile(root);
+  const def = lookupWorkflowDef(loaded.profile.workflows, workflowId);
+  if (def === undefined) throw new UnknownWorkflowError(workflowId);
+  const processAuthority = await resolveWorkflowProcessAuthority(
+    root, processOptions.workspaceId, processOptions.required === true,
+  );
+  await assertRunQuota(root);
+  const run = buildPendingRun({
+    runId: await mintFreshRunId(root, workflowId, mintId), workflowId, def,
+    profileDigest: loaded.digest, inputs: captured, processAuthority,
+  });
+  await writeRun(root, run);
+  return run;
+}
+
+/** Start an opted-in product workflow bound to one explicit workspace. */
+export function startProductWorkflow(
+  root: string, workspaceId: string, workflowId: string, inputs: Record<string, unknown>,
+): Promise<WorkflowRun> {
+  return startWorkflow(root, workflowId, inputs, mintRunId, {}, { workspaceId, required: true });
 }

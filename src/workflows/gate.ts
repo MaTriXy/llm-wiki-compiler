@@ -34,6 +34,8 @@ import {
 } from "./errors.js";
 import { withRunLock, isTerminalStatus } from "./with-lock.js";
 import { maybeAutoProject } from "./projection.js";
+import { subjectDigestForGate } from "./subject-gate.js";
+import { SubjectGateVerificationError } from "./approval-subject.js";
 import type { BlockingLockOptions } from "../utils/lock.js";
 import type { WorkflowActorKind, WorkflowRun } from "./types.js";
 
@@ -43,6 +45,21 @@ export interface ApproveGateOptions {
   actorKind: WorkflowActorKind;
   /** Optional free-form label identifying the actor (e.g. a username or agent id). */
   actorLabel?: string;
+  /** Subject digest displayed before a subject-bound human confirmation. */
+  expectedSubjectDigest?: string;
+}
+
+/** Gate kind plus the optional verified subject shown before confirmation. */
+export interface GateChallengeV1 {
+  kind: GateKind;
+  subjectDigest?: string;
+}
+
+/** Parse and match one current stage gate. */
+function declaredGateKind(runId: string, gate: string | undefined, gateId: string): GateKind {
+  const parsed = gate === undefined ? null : parseGate(gate);
+  if (parsed === null || parsed.id !== gateId) throw new UnknownGateError(runId, gateId);
+  return parsed.kind;
 }
 
 /** True when `actorKind` can satisfy a gate of `gateKind` (the security rule). */
@@ -77,7 +94,10 @@ function clearStagePark(run: WorkflowRun): WorkflowRun["stageLog"] {
 }
 
 /** Record the satisfied gate + `gate-approved` event and persist the result. */
-async function recordApproval(root: string, run: WorkflowRun, fullGate: string, gateId: string, opts: ApproveGateOptions): Promise<WorkflowRun> {
+async function recordApproval(
+  root: string, run: WorkflowRun, fullGate: string, gateId: string,
+  opts: ApproveGateOptions, subjectDigest?: string,
+): Promise<WorkflowRun> {
   const bumped = appendRunEvent(run, {
     type: "gate-approved",
     at: new Date().toISOString(),
@@ -85,6 +105,7 @@ async function recordApproval(root: string, run: WorkflowRun, fullGate: string, 
     actorLabel: opts.actorLabel,
     gateId,
     stageId: run.currentStage ?? undefined,
+    subjectDigest,
   });
   const approved: WorkflowRun = {
     ...bumped,
@@ -95,31 +116,17 @@ async function recordApproval(root: string, run: WorkflowRun, fullGate: string, 
   return approved;
 }
 
-/**
- * Resolve the KIND (`human`/`agent`/`trust`) of the gate `gateId` on the run's
- * CURRENT stage — the read the CLI uses to decide whether the interactive
- * human-proof (C1) is required BEFORE it calls {@link approveGate}.
- *
- * Reads the run fail-closed (an absent/unavailable run → {@link RunUnavailableError})
- * and resolves the current stage's declared gate; throws {@link UnknownGateError}
- * when the current stage declares no gate matching `gateId`. Takes no lock (a pure
- * read of an immutable-per-stage gate declaration).
- *
- * @param root - Absolute project root.
- * @param runId - The run whose current-stage gate kind to resolve.
- * @param gateId - The id part of the gate to resolve.
- * @returns The gate's {@link GateKind}.
- * @throws {RunUnavailableError} When the run is absent/unavailable.
- * @throws {UnknownGateError} When the current stage declares no matching gate.
- */
-export async function resolveGateKind(root: string, runId: string, gateId: string): Promise<GateKind> {
+/** Resolve and verify the exact gate challenge shown to an operator. */
+export async function resolveGateChallenge(
+  root: string, runId: string, gateId: string,
+): Promise<GateChallengeV1> {
   const read = await readRun(root, runId);
   if (read.status === "absent") throw new RunUnavailableError(runId, "absent");
   if (read.status === "unavailable") throw new RunUnavailableError(runId, read.detail);
   const { stage } = await resolveCurrentStage(root, read.run);
-  const parsed = stage.gate === undefined ? null : parseGate(stage.gate);
-  if (parsed === null || parsed.id !== gateId) throw new UnknownGateError(runId, gateId);
-  return parsed.kind;
+  const kind = declaredGateKind(runId, stage.gate, gateId);
+  const subjectDigest = await subjectDigestForGate(root, read.run, stage, gateId);
+  return subjectDigest === undefined ? { kind } : { kind, subjectDigest };
 }
 
 /**
@@ -160,8 +167,12 @@ export async function approveGate(
     if (isTerminalStatus(locked.status)) throw new RunNotActiveError(runId, locked.status);
     const { stage } = await resolveCurrentStage(root, locked);
     const fullGate = vouchGate(locked, stage.gate, gateId, opts);
+    const subjectDigest = await subjectDigestForGate(root, locked, stage, gateId);
+    if (subjectDigest !== undefined && opts.expectedSubjectDigest !== subjectDigest) {
+      throw new SubjectGateVerificationError("confirmation-subject-mismatch");
+    }
     if (locked.satisfiedGates.includes(fullGate)) return locked;
-    return recordApproval(root, locked, fullGate, gateId, opts);
+    return recordApproval(root, locked, fullGate, gateId, opts, subjectDigest);
   }, lockOptions);
   await maybeAutoProject(root, run);
   return run;

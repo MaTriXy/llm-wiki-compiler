@@ -20,7 +20,7 @@ import {
 
 const EXPECTED_CSP =
   "default-src 'self'; script-src 'self'; style-src 'self'; " +
-  "img-src 'self' data:; font-src 'self'; connect-src 'self'; " +
+  "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; " +
   "frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'none'";
 
 const { start: startViewerProcess } = useViewerProcessLifecycle();

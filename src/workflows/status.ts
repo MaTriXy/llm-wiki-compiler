@@ -31,6 +31,7 @@ import { lookupWorkflowDef } from "./start.js";
 import { mapStageId } from "./adapt.js";
 import type { WorkflowRun, WorkflowRunStatus } from "./types.js";
 import type { ProfilePack, WorkflowDef } from "../profile/types.js";
+import { assertCurrentWorkflowProcessAuthority } from "./process-authority.js";
 
 /** How a run relates to the current profile config. */
 export type RunClassification = "current" | "historical" | "needs-adaptation" | "blocked-by-config";
@@ -77,6 +78,10 @@ export interface RunStatus {
    * observable without re-reading the profile. Does NOT affect classification.
    */
   awaitingOutput?: boolean;
+  /** True when the current stage is parked for its declarative human input. */
+  needsHumanInput?: boolean;
+  /** The schema id an operator must satisfy, present with `needsHumanInput`. */
+  humanInputSchemaId?: string;
   /**
    * A DECLARED write entity type of the current stage, for the `awaiting-output`
    * `next:` submit hint (`--entity-type <this>`). The FIRST entry of the stage's
@@ -98,7 +103,7 @@ export interface RunStatus {
 }
 
 /** Terminal run statuses — a run in any of these is readable history only. */
-const TERMINAL_STATUSES: readonly WorkflowRunStatus[] = ["completed", "cancelled", "failed"];
+const TERMINAL_STATUSES: readonly WorkflowRunStatus[] = ["completed", "cancelled", "failed", "refused"];
 
 /** True when the run has reached a terminal lifecycle status. */
 function isTerminal(run: WorkflowRun): boolean {
@@ -145,7 +150,8 @@ function awaitingOutputOf(run: WorkflowRun, def: WorkflowDef): boolean {
   const entry = run.stageLog.find((e) => e.stageId === run.currentStage);
   if (entry?.status !== "awaiting-gate") return false;
   const stage = def.stages.find((s) => s.id === run.currentStage);
-  if (stage === undefined || (stage.writes.length === 0 && (stage.artifactWrites ?? []).length === 0)) return false;
+  if (stage === undefined || (stage.writes.length === 0 && (stage.artifactWrites ?? []).length === 0
+    && stage.productAction === undefined)) return false;
   return run.outputs[run.currentStage] === undefined;
 }
 
@@ -178,7 +184,7 @@ function currentStageFirstArtifactWrite(run: WorkflowRun, def: WorkflowDef): str
  * stage, OR a renamed id via `previousIds`) is `needs-adaptation`; only an
  * UNMAPPABLE current stage (removed, not renamed) is `blocked-by-config`.
  */
-function classifyRun(run: WorkflowRun, profile: ProfilePack): RunClassification {
+export function classifyRun(run: WorkflowRun, profile: ProfilePack): RunClassification {
   if (isTerminal(run)) return "historical";
   const def = lookupWorkflowDef(profile.workflows, run.workflowId);
   if (def === undefined) return "historical";
@@ -202,6 +208,11 @@ function applyParkHints(status: RunStatus, run: WorkflowRun, def: WorkflowDef): 
     status.awaitingGate = gate.id;
     if (gate.trust) status.awaitingTrustGate = true;
   }
+  const humanInput = currentHumanInput(run, def);
+  if (humanInput !== undefined) {
+    status.needsHumanInput = true;
+    status.humanInputSchemaId = humanInput;
+  }
   if (!awaitingOutputOf(run, def)) return;
   status.awaitingOutput = true;
   const writeType = currentStageFirstWrite(run, def);
@@ -210,11 +221,25 @@ function applyParkHints(status: RunStatus, run: WorkflowRun, def: WorkflowDef): 
   if (artifactType !== undefined) status.nextSubmitArtifactType = artifactType;
 }
 
+/** Return the schema id when the current stage is parked for human input. */
+function currentHumanInput(run: WorkflowRun, def: WorkflowDef): string | undefined {
+  if (run.currentStage === null || Object.hasOwn(run.outputs, run.currentStage)) return undefined;
+  const entry = run.stageLog.find((item) => item.stageId === run.currentStage);
+  if (entry?.status !== "awaiting-gate") return undefined;
+  return def.stages.find((stage) => stage.id === run.currentStage)?.humanInput?.schemaId;
+}
+
 /** Read one run and turn it into a {@link RunStatus}, failing closed on absent/unavailable. */
 async function statusForRun(root: string, runId: string, profile: ProfilePack): Promise<RunStatus> {
   const read = await readRun(root, runId);
   if (read.status === "absent") return { runId, classification: "blocked-by-config", problem: "run file absent" };
   if (read.status === "unavailable") return { runId, classification: "blocked-by-config", problem: read.detail };
+  try {
+    await assertCurrentWorkflowProcessAuthority(root, read.run);
+  } catch (error) {
+    const problem = error instanceof Error ? error.message : "workflow process authority is unavailable";
+    return { runId, classification: "blocked-by-config", run: read.run, problem };
+  }
   const classification = classifyRun(read.run, profile);
   const status: RunStatus = { runId, classification, run: read.run };
   const def = lookupWorkflowDef(profile.workflows, read.run.workflowId);
