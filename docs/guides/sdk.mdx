@@ -58,6 +58,29 @@ console.log(`${status.pages.total} pages, ${status.sources} sources`);
 
 ## Method reference
 
+### Read-only domain observations
+
+The experimental package exports `activeProfileDigest(root)`,
+`loadNonDefaultProfile(root)`, and
+`readConfinedCappedBuffer(root, leaf, expectedDir, maxBytes)` for external
+coordinators. These require no write grant and do not mutate the project.
+
+`activeProfileDigest` returns the compiler's bare SHA-256 profile digest,
+including for the built-in default. `loadNonDefaultProfile` returns the validated
+`LoadedProfile`, or `undefined` for that built-in default. Both reject an invalid
+active profile rather than silently falling back. A digest is an observation,
+not a lock against later profile changes or permission to mutate records.
+
+The byte reader accepts a direct leaf of an existing canonical directory under
+the supplied root. It rejects symlinked leaves/parents, out-of-root or mismatched
+selectors, and invalid byte budgets. Results are `ok` with a `Buffer`, `oversize`
+with `actualBytes`, `absent` for a missing leaf under a verified parent, or
+`unavailable` when the read cannot be trusted. Missing/unresolvable parents are
+`unavailable`, not proof of absence. Budgets must be nonnegative safe integers
+less than `Number.MAX_SAFE_INTEGER`; reading is bounded even if the file grows.
+Reads are point-in-time observations, not transactional snapshots of concurrent
+in-place file edits. Use compiler mutation APIs for authority and preconditions.
+
 ### Verified artifact reads and discovery
 
 `wiki.readVerifiedArtifactBody(ref)` returns `{ health, bytes? }`. Bytes are returned only when the current profile, manifest, content hash, and body contract verify successfully. It returns the same verified UTF-8 body snapshot without reopening the file. For a member-bearing artifact, this body is the JSON member manifest, not the files packed together; all members must also verify before the manifest is returned.

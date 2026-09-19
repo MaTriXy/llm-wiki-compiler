@@ -113,7 +113,12 @@ export type {
 } from "./trust/planner.js";
 export type { TrustDecision } from "./trust/decision.js";
 
-// Profile pack TYPES only — the loader stays internal (no `loadProfile` export).
+// Experimental read-only domain contract. The unrestricted loader stays internal;
+// the non-default projection preserves the existing compiler profile validation.
+export { activeProfileDigest, readConfinedCappedBuffer } from "./sdk/domain-read.js";
+export type { ConfinedCappedRead } from "./sdk/domain-read.js";
+export { loadNonDefaultProfile } from "./profile/block.js";
+// Profile pack types for callers interpreting the read-only projection.
 export type {
   ProfilePack,
   EntityId,
