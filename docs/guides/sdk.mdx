@@ -58,6 +58,30 @@ console.log(`${status.pages.total} pages, ${status.sources} sources`);
 
 ## Method reference
 
+### Verified artifact reads and discovery
+
+`wiki.readVerifiedArtifactBody(ref)` returns `{ health, bytes? }`. Bytes are returned only when the current profile, manifest, content hash, and body contract verify successfully. It returns the same verified UTF-8 body snapshot without reopening the file. For a member-bearing artifact, this body is the JSON member manifest, not the files packed together; all members must also verify before the manifest is returned.
+
+`wiki.discoverArtifact({ artifactType, slug })` locates one exact artifact and returns `{ status: "found", ref }` only after fresh verification. The selector must contain exactly those two own data properties with safe identifiers. Invalid selectors throw `TypeError`; missing, unhealthy, or unreadable artifacts return `{ status: "unavailable" }`.
+
+Both methods require an active non-default profile declaring artifact types, otherwise they throw `ArtifactVerifyUnavailableError`. Neither requires an artifact-write grant or modifies the wiki. An unavailable discovery result does **not** prove that a previous write did not occur; a found reference does **not** authenticate a workflow occurrence or authorize an operation.
+
+### Binary files in artifact bundles
+
+A profile artifact type can declare a `members` policy instead of `metadata`. Its `contentKind` must be `json`; its declared file holds a compiler-generated manifest. The policy specifies `maxCount`, `maxMemberBytes`, and `maxTotalBytes`, with optional `allowedExtensions`, `requiredNames`, and `exactNames`.
+
+```ts
+const { ref } = await wiki.writeArtifact({
+  artifactType: "edition-assets", // declared by the active profile
+  slug: "issue-01",
+  memberFiles: [{ fileName: "cover.jpg", bytes: jpegBytes }],
+});
+```
+
+Supply exactly one of `body` or `memberFiles`. Member bytes are copied synchronously, hashed, sorted by name, and bound into the manifest; callers cannot supply their own manifest hashes. The existing operator-configured artifact-write grant is still required. Reads require no write grant.
+
+Replacement journals the previous manifest and binary files before writing or removing obsolete members. Verification rejects changed or missing members and unexpected directory entries. Case/Unicode-aliasing names are refused conservatively. Bundle verification is a point-in-time check, not a filesystem snapshot held for future reads. This port adds no member-download API or product workflow.
+
 ### Ingest
 
 <ParamField body="wiki.ingest({ source })" type="Promise<IngestResult>">

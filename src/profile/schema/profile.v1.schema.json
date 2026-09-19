@@ -248,7 +248,21 @@
         "fileName": { "type": "string", "minLength": 1 },
         "contentKind": { "enum": ["json", "text"] },
         "maxBytes": { "type": "integer", "minimum": 1 },
-        "metadata": { "type": "object", "additionalProperties": { "$ref": "#/$defs/fieldDef" } }
+        "metadata": { "type": "object", "additionalProperties": { "$ref": "#/$defs/fieldDef" } },
+        "members": {
+          "type": "object",
+          "description": "Member-bearing declaration (json only; exclusive with metadata): the declared file is a member manifest over flat sibling leaves. Structural policy only — enforced identically on write and on read by validateArtifactBody().",
+          "required": ["maxCount", "maxMemberBytes", "maxTotalBytes"],
+          "additionalProperties": false,
+          "properties": {
+            "maxCount": { "type": "integer", "minimum": 1 },
+            "maxMemberBytes": { "type": "integer", "minimum": 1 },
+            "maxTotalBytes": { "type": "integer", "minimum": 1 },
+            "allowedExtensions": { "type": "array", "items": { "type": "string", "minLength": 2 } },
+            "requiredNames": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "exactNames": { "type": "boolean" }
+          }
+        }
       }
     },
     "connectorBindingDef": {

@@ -37,6 +37,9 @@ import type { ActionRunResult } from "../workflows/run-action.js";
 import type { ProjectionResult } from "../workflows/projection.js";
 import type { ArtifactRef } from "../artifacts/ref.js";
 import type { ArtifactHealth } from "../artifacts/resolve.js";
+import type { VerifiedArtifactBodyV1 } from "../artifacts/read-verified.js";
+import type { ArtifactSelectorV1, ArtifactDiscoveryV1 } from "../artifacts/discover.js";
+import type { ArtifactMemberFileInput } from "../artifacts/members.js";
 
 /**
  * @experimental
@@ -60,14 +63,15 @@ export interface SdkTransitionLifecycleInput {
  * slug, and raw body bytes (as a string). Mirrors the CLI `artifact write`
  * `--type`/`--slug`/`--body` flags; the SDK has no file-path body source.
  */
-export interface SdkWriteArtifactInput {
+export type SdkWriteArtifactInput = {
   /** Profile-declared artifact type (`profile.artifacts[artifactType]`). */
   artifactType: string;
   /** Artifact slug (the identifier within its type). */
   slug: string;
-  /** Raw artifact body bytes. Hashed as-is; no encoding is inferred. */
-  body: string;
-}
+} & (
+  | { body: string; memberFiles?: undefined }
+  | { body?: undefined; memberFiles: readonly ArtifactMemberFileInput[] }
+);
 
 /** Options for `createWiki`. */
 export interface CreateWikiOptions {
@@ -553,4 +557,10 @@ export interface Wiki {
    * Foundation API — the shape may change in a future minor release.
    */
   verifyArtifact(ref: ArtifactRef): Promise<{ health: ArtifactHealth }>;
+
+  /** Read exact verified bytes; requires an active profile declaring artifact types. */
+  readVerifiedArtifactBody(ref: ArtifactRef): Promise<VerifiedArtifactBodyV1>;
+
+  /** Recover an exact verified ref; unavailable is not proof that no write occurred. */
+  discoverArtifact(selector: ArtifactSelectorV1): Promise<ArtifactDiscoveryV1>;
 }

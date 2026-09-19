@@ -49,6 +49,18 @@ import { loadNonDefaultProfile } from "../profile/block.js";
 import { resolveArtifactRef, declaresArtifactTypes, ArtifactVerifyUnavailableError, type ArtifactHealth } from "../artifacts/resolve.js";
 import type { ArtifactPlannedMutation } from "../trust/planner.js";
 import type { CreateWikiOptions, Wiki, SdkCompileOptions } from "./types.js";
+import { readVerifiedArtifactBody } from "../artifacts/read-verified.js";
+import { captureArtifactSelector, discoverArtifact } from "../artifacts/discover.js";
+
+/** Share the active-profile admission across artifact read surfaces. */
+async function requireArtifactProfile(root: string) {
+  const loaded = await loadNonDefaultProfile(root);
+  if (!loaded) throw new ArtifactVerifyUnavailableError("no-profile", "the project has no non-default profile");
+  if (!declaresArtifactTypes(loaded.profile)) {
+    throw new ArtifactVerifyUnavailableError("no-artifact-types", "no artifact types declared by the active profile");
+  }
+  return loaded.profile;
+}
 
 /**
  * Run `fn` with output scoped quiet via AsyncLocalStorage.
@@ -158,19 +170,34 @@ export function createWiki(options: CreateWikiOptions): Wiki {
     // the call site. Naming each field (rather than spreading `input`) means no
     // caller-injected property can ride along and override the SDK-stamped
     // `origin` or `kind`.
-    writeArtifact: (input) =>
-      runQuiet(async () => {
-        const mutation: ArtifactPlannedMutation = {
-          kind: "artifact",
-          artifactType: input.artifactType,
-          slug: input.slug,
-          body: input.body,
-          origin: "sdk",
-        };
+    writeArtifact: (input) => {
+      // EXACTLY one of body/memberFiles: neither would synthesize an empty
+      // body, and BOTH would silently discard the caller's body — a JS caller
+      // can pass either shape, so the contract is enforced at runtime.
+      if ((input.body === undefined) === (input.memberFiles === undefined)) {
+        return Promise.reject(new Error("writeArtifact requires exactly one of body or memberFiles"));
+      }
+      // SNAPSHOT SYNCHRONOUSLY, before the first await: member bytes are
+      // caller-owned mutable views, and hashing one snapshot while writing
+      // another would be a forged-manifest channel. Copying here (and again at
+      // the executor for non-SDK callers) pins hash === written bytes.
+      const mutation: ArtifactPlannedMutation = {
+        kind: "artifact",
+        artifactType: input.artifactType,
+        slug: input.slug,
+        // A member-bearing write carries an EMPTY body: core derives the manifest.
+        body: input.memberFiles === undefined ? (input.body as string) : "",
+        ...(input.memberFiles === undefined ? {} : {
+          memberFiles: input.memberFiles.map((file) => ({ fileName: file.fileName, bytes: Uint8Array.from(file.bytes) })),
+        }),
+        origin: "sdk",
+      };
+      return runQuiet(async () => {
         const [result] = await applyApprovedMutations(root, [mutation]);
         if (result.kind !== "artifact") throw new Error("executor returned a non-artifact result for an artifact write");
         return { ref: result.ref };
-      }),
+      });
+    },
 
     // `resolveArtifactRef` also returns the parsed manifest now (an MCP-only
     // optimization — see `src/mcp/tools.ts`); project it away here rather than
@@ -178,14 +205,17 @@ export function createWiki(options: CreateWikiOptions): Wiki {
     // stays exactly `{ health }` and never leaks manifest fields.
     verifyArtifact: (ref): Promise<{ health: ArtifactHealth }> =>
       runQuiet(async () => {
-        const loaded = await loadNonDefaultProfile(root);
-        if (!loaded) throw new ArtifactVerifyUnavailableError("no-profile", "the project has no non-default profile");
-        if (!declaresArtifactTypes(loaded.profile)) {
-          throw new ArtifactVerifyUnavailableError("no-artifact-types", "no artifact types declared by the active profile");
-        }
-        const { health } = await resolveArtifactRef(root, loaded.profile, ref);
+        const { health } = await resolveArtifactRef(root, await requireArtifactProfile(root), ref);
         return { health };
       }),
+
+    readVerifiedArtifactBody: (ref) => runQuiet(async () =>
+      readVerifiedArtifactBody(root, await requireArtifactProfile(root), ref)),
+
+    discoverArtifact: (selector) => runQuiet(async () => {
+      const captured = captureArtifactSelector(selector);
+      return discoverArtifact(root, await requireArtifactProfile(root), captured);
+    }),
 
     // @experimental non-default staging slice — factored into staging-facade.ts.
     ...buildStagingFacade(root, runQuiet),

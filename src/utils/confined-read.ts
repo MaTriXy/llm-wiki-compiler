@@ -224,11 +224,22 @@ export async function openConfinedLeaf(root: string, leaf: string, expectedDir: 
  * the handle.
  */
 export async function readWithinCapOrElse<T>(opened: Extract<ConfinedLeafOpen, { kind: "confirmed" }>, maxBytes: number, onOversize: (actualBytes: number) => T): Promise<CappedLeafRead | T> {
+  const result = await readConfirmedBufferOrElse(opened, maxBytes, onOversize);
+  if (typeof result !== "object" || result === null || !("kind" in result) || result.kind !== "ok") {
+    return result as CappedLeafRead | T;
+  }
+  try {
+    return { kind: "ok", body: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(result.body) };
+  } catch { return { kind: "unavailable" }; }
+}
+
+/** Exact bytes from the same confined handle; no decoding or second path open. */
+export async function readConfirmedBufferOrElse<T>(opened: Extract<ConfinedLeafOpen, { kind: "confirmed" }>, maxBytes: number, onOversize: (actualBytes: number) => T): Promise<CappedLeafReadBuffer | T> {
   try {
     if (opened.size > maxBytes) return onOversize(opened.size);
     const bytes = await readBoundedBytes(opened.handle, maxBytes);
     if (bytes.length > maxBytes) return onOversize((await opened.handle.stat()).size);
-    return { kind: "ok", body: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) };
+    return { kind: "ok", body: bytes };
   } catch {
     return { kind: "unavailable" };
   } finally {
@@ -266,6 +277,13 @@ export async function readConfinedLeaf(root: string, leaf: string, expectedDir: 
   const opened = await openConfinedLeaf(root, leaf, expectedDir, opts);
   if (opened.kind !== "confirmed") return opened;
   return readWithinCapOrElse(opened, maxBytes, () => ({ kind: "unavailable" as const }));
+}
+
+/** Binary sibling of the confined text reader, with identical cap and path policy. */
+export async function readConfinedLeafBuffer(root: string, leaf: string, expectedDir: string, maxBytes: number, opts: ReadLeafOptions = {}): Promise<CappedLeafReadBuffer> {
+  const opened = await openConfinedLeaf(root, leaf, expectedDir, opts);
+  if (opened.kind !== "confirmed") return opened;
+  return readConfirmedBufferOrElse(opened, maxBytes, () => ({ kind: "unavailable" as const }));
 }
 
 /** Test-only seam: lets a test interpose between `open` and the post-check. */

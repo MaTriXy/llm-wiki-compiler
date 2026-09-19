@@ -63,6 +63,9 @@ export type { SdkWriteArtifactInput } from "./sdk/types.js";
 export type { ArtifactRef } from "./artifacts/ref.js";
 export type { ArtifactHealth } from "./artifacts/resolve.js";
 export { ArtifactVerifyUnavailableError } from "./artifacts/resolve.js";
+export type { VerifiedArtifactBodyV1 } from "./artifacts/read-verified.js";
+export type { ArtifactSelectorV1, ArtifactDiscoveryV1 } from "./artifacts/discover.js";
+export type { ArtifactMemberFileInput } from "./artifacts/members.js";
 
 // @experimental — programmatic non-default entity-page staging loop. The
 // `createWiki()` facade exposes `stageEntityPage`/`promoteStagedPage`; these are

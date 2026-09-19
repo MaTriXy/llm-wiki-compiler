@@ -57,6 +57,7 @@ import { ProfileValidationError } from "./errors.js";
 import { SOURCES_DIR, LLMWIKI_DIR, EXPORT_DIR, CONCEPTS_DIR, QUERIES_DIR, WORKFLOW_PROJECTION_DIR } from "../utils/constants.js";
 import { isValidArtifactFileName, MAX_ARTIFACT_BYTES } from "../artifacts/name.js";
 import { getConnectorDef } from "../connectors/registry.js";
+import { assertMembersDef } from "./validate-artifact-members.js";
 
 export { ProfileValidationError } from "./errors.js";
 
@@ -611,6 +612,7 @@ function validateArtifacts(profile: ProfilePack, declaredArtifactTypes: Set<stri
       `artifact ${JSON.stringify(id)} maxBytes must be in 1..${MAX_ARTIFACT_BYTES}`);
     assert(def.contentKind === "json" || def.metadata === undefined,
       `artifact ${JSON.stringify(id)} metadata is permitted only when contentKind is "json"`);
+    if (def.members !== undefined) assertMembersDef(id, def);
     // The SHARED FieldType union includes artifactRef, which would make `metadata`
     // a third consumer of it — but Layer B and ref-health never run on artifact
     // bodies, so a nested artifact→artifact ref would be silently half-supported.

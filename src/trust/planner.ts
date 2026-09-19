@@ -32,6 +32,7 @@ import { runMandatoryPageChecks, resourceCapForOrigin, type PageWriteContext } f
 import { composeTrustDecision, type TrustDecision, type TrustCheckResult } from "./decision.js";
 import { entityId, isSlugSafe, isSafeFilenameComponent } from "../profile/identity.js";
 import type { EntityId } from "../profile/types.js";
+import type { ArtifactMemberFileInput } from "../artifacts/members.js";
 import type { AppendRelationInput } from "../relations/store.js";
 
 /** Every CLP store a mutation can target. The executor handles `page`, `relation`,
@@ -136,7 +137,13 @@ export interface ArtifactPlannedMutation {
   kind: "artifact";
   artifactType: string;
   slug: string;
+  /** The bytes to write; for a member-bearing type this must be EMPTY (core derives the manifest). */
   body: string;
+  /**
+   * The member leaves of a member-bearing type (bytes only — core hashes them
+   * and renders the manifest). Refused on a type that declares no members.
+   */
+  memberFiles?: readonly ArtifactMemberFileInput[];
   /** Provenance recorded in the audit event; set by the calling surface (F2). */
   origin: ArtifactOrigin;
 }

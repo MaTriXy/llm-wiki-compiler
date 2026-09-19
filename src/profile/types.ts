@@ -280,6 +280,32 @@ export interface ArtifactTypeDef {
   maxBytes: number;
   /** OPTIONAL partial scalar field-contract over top-level JSON object fields (json only). */
   metadata?: Record<string, FieldDef>;
+  /**
+   * OPTIONAL member-bearing declaration (json only; exclusive with `metadata`):
+   * the declared file becomes a core-schema MEMBER MANIFEST listing flat
+   * sibling leaves by name, sha256, and byte count, so the pinned ref is a
+   * Merkle root over binary-capable members (see src/artifacts/members.ts).
+   */
+  members?: ArtifactMembersDef;
+}
+
+/**
+ * The generic member policy of a member-bearing artifact type. Vocabulary is
+ * structural only (counts, bytes, names, extensions) — never a product's.
+ */
+export interface ArtifactMembersDef {
+  /** Maximum number of member leaves. */
+  maxCount: number;
+  /** Inclusive per-member byte ceiling. */
+  maxMemberBytes: number;
+  /** Inclusive ceiling over the SUM of member byte counts. */
+  maxTotalBytes: number;
+  /** When present, every member's lower-cased extension must be one of these (e.g. ".tex"). */
+  allowedExtensions?: string[];
+  /** Member names that must each be present. */
+  requiredNames?: string[];
+  /** When true, any member OUTSIDE `requiredNames` is refused. */
+  exactNames?: boolean;
 }
 
 /** A profile pack: the full declarative description of a wiki's entity types. */
