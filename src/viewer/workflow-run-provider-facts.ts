@@ -12,6 +12,7 @@ import type {
   StageOutputRef, VerifiedExperimentStateV1, VerifiedFactPanelV1,
   VerifiedFactRowV1, VerifiedStageFactsV1,
 } from "./workflow-run-projection.js";
+import { snapshotOptionalExperimentState } from "./compat/experiment-state.js";
 
 /** Bounds on a provider's verified-facts payload (fail-closed: a value past a bound degrades). */
 const MAX_STAGE_STRING_LEN = 4_000;
@@ -38,24 +39,6 @@ export interface NormalizedFacts {
   readonly pdfRef?: StageOutputRef & { readonly member: string };
   readonly experimentState?: VerifiedExperimentStateV1;
   readonly factPanel?: VerifiedFactPanelV1;
-}
-
-/** Allowed verdict values per closed lifecycle; non-judged states require absence. */
-const EXPERIMENT_LIFECYCLE_VERDICTS: Readonly<Record<string, readonly unknown[]>> = {
-  designed: [undefined], executing: [undefined], "result-recorded": [undefined],
-  judged: ["supports", "contradicts"],
-};
-
-/** Read an optional experiment-state object ONCE into a fresh closed snapshot. */
-function snapshotExperimentState(value: unknown): VerifiedExperimentStateV1 | null {
-  if (typeof value !== "object" || value === null) return null;
-  const raw = value as Record<string, unknown>;
-  const hypothesis = raw.hypothesis, slug = raw.slug, lifecycle = raw.lifecycle, verdict = raw.verdict;
-  const allowedVerdicts = typeof lifecycle === "string" ? EXPERIMENT_LIFECYCLE_VERDICTS[lifecycle] : undefined;
-  const fieldsValid = [isBoundedString(hypothesis), isBoundedString(slug), allowedVerdicts?.includes(verdict) === true];
-  if (!fieldsValid.every(Boolean)) return null;
-  const base = { hypothesis, slug, lifecycle } as VerifiedExperimentStateV1;
-  return verdict === undefined ? base : { ...base, verdict } as VerifiedExperimentStateV1;
 }
 
 /**
@@ -142,8 +125,7 @@ export function normalizeVerifiedFacts(facts: VerifiedStageFactsV1): NormalizedF
   const required = snapshotRequiredFacts(facts);
   const groundedRefs = snapshotOptionalStrings(facts.groundedRefs);
   const pdfRef = snapshotOptionalPdf(facts.pdfRef);
-  const rawExperimentState = facts.experimentState;
-  const experimentState = rawExperimentState === undefined ? undefined : snapshotExperimentState(rawExperimentState);
+  const experimentState = snapshotOptionalExperimentState(facts.experimentState);
   const rawFactPanel = facts.factPanel;
   const factPanel = rawFactPanel === undefined ? undefined : snapshotFactPanel(rawFactPanel);
   if (required === null || groundedRefs === null || pdfRef === null

@@ -51,6 +51,7 @@
   },
   "files": [
     "dist/",
+    "ARCHITECTURE.md",
     "CHANGELOG.md",
     "LICENSE",
     "README.md"

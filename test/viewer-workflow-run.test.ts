@@ -344,10 +344,12 @@ describe("llmwiki view — /api/workflows/:workflowId/runs/:runId (subprocess)",
     const root = await makeTempRoot("wf-run-asset");
     await installWorkflowProfile(root);
     const handle = await startViewerProcess(root);
-    const asset = await fetch(`http://${handle.host}:${handle.port}/assets/viewer-stage-facts.js`);
-    expect(asset.status).toBe(200);
-    expect(asset.headers.get("Content-Type")).toContain("application/javascript");
-    expect(asset.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+    for (const name of ["viewer-stage-facts.js", "viewer-experiment-compat.js"]) {
+      const asset = await fetch(`http://${handle.host}:${handle.port}/assets/${name}`);
+      expect(asset.status).toBe(200);
+      expect(asset.headers.get("Content-Type")).toContain("application/javascript");
+      expect(asset.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+    }
     const runs = await fetchJson(handle, "/api/workflow-runs");
     expect(runs.status).toBe(200);
     expect(Array.isArray((runs.body as { runs: unknown[] }).runs)).toBe(true);

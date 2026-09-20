@@ -40,6 +40,11 @@ const PUBLIC_TEMPLATE_IDENTITIES = new Map([
 /** The repo-root packages/ directory product instances live in. */
 const PACKAGES_DIR = path.resolve(SRC_DIR, "../packages");
 
+/** External coordinators and product implementations must depend on the compiler, not vice versa. */
+function isExternalProductRuntime(specifier: string): boolean {
+  return /^(?:@temporalio\/|@dbos-inc\/|(?:llmflow(?:-internal)?|llmwiki-(?:autosci|newsroom))(?:\/|$))/.test(specifier);
+}
+
 /**
  * THE AUTHORITY IS TYPESCRIPT'S OWN PREPROCESSOR, not a rule this file invents.
  *
@@ -133,7 +138,7 @@ describe("product boundary: core is generic, products are packages", () => {
     for (const file of srcTsFiles()) {
       const source = readFileSync(path.join(SRC_DIR, file), "utf8");
       for (const { pos, specifier } of importedSpecifiers(source)) {
-        if (!reachesPackages(file, specifier)) continue;
+        if (!reachesPackages(file, specifier) && !isExternalProductRuntime(specifier)) continue;
         const line = source.slice(0, pos).split("\n").length;
         offenders.push(`src/${file}:${line}: ${specifier}`);
       }
@@ -160,5 +165,20 @@ describe("product boundary: core is generic, products are packages", () => {
     expect(isPublicTemplateIdentity(file, 'profileId: "other",')).toBe(false);
     expect(isPublicTemplateIdentity(file, 'productId: "newsroom",')).toBe(false);
     expect(isPublicTemplateIdentity("commands/newsroom.ts", 'profileId: "newsroom",')).toBe(false);
+  });
+
+  it("recognizes installed product and engine imports as well as deep imports", () => {
+    for (const name of ["llmwiki-autosci", "llmwiki-newsroom/helpers", "llmflow", "@temporalio/worker", "@dbos-inc/dbos-sdk"]) {
+      expect(isExternalProductRuntime(name)).toBe(true);
+    }
+    expect(isExternalProductRuntime("../profile/templates/builtin/newsroom.js")).toBe(false);
+    expect(isExternalProductRuntime("./workflows/start.js")).toBe(false);
+  });
+
+  it("does not declare known product or orchestration packages as compiler dependencies", () => {
+    const manifest = JSON.parse(readFileSync(path.resolve(SRC_DIR, "../package.json"), "utf8"));
+    const names = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]
+      .flatMap((field) => Object.keys(manifest[field] ?? {}));
+    expect(names.filter(isExternalProductRuntime)).toEqual([]);
   });
 });

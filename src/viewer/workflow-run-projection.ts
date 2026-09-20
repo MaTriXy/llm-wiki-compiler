@@ -3,8 +3,8 @@
  * @description The GENERIC, request-time per-run stage projection the viewer serves
  * at `/api/workflows/:workflowId/runs/:runId` (P9.1). It is workflow-AGNOSTIC — it
  * reads only core workflow seams (`readRun`, `classifyRun`, `lookupWorkflowDef`) and
- * projects each stage's generic status + gate lifecycle. It contains NO product
- * vocabulary (the `no-research-branch-in-core` invariant), and never interprets a
+ * projects each stage's generic status + gate lifecycle. Scientific presentation
+ * compatibility is isolated in `compat/`; this module never interprets a
  * stage's recorded output beyond its opaque artifact ref.
  *
  * "What happened scientifically" is NOT core's to assert: a recorded checkpoint is a
@@ -36,6 +36,8 @@ import { loadProfile } from "../profile/load.js";
 import { applyLiveStageProvider } from "./workflow-run-facts.js";
 import type { WorkflowRun, WorkflowActorKind, WorkflowEvent } from "../workflows/types.js";
 import type { WorkflowDef } from "../profile/types.js";
+import type { VerifiedExperimentStateV1 } from "./compat/experiment-state.js";
+export type { VerifiedExperimentStateV1 } from "./compat/experiment-state.js";
 
 /** The minimum wait for a never-settling provider before the live route degrades. */
 const MIN_PROVIDER_TIMEOUT_MS = 60_000;
@@ -73,17 +75,6 @@ export interface StageOutputRef {
   readonly artifactType: string;
   readonly slug: string;
   readonly sha256: string;
-}
-
-/**
- * Legacy provider compatibility only; no process transitions derive from it.
- * @deprecated New product providers should supply the generic factPanel.
- */
-export interface VerifiedExperimentStateV1 {
-  readonly hypothesis: string;
-  readonly slug: string;
-  readonly lifecycle: "designed" | "executing" | "result-recorded" | "judged";
-  readonly verdict?: "supports" | "contradicts";
 }
 
 /** Closed presentation tones for one verified generic fact. */

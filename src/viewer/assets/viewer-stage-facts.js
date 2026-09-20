@@ -2,7 +2,7 @@
  * @file viewer-stage-facts.js
  * @description CSP-safe DOM builders for verified stage facts. The module is
  * product-neutral: it renders bounded projection text, closed tone classes,
- * provenance edges, and the existing optional experiment compatibility panel.
+ * and provenance edges. Legacy product presentation lives in its own adapter.
  */
 
 const FACT_TONES = new Set(["neutral", "success", "warning", "danger"]);
@@ -20,45 +20,6 @@ export function buildVerifiedStageFacts(stage) {
   const panel = buildFactPanel(stage.factPanel);
   if (panel) fragment.appendChild(panel);
   return fragment;
-}
-
-/** Compatibility panel for older providers; never infer facts from stage ids. */
-export function buildExperimentPanel(stages) {
-  const verified = [...stages].reverse().map(verifiedExperimentState).find(Boolean);
-  if (!verified) return null;
-  const panel = document.createElement("section");
-  panel.className = "journey-experiment";
-  panel.appendChild(buildHeading("h2", "Experiment state"));
-  appendExperimentFact(panel, "hypothesis", "Hypothesis", verified.hypothesis, true);
-  appendExperimentFact(panel, "slug", "Experiment", verified.slug, true);
-  appendExperimentFact(panel, "lifecycle", "Lifecycle", experimentLifecycleText(verified), true);
-  return panel;
-}
-
-/** Return a verified row's minimum closed experiment-fact shape, else null. */
-function verifiedExperimentState(stage) {
-  const safeStage = Object(stage);
-  const facts = Object(safeStage.experimentState);
-  const valid = [safeStage.verification === "verified", isNonEmptyString(facts.hypothesis),
-    isNonEmptyString(facts.slug), isNonEmptyString(facts.lifecycle)].every(Boolean);
-  return valid ? safeStage.experimentState : null;
-}
-
-/** Render a verified lifecycle and its optional judged verdict. */
-function experimentLifecycleText(state) {
-  if (state.lifecycle !== "judged" || !isNonEmptyString(state.verdict)) return state.lifecycle;
-  return `${state.lifecycle}: ${state.verdict}`;
-}
-
-/** Append one experiment fact with an explicit proof label. */
-function appendExperimentFact(panel, key, label, value, verified) {
-  const row = document.createElement("p");
-  row.className = "journey-experiment-fact";
-  row.dataset.experimentField = key;
-  row.appendChild(buildSpan("journey-experiment-label", `${label}: `));
-  row.appendChild(document.createTextNode(value));
-  row.appendChild(buildSpan("journey-experiment-proof", verified ? "Verified" : "Recorded only"));
-  panel.appendChild(row);
 }
 
 /** Build the product-neutral verified summary and evidence block. */

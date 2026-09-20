@@ -2,10 +2,10 @@
  * @file src/index.ts
  * @description Public SDK surface for llm-wiki-compiler.
  *
- * Re-exports the stable, consumer-facing types and error classes that form the
- * library API. CLI internals (commander setup, prompts, viewer server) are
- * intentionally excluded — they live only in src/cli.ts and are not part of
- * the programmatic API.
+ * Re-exports consumer-facing types, errors, and opt-in integration surfaces.
+ * Experimental APIs retain their individual stability annotations. Commander
+ * setup and prompts remain CLI internals; the viewer has an explicit embedding
+ * entry point. Product instances and external workflow engines are not bundled.
  *
  * Consumers can import types and errors directly:
  *   import type { Page, PageRef } from "llm-wiki-compiler";

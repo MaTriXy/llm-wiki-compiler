@@ -91,6 +91,7 @@ const MODULE_ORDER = [
   "viewer-nav-types.js",
   "viewer-sidebar.js",
   "viewer-stage-facts.js",
+  "viewer-experiment-compat.js",
   "viewer-journey.js",
   "viewer-journey-route.js",
   "viewer-dashboard-vocabulary.js",

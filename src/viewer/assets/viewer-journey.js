@@ -16,10 +16,11 @@
  *
  * The module is workflow-GENERIC: it renders whatever the projection returns
  * (verified via a product provider, recorded-only via plain `llmwiki view`)
- * and carries no product vocabulary.
+ * with a separately isolated presentation adapter for archived providers.
  */
 
-import { buildExperimentPanel, buildVerifiedStageFacts } from "./viewer-stage-facts.js";
+import { buildVerifiedStageFacts } from "./viewer-stage-facts.js";
+import { buildExperimentPanel } from "./viewer-experiment-compat.js";
 
 /** Human-readable labels for each run classification the projection can carry. */
 const CLASSIFICATION_LABELS = {
@@ -37,7 +38,7 @@ const GATE_STATE_TEXT = {
 };
 
 /**
- * Render the per-run research journey into `main`, or a visible error panel
+ * Render the per-run workflow journey into `main`, or a visible error panel
  * when the response is a problem envelope / not a valid projection.
  *
  * @param {HTMLElement} main - The main pane to render into (cleared first).

@@ -6,6 +6,10 @@
 > viewer. Standalone AutoSci/Newsroom process packages are not included; their
 > existing builtin ontology templates remain supported.
 
+See [Compiler, integrations, and products](ARCHITECTURE.md) for the ownership
+boundaries between base llmwiki, configurable domain capabilities, external
+orchestration, and product implementations.
+
 ### Development runtime authority
 
 SDK clients can prepare, observe and retire record effects with explicit grants.
