@@ -11,6 +11,7 @@ import {
   captureConnectorCandidateIds,
   captureConnectorReason,
 } from "./candidate-batch.js";
+import type { CandidateCustodyPolicy } from "../compiler/candidate-custody-limits.js";
 
 /** Ordinary generated candidate identities preserve their historical display. */
 const ORDINARY_CANDIDATE_ID = /^[A-Za-z0-9._-]+$/;
@@ -74,8 +75,10 @@ export function renderConnectorReason(reason: string): string {
 }
 
 /** Render one already-validated bounded candidate list without truncation. */
-export function renderCandidateIds(candidateIds: readonly string[]): string {
-  const captured = captureConnectorCandidateIds(candidateIds);
+export function renderCandidateIds(
+  candidateIds: readonly string[], policy: CandidateCustodyPolicy = "bounded",
+): string {
+  const captured = captureConnectorCandidateIds(candidateIds, policy);
   let rendered = "";
   for (let index = 0; index < captured.length; index += 1) {
     if (index > 0) rendered += ", ";

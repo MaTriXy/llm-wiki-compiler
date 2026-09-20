@@ -48,6 +48,7 @@ async function expectRefreshRuns(value: string | undefined): Promise<void> {
   const provider = vi.spyOn(embeddings, "updateEmbeddingsLockedCore").mockResolvedValue({
     embedded: [PAGE_ID],
     eligible: [PAGE_ID],
+    pruned: [],
   });
 
   await refreshEmbeddingsDrainingPending(root, [PAGE_ID]);
@@ -101,6 +102,7 @@ describe("LLMWIKI_EMBEDDINGS", () => {
     const provider = vi.spyOn(embeddings, "updateEmbeddingsLockedCore").mockResolvedValue({
       embedded: [],
       eligible: [],
+      pruned: [],
     });
 
     await refreshEmbeddingsDrainingPending(root, []);

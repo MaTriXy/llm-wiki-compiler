@@ -20,6 +20,7 @@ import {
 } from "../../src/operation-bundles/catalog-store.js";
 import type { MutationId } from "../../src/operation-bundles/ids.js";
 import { operationPaths } from "../../src/operation-bundles/paths.js";
+import { AtomicWritePostCommitError } from "../../src/utils/atomic-write.js";
 import { makeOutsideDir } from "../fixtures/outside-dir.js";
 import { useTempRoot } from "../fixtures/temp-root.js";
 
@@ -58,11 +59,13 @@ async function expectConcurrentCatalogRefusal(
 describe("catalog durability", () => {
   it("recovers an exact replay after committed directory-sync failure", async () => {
     const candidate = record("durable"), failure = new Error("directory sync fault");
-    await expect(appendCatalogRecordLocked(root.dir, "research", candidate, {
+    const rejected = await appendCatalogRecordLocked(root.dir, "research", candidate, {
       beforeDirectorySyncForTest: async (dir) => {
         if (dir === operationPaths(root.dir, "research").workspaceRoot) throw failure;
       },
-    })).rejects.toBe(failure);
+    }).catch(error => error);
+    expect(rejected).toBeInstanceOf(AtomicWritePostCommitError);
+    expect(rejected.cause).toBe(failure);
 
     await expect(appendCatalogRecordLocked(root.dir, "research", candidate)).resolves.toBe("same");
     const read = await readCatalogStore(root.dir, "research");

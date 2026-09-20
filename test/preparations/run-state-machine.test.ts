@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { canonicalBytes } from "../../src/profile/templates/signing/canonical.js";
 import { signPreparationRun } from "../../src/preparations/run-integrity.js";
 import { parsePreparationRun } from "../../src/preparations/run-parse.js";
@@ -51,7 +52,7 @@ describe("preparation run state machine", () => {
   it("rejects a terminal success carrying an outcome-unknown effect", () => {
     const running = append(genesisContent(), { type: "phase-started", stateAfter: "running", actor: ACTOR, at: "2026-07-20T00:00:01.000Z", payload: { kind: "phase", phaseInstanceId: `phi_${"a".repeat(64)}`, phaseState: "running" } });
     const succeeded = append(running, { type: "succeeded", stateAfter: "succeeded", actor: ACTOR, at: "2026-07-20T00:00:02.000Z", payload: { kind: "none" } });
-    const withEffect = { ...succeeded, effectSummaries: [{ attemptId: `pat_${"a".repeat(64)}`, effectIndex: 0, outcome: "outcome-unknown" as const }] };
+    const withEffect = { ...succeeded, effectSummaries: [{ attemptId: `pat_${"a".repeat(64)}` as const, effectIndex: 0, outcome: "outcome-unknown" as const }] };
     expect(() => parsePreparationRun(text(withEffect))).toThrow(/outcome-unknown/);
   });
 
@@ -71,7 +72,7 @@ describe("preparation run state machine", () => {
   });
 
   it("accepts a settlement state whose external effect is fully settled", () => {
-    const settled = { ...terminal("succeeded"), effectSummaries: [{ attemptId: PAT, effectIndex: 0, outcome: "applied" as const, receiptDigest: `sha256:${"b".repeat(64)}` as const }], brokerRequestSummaries: [{ brokerRequestId: BRQ, attemptId: PAT, requestIndex: 0, state: "settled" as const }] };
+    const settled = { ...terminal("succeeded"), effectSummaries: [{ attemptId: PAT, effectIndex: 0, outcome: "applied" as const, receiptDigest: parseSha256Digest(`sha256:${"b".repeat(64)}`) }], brokerRequestSummaries: [{ brokerRequestId: BRQ, attemptId: PAT, requestIndex: 0, state: "settled" as const }] };
     expect(parsePreparationRun(text(settled)).state).toBe("succeeded");
   });
 

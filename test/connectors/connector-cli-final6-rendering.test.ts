@@ -81,7 +81,7 @@ describe("Final6 connector CLI candidate rendering", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("refuses an injected 201-id result without rendering it as success", async () => {
+  it("renders every identity in a public legacy 201-id result", async () => {
     const candidateIds = Array.from({ length: 201 }, (_, index) => `candidate-${index}`);
     const runner = async () => ({ kind: "noop", candidateIds } as RunConnectorResult);
 
@@ -89,8 +89,8 @@ describe("Final6 connector CLI candidate rendering", () => {
     const rendered = lines.join("\n");
 
     expect(lines).toHaveLength(1);
-    expect(rendered).toContain("connector returned invalid candidate identities");
-    expect(rendered).not.toContain("candidate-0");
-    expect(process.exitCode).toBe(1);
+    expect(rendered).toContain("noop: candidate-0, candidate-1");
+    expect(rendered).toContain("candidate-200");
+    expect(process.exitCode).not.toBe(1);
   });
 });

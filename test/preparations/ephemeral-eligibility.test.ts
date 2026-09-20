@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   ephemeralIneligibility, EphemeralIneligibleError, assertEphemeralEligible,
 } from "../../src/preparations/ephemeral.js";
@@ -26,7 +27,7 @@ describe("ephemeral-read shape eligibility", () => {
     expect(ephemeralIneligibility(ephemeralBrokerPlan())).toBeNull();
     expect(() => parsePreparationPlan(JSON.stringify(ephemeralEffectPlanObject()))).toThrow();
     const broker = ephemeralBrokerPlan();
-    const withEffect = { ...broker, phases: [{ ...broker.phases[0]!, effectPlanDigest: `sha256:${"d".repeat(64)}` as const }] };
+    const withEffect = { ...broker, phases: [{ ...broker.phases[0]!, effectPlanDigest: parseSha256Digest(`sha256:${"d".repeat(64)}`) }] };
     expect(ephemeralIneligibility(withEffect)).toBe("external-effect-required");
   });
 

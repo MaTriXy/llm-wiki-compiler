@@ -13,7 +13,7 @@
  * symbols without forming an import cycle.
  */
 
-import { candidatePath } from "./candidate-paths.js";
+import { candidatePath, UnsafeCandidateIdError } from "./candidate-paths.js";
 import { safeReadFile } from "../utils/markdown.js";
 import { TextDecoder } from "node:util";
 import { opendir } from "node:fs/promises";
@@ -29,11 +29,13 @@ import {
   captureCandidateCustody,
   captureCandidateStoreBinding,
   CandidateCustodyUnavailableError,
+  CandidateLeafUnavailableError,
   type CandidateCustodyRead,
   type CandidateCustodyReceipt,
   type CandidateStoreBinding,
 } from "./candidate-custody.js";
 import { sanitizeCandidate } from "./candidate-sanitize.js";
+import type { CandidateCustodyPolicy } from "./candidate-custody-limits.js";
 export { DEFAULT_HELD_REASONS } from "./candidate-sanitize.js";
 import type { ReviewCandidate } from "../utils/types.js";
 
@@ -70,10 +72,11 @@ export interface CandidateMutationScanHooks {
 /** Validate the public store path, then capture one race-sensitive binding. */
 export async function captureCandidateMutationStoreBinding(
   root: string,
+  requireLiteral = true,
 ): Promise<CandidateStoreBinding | null> {
   const resolved = await resolveConfinedCandidatesDir(root, CANDIDATES_DIR);
   if (resolved === null) return null;
-  const binding = await captureCandidateStoreBinding(root);
+  const binding = await captureCandidateStoreBinding(root, requireLiteral);
   if (binding === null) throw new CandidateCustodyUnavailableError();
   return binding;
 }
@@ -207,8 +210,9 @@ async function readCandidateEntry(
   root: string,
   fileId: string,
   expectedStore?: CandidateStoreBinding,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<CandidateFileEntry | null> {
-  const custody = await captureCandidateCustody(root, fileId, expectedStore);
+  const custody = await captureCandidateCustody(root, fileId, expectedStore, policy);
   return custody === null ? null : parseCandidateEntry(fileId, custody);
 }
 
@@ -248,6 +252,7 @@ function isValidCandidate(value: unknown): value is ReviewCandidate {
 /** Enumerate sanitized candidates with their confined filename identities. */
 export async function listCandidateFileEntries(
   root: string,
+  rejectUnsafeIds = false,
 ): Promise<CandidateFileEntry[]> {
   const dir = await resolveConfinedCandidatesDir(root, CANDIDATES_DIR);
   if (dir === null) return []; // absent candidates dir → nothing pending
@@ -255,11 +260,12 @@ export async function listCandidateFileEntries(
   const entries: CandidateFileEntry[] = [];
   for (const fileId of ids) {
     try {
-      const entry = await readCandidateEntry(root, fileId);
+      const entry = await readCandidateEntry(root, fileId, undefined, "public");
       if (entry) entries.push(entry);
     } catch (error) {
       if (error instanceof UnsafeCandidateDirError ||
-          error instanceof CandidateCustodyUnavailableError) throw error;
+          (error instanceof CandidateCustodyUnavailableError && !(error instanceof CandidateLeafUnavailableError)) ||
+          (rejectUnsafeIds && error instanceof UnsafeCandidateIdError)) throw error;
       output.note(`[llmwiki] Skipping unparseable candidate file: ${fileId}.json`);
     }
   }

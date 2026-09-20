@@ -7,6 +7,7 @@
 
 import {
   captureCandidateMutationStoreBinding,
+  listCandidateFileEntries,
   listCandidateMutationFileIdsForBinding,
   readCandidateEntryForMutation,
   sortCandidateFileEntries,
@@ -127,6 +128,30 @@ export async function selectCandidateEntriesForMutation(
 ): Promise<CandidateFileEntry[]> {
   const selection = await selectCandidateEntriesForMutationWithTotal(root, selector, bounds);
   return [...selection.entries];
+}
+
+/**
+ * Public candidate discovery skips malformed unrelated records. Preserve that
+ * behavior for ordinary generation/cleanup while validating the selected files'
+ * identities and retaining exact-byte receipts for subsequent mutation. New
+ * authority operations use the strict whole-store selector above instead.
+ */
+export async function selectReadableCandidateEntriesForMutation(
+  root: string, selector: CandidateMutationSelector,
+  bounds?: CandidateSelectionBounds,
+  hooks: CandidateMutationSelectionHooks = {},
+): Promise<CandidateFileEntry[]> {
+  const binding = await captureCandidateMutationStoreBinding(root, false);
+  if (binding === null) return [];
+  await hooks.afterInitialCustodyForTest?.();
+  await hooks.afterOpenForTest?.();
+  const selected = (await listCandidateFileEntries(root, true)).filter(entry => selector(entry.candidate));
+  await hooks.afterEnumerationForTest?.();
+  if (bounds && selected.length > bounds.maxSelected) throw bounds.overflowError();
+  assertCandidateEntriesWritable(selected);
+  await hooks.beforeReturnForTest?.();
+  await assertCandidateStoreBinding(root, binding);
+  return selected;
 }
 
 /** Select and count under one store binding through the final receipt read. */

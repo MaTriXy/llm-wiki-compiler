@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   RECONCILIATION_DECISIONS, ReconciliationAuthorityError, assertDeferPermitted,
   assertReconciliationsSettled, decideReconciliation, pendingOperatorReconciliations,
@@ -29,7 +30,7 @@ const ATTEMPT = `pat_${"a".repeat(64)}` as AttemptId;
 
 const evidence: EvidenceRefV1 = {
   kind: "reconciliation-finding", mediaType: "application/json", provenanceLabel: "host-derived",
-  digest: `sha256:${"b".repeat(64)}`, byteCount: 64, sensitivity: "ordinary", retention: "audit",
+  digest: parseSha256Digest(`sha256:${"b".repeat(64)}`), byteCount: 64, sensitivity: "ordinary", retention: "audit",
   producer: { kind: "host", contractDigest: HANDLER_DIGEST }, untrusted: true,
 };
 

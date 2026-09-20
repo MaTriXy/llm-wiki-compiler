@@ -33,6 +33,8 @@ import type { LifecyclePendingUnitV1, PreparationLifecyclePendingState } from ".
 import { selectSweepTargetUnit } from "../preparations/lifecycle-snapshot/sweep-target.js";
 import type { PreparationLifecycleOperationV1 } from "../preparations/lifecycle-snapshot/types.js";
 import { scanOperationInventory } from "./capacity.js";
+import { legacyPrivateAliasHasNoEntries } from "../utils/legacy-private-layout.js";
+import { PREPARATION_QUARANTINE_SEGMENT, PREPARATION_PRUNE_REGISTRY } from "../preparations/paths.js";
 import { readOperationKey } from "./key-epoch.js";
 import { operationManifestDigest } from "./manifest-parse.js";
 import type { OperationProblemCode } from "./problems.js";
@@ -555,6 +557,9 @@ async function gatePreparationLifecycle(
   // refuses every OTHER destructive intent, because their key epoch is the thing
   // being reset and their leaves become reset's custody.
   if (intent === "reset") return null;
+  if (!isDestructiveIntent(intent) && await legacyPrivateAliasHasNoEntries(
+    root, [PREPARATION_QUARANTINE_SEGMENT, PREPARATION_PRUNE_REGISTRY],
+  )) return null;
   const pending = await resolvePreparationLifecyclePending(root);
   if (!isDestructiveIntent(intent)) {
     refusePendingPreparationLifecycle(pending);

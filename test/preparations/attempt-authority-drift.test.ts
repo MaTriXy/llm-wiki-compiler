@@ -9,6 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { acquireMutationLockBlocking } from "../../src/operation-bundles/lock-gate.js";
 import { releaseLock } from "../../src/utils/lock.js";
 import { preparationRunPredecessor } from "../../src/preparations/run-integrity.js";
@@ -56,18 +57,18 @@ describe("preparation attempt authority drift", () => {
   });
 
   it("parks a late result when the observed provider pin drifts from the seal", async () => {
-    const leg = async () => ({ ...succeededLeg(), observedProviderPinDigest: `sha256:${"e".repeat(64)}` as const });
+    const leg = async () => ({ ...succeededLeg(), observedProviderPinDigest: parseSha256Digest(`sha256:${"e".repeat(64)}`) });
     expect(await executePhaseAttempt(attemptRequest(staged, { leg }))).toEqual({ status: "parked", reason: "provider-pin-drift" });
   });
 
   it("parks a receiptless phase whose live authority re-resolves differently at commit", async () => {
-    const drifted = providerAuthority({ providerPinDigest: `sha256:${"f".repeat(64)}` });
+    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
     const request = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
     expect(await executePhaseAttempt(request)).toEqual({ status: "parked", reason: "authority-drift" });
   });
 
   it("ignores an authority resolver the leg swaps mid-attempt and still parks", async () => {
-    const drifted = providerAuthority({ providerPinDigest: `sha256:${"f".repeat(64)}` });
+    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
     const input = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
     (input as { leg: unknown }).leg = async () => {
       (input as { authorityResolver: unknown }).authorityResolver = driftingResolver(providerAuthority(), providerAuthority());
@@ -77,7 +78,7 @@ describe("preparation attempt authority drift", () => {
   });
 
   it("durably parks a drifted attempt to recovery-required with the owner cleared", async () => {
-    const drifted = providerAuthority({ providerPinDigest: `sha256:${"f".repeat(64)}` });
+    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
     const request = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
     expect(await executePhaseAttempt(request)).toEqual({ status: "parked", reason: "authority-drift" });
     const read = await readPreparationRun(staged.root, staged.binding);
@@ -87,9 +88,9 @@ describe("preparation attempt authority drift", () => {
 
   const pending = (byteCount: number, digit: string) => ({
     ref: {
-      kind: "x", mediaType: "application/json", provenanceLabel: "p", digest: `sha256:${digit.repeat(64)}` as const,
+      kind: "x", mediaType: "application/json", provenanceLabel: "p", digest: parseSha256Digest(`sha256:${digit.repeat(64)}`),
       byteCount, sensitivity: "ordinary" as const, retention: "audit" as const,
-      producer: { kind: "host" as const, contractDigest: `sha256:${"2".repeat(64)}` as const }, untrusted: true as const,
+      producer: { kind: "host" as const, contractDigest: parseSha256Digest(`sha256:${"2".repeat(64)}`) }, untrusted: true as const,
     }, tempPath: "/nonexistent",
   });
 
@@ -114,13 +115,13 @@ describe("preparation attempt authority drift", () => {
   });
 
   it("parks an outcome whose effect count exceeds the sealed bound", async () => {
-    const effect = { receipt: { providerPinDigest: `sha256:${"a".repeat(64)}`, outcome: "refused" } as never, effectIndex: 0 };
+    const effect = { receipt: { providerPinDigest: parseSha256Digest(`sha256:${"a".repeat(64)}`), outcome: "refused" } as never, effectIndex: 0 };
     const request = attemptRequest(staged, { leg: async () => ({ ...succeededLeg(), effects: [effect] }) });
     expect(await executePhaseAttempt(request)).toEqual({ status: "parked", reason: "effects-exceed-sealed-bound" });
   });
 
   it("ignores a swapped resolve method and still parks on drift", async () => {
-    const drifted = providerAuthority({ providerPinDigest: `sha256:${"f".repeat(64)}` });
+    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
     const input = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
     (input as { leg: unknown }).leg = async () => {
       (input.authorityResolver as { resolve: unknown }).resolve = fixedResolver(providerAuthority()).resolve;

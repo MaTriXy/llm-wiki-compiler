@@ -120,7 +120,7 @@ export async function runConnector(
 /** Recheck candidate arrays before any connector result leaves core. */
 function checkedPublicResult(result: RunConnectorResult): RunConnectorResult {
   try {
-    return captureConnectorResult(result) as RunConnectorResult;
+    return captureConnectorResult(result, "public") as RunConnectorResult;
   } catch {
     return captureConnectorResult({
       kind: "unavailable",
@@ -208,7 +208,7 @@ async function finishConnectorGate(
   if (headers.kind !== "ok") return headers;
   const supersedable = await supersedableCandidates(root, setup.identity, deps.candidateSelectionHooksForTest);
   if ("kind" in supersedable) return supersedable;
-  const audit = await preflightAuditCapacity(root, setup.identity, supersedable, deps.now);
+  const audit = await preflightAuditCapacity(root, setup.identity, supersedable, deps.now, "public");
   if (audit) return audit;
   const interval = await enforceRequestInterval(root, connectorId, setup.config, deps.now);
   if (interval) return interval;
@@ -363,28 +363,28 @@ async function stagePreparedDraft(
   const selection = await selectConnectorCandidateEntriesForRun(root, draft.idempotencyKey,
     deps.candidateSelectionHooksForTest);
   if ("kind" in selection) return selection;
-  if (!canStageFreshConnectorIntent(selection)) return candidateStoreUnavailable();
   const existing = selection.entries;
   const candidateIds = existing.map(({ fileId }) => fileId);
   if (includesConnectorContentHash(existing, draft.contentHash)) {
-    const event = connectorEvent(draft, [], candidateIds, [], deps.now);
+    const event = connectorEvent(draft, [], candidateIds, [], deps.now, "public");
     await preflightEventAppend(root, event);
     await appendEventLocked(root, event);
     return { kind: "noop", candidateIds };
   }
+  if (!canStageFreshConnectorIntent(selection)) return candidateStoreUnavailable();
   const loaded = await loadNonDefaultProfile(root);
   if (!loaded) return { kind: "unavailable", reason: "connector profile unavailable" };
   const preflightIds = [stagedCandidatePreflightId(draft.slug)];
   const archivedIds = candidateIds;
-  await preflightEventAppend(root, connectorEvent(draft, preflightIds, [], archivedIds, deps.now));
-  const archived = await archiveCandidatesWithUndo(root, existing, deps.candidateMoves);
+  await preflightEventAppend(root, connectorEvent(draft, preflightIds, [], archivedIds, deps.now, "public"));
+  const archived = await archiveCandidatesWithUndo(root, existing, deps.candidateMoves, "public");
   if (archived.kind === "recovery-required") return archived;
   if (archived.kind === "failed-and-restored") {
     return { kind: "unavailable", reason: "connector could not archive a superseded candidate" };
   }
   const staged = await stageReplacement(root, draft, loaded.profile, archived.receipts, deps);
   if (staged.kind !== "staged") return staged;
-  await appendConnectorEvent(root, draft, [staged.change.id], [], archivedIds, deps.now);
+  await appendConnectorEvent(root, draft, [staged.change.id], [], archivedIds, deps.now, "public");
   return archivedIds.length > 0
     ? { kind: "superseded", archivedIds, candidateIds: [staged.change.id] }
     : { kind: "staged", candidateIds: [staged.change.id] };
@@ -401,7 +401,7 @@ async function stageReplacement(
   try {
     return await stageConnectorCandidate(
       root, draft, profile, receipts, deps.candidateMoves, deps.now,
-      deps.beforeCandidateStageForTest,
+      deps.beforeCandidateStageForTest, "public",
     );
   } catch (error) {
     if (error instanceof StagedWriteOverflowError ||
@@ -426,7 +426,6 @@ async function supersedableCandidates(
 ): Promise<SupersedableCandidates | RunConnectorResult> {
   const selection = await selectConnectorCandidateEntriesForRun(root, identity.idempotencyKey, hooks);
   if ("kind" in selection) return selection;
-  if (!canStageFreshConnectorIntent(selection)) return candidateStoreUnavailable();
   return {
     existingIds: selection.entries.map(({ fileId }) => fileId),
     preflightStagedId: preflightCandidateId(identity.slug),

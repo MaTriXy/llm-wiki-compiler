@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { acquireLock, releaseLock } from "../../src/utils/lock.js";
 import { derivePhaseInstanceId, singleExpansionIdentity } from "../../src/preparations/ids.js";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { executePhaseAttempt } from "../../src/preparations/attempts/execute.js";
 import { readPreparationKey } from "../../src/preparations/key-epoch.js";
 import { stagePreparationLocked } from "../../src/preparations/stage.js";
@@ -27,7 +28,7 @@ import { providerInputSpecsContentExposureDigest, type ProviderInvokeFn } from "
 import type { PreparationEvidenceLocation } from "../../src/preparations/evidence-store.js";
 import { fixturePlan, stageRequest } from "./store-fixture.js";
 
-export const PIN = `sha256:${"a".repeat(64)}` as const;
+export const PIN = parseSha256Digest(`sha256:${"a".repeat(64)}`);
 /** The empty input-spec content-exposure digest, so the provider exposure bind holds. */
 export const EXPOSURE = providerInputSpecsContentExposureDigest([]);
 const PRINCIPAL = { id: "operator", surface: "cli" } as const;
@@ -138,7 +139,7 @@ export function providerRequest(overrides: {
     },
     launch: {
       sourceTreeReal: "/src", launchParentDir: overrides.launchParentDir ?? "/caller-launch",
-      artifact: { entrypointRelativePath: "entry.js", digest: PIN, archiveFormat: "tar", archiveByteCount: 1, expandedTreeDigest: PIN, expandedByteCount: 1, entryCount: 1 },
+      artifact: { artifactId: "test-artifact", os: "linux", architecture: "x64", entrypointRelativePath: "entry.js", artifactDigest: PIN, archiveFormat: "tar", archiveByteCount: 1, expandedTreeDigest: PIN, expandedByteCount: 1, entryCount: 1 },
     },
     inputSpecs: overrides.inputSpecs ?? [], input: null, operationContext: overrides.operationContext ?? {},
     declaredOutputs: [], custodyValidators: [], brokers: overrides.brokers ?? {},

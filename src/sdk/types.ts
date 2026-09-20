@@ -346,7 +346,7 @@ export interface Wiki {
    * and reports `embedding-index-outdated` so the caller SEES why semantic
    * retrieval contributed nothing (S6).
    */
-  search(question: string): Promise<SearchResult>;
+  search(question: string, options?: { embeddingFailure?: "throw" | "fallback" }): Promise<SearchResult>;
   /**
    * Generate a grounded answer from the wiki. Requires LLM credentials.
    *
@@ -354,10 +354,16 @@ export interface Wiki {
    * configured LLM provider to produce the answer.
    *
    * Streaming token delivery (`onToken`) is intentionally NOT exposed by the
-   * facade in v1 — only `save` and `debug` are surfaced. Callers needing
+   * facade. Callers needing
    * per-token streaming should use `generateAnswer` directly.
    */
-  query(question: string, options?: { save?: boolean; debug?: boolean; pageScope?: readonly string[] }): Promise<QueryResult>;
+  query(question: string, options?: {
+    save?: boolean; debug?: boolean; pageScope?: readonly string[];
+    /** Opt-in error recovery; scoped queries default to fallback. */
+    embeddingFailure?: "throw" | "fallback";
+    /** Opt-in hydrated provenance; scoped queries always use this mode. */
+    grounding?: "hydrated";
+  }): Promise<QueryResult>;
   /** Fetch a single page by directory and slug. No LLM required. */
   getPage(ref: PageRef): Promise<Page | null>;
   /** List wiki pages with optional filters and cursor-based pagination. No LLM required. */

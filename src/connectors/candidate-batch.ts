@@ -6,6 +6,7 @@
  */
 
 import { assertCandidateId } from "../compiler/candidate-paths.js";
+import type { CandidateCustodyPolicy } from "../compiler/candidate-custody-limits.js";
 import {
   captureDenseArray,
   captureOwnDataRecord,
@@ -15,6 +16,11 @@ import { isWellFormedUnicode } from "../utils/well-formed-unicode.js";
 
 /** Maximum exact candidate identities carried by one connector batch. */
 export const MAX_CONNECTOR_CANDIDATE_BATCH = 200;
+
+/** Existing local runs have no new selected-batch cap; direct ports stay bounded. */
+export function connectorCandidateBatchLimit(policy: CandidateCustodyPolicy): number {
+  return policy === "public" ? Number.MAX_SAFE_INTEGER : MAX_CONNECTOR_CANDIDATE_BATCH;
+}
 
 /** Maximum code units and UTF-8 bytes in one public connector reason. */
 const MAX_CONNECTOR_RESULT_REASON_BYTES = 512;
@@ -80,11 +86,13 @@ export function captureConnectorReason(value: unknown): string {
 }
 
 /** Capture one bounded dense exact candidate-ID list. */
-export function captureConnectorCandidateIds(value: unknown): readonly string[] {
+export function captureConnectorCandidateIds(
+  value: unknown, policy: CandidateCustodyPolicy = "bounded",
+): readonly string[] {
   try {
     return captureDenseArray(
       value,
-      MAX_CONNECTOR_CANDIDATE_BATCH,
+      connectorCandidateBatchLimit(policy),
       captureCandidateId,
       () => new ConnectorCandidateBatchOverflowError(),
     );
@@ -112,13 +120,16 @@ function assertExactKeys(
 function captureSimpleResult(
   record: Readonly<Record<string, unknown>>,
   kind: "staged" | "noop" | "recovery-required",
+  policy: CandidateCustodyPolicy,
 ): ConnectorResultSnapshot {
   assertExactKeys(record, ["kind", "candidateIds"]);
-  return Object.freeze({ kind, candidateIds: captureConnectorCandidateIds(record.candidateIds) });
+  return Object.freeze({ kind, candidateIds: captureConnectorCandidateIds(record.candidateIds, policy) });
 }
 
 /** Capture any public connector result into a closed immutable DTO. */
-export function captureConnectorResult(value: unknown): ConnectorResultSnapshot {
+export function captureConnectorResult(
+  value: unknown, policy: CandidateCustodyPolicy = "bounded",
+): ConnectorResultSnapshot {
   let record: Readonly<Record<string, unknown>>;
   try {
     record = captureOwnDataRecord(value);
@@ -127,14 +138,14 @@ export function captureConnectorResult(value: unknown): ConnectorResultSnapshot 
   }
   const kind = record.kind;
   if (kind === "staged" || kind === "noop" || kind === "recovery-required") {
-    return captureSimpleResult(record, kind);
+    return captureSimpleResult(record, kind, policy);
   }
   if (kind === "superseded") {
     assertExactKeys(record, ["kind", "archivedIds", "candidateIds"]);
     return Object.freeze({
       kind,
-      archivedIds: captureConnectorCandidateIds(record.archivedIds),
-      candidateIds: captureConnectorCandidateIds(record.candidateIds),
+      archivedIds: captureConnectorCandidateIds(record.archivedIds, policy),
+      candidateIds: captureConnectorCandidateIds(record.candidateIds, policy),
     });
   }
   if (kind === "refused" || kind === "unavailable") {

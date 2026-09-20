@@ -151,7 +151,11 @@ function deepCaptureObject(value: object, budget: { nodes: number }, depth: numb
   const keys = ownKeys(value);
   if (keys.some((key) => typeof key === "symbol")) throw new RuntimeCaptureError();
   const out = Object.create(null) as Record<string, unknown>;
-  for (const key of keys as string[]) out[key] = deepCapture(ownDataValue(value, key), budget, depth);
+  for (const key of keys as string[]) {
+    // Strict trust-boundary capture must not promote hidden data into JSON.
+    if (!Object.getOwnPropertyDescriptor(value, key)?.enumerable) throw new RuntimeCaptureError();
+    out[key] = deepCapture(ownDataValue(value, key), budget, depth);
+  }
   return Object.freeze(out);
 }
 

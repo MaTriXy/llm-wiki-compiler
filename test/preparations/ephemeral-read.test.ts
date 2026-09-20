@@ -49,8 +49,8 @@ afterEach(async () => {
 function answered(): ProviderInvokeFn {
   return async () => ({ kind: "completed", admitted: {
     outcome: "succeeded",
-    acceptedArtifacts: [{ outputId: "answer", mediaType: "application/json", digest: `sha256:${HEX}`, byteCount: BYTES.byteLength,
-      evidence: { evidencePath: outputPath, digest: `sha256:${HEX}`, byteCount: BYTES.byteLength } }],
+    acceptedArtifacts: [{ outputId: "answer", mediaType: "application/json", digest: parseSha256Digest(`sha256:${HEX}`), byteCount: BYTES.byteLength,
+      evidence: { evidencePath: outputPath, digest: parseSha256Digest(`sha256:${HEX}`), byteCount: BYTES.byteLength } }],
     counts: { declared: 1, acceptedArtifacts: 1, requiredMissing: 0, receipts: 0 },
     receipts: [], usage: USAGE, untrusted: { untrusted: true, providerReportedCounts: null, warnings: null, output: null } } });
 }
@@ -89,7 +89,7 @@ describe("executable ephemeral read", () => {
   });
 
   it("writes no project byte and discards custody when a mid-flight failure refuses", async () => {
-    const drifted = providerAuthority({ providerPinDigest: `sha256:${"f".repeat(64)}` });
+    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
     const request = ephemeralRequest({ authorityResolver: driftingResolver(providerAuthority(), drifted) });
     const before = await snapshotTree(staged.root);
     const run = await withEphemeralSandbox(() => runFixtureRead(request, answered()));

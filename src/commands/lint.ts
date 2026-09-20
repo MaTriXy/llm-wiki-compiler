@@ -165,7 +165,7 @@ async function runFlat(): Promise<void> {
 
 /** The `--tiered` path: one run, both views, deterministic-only exit code. */
 async function runTiered(): Promise<void> {
-  const { summary, tiered } = await lintBothViews(process.cwd());
+  const { summary, tiered } = await lintBothViews(process.cwd(), "wiki-wide");
   printTiered(tiered);
   console.log();
   output.status("*", `${tiered.deterministicErrors} deterministic error(s) — the count that means something is wrong`);

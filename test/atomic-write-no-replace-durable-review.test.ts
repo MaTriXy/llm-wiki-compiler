@@ -92,7 +92,7 @@ describe("durable no-replace post-commit failures", () => {
     // Sequentially materializing 4,097 sibling leaves is filesystem-bound and
     // can exceed the default timeout on a loaded host; the assertion itself is
     // cheap.
-  }, 120_000);
+  });
 
   it("syncs an exact existing leaf before reporting its collision", async () => {
     const parent = path.join(root.dir, "collision-file-sync");

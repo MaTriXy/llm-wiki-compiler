@@ -16,6 +16,7 @@ import { appendRunEvent } from "./events.js";
 import { isTrustGate } from "./gates.js";
 import { isTrustedWriteGranted } from "./trusted-write.js";
 import { writeRun, serializeRunWithinCap } from "./store.js";
+import { AtomicWritePostCommitError } from "../utils/atomic-write.js";
 import { TrustGateRequiresGrantError } from "./errors.js";
 import type { TrustDecision } from "../trust/decision.js";
 import type { WorkflowRun, PendingStageOutput } from "./types.js";
@@ -143,13 +144,10 @@ export async function preflightApplyRecord(
 }
 
 /**
- * Run the external `apply`, and on a THROWN failure CLEAR the pre-apply intent
- * marker (restore `run`) before rethrowing. A thrown apply here is a denial /
- * pre-mutation refusal — the external write provably did NOT land — so the marker
- * must NOT linger and strand the run in a fail-closed `pendingOutput` state for a
- * write that never happened. The residual silent-orphan window is only a PROCESS
- * crash between the intent persist and this clear (exactly what the marker exists
- * to catch); an in-process apply throw rolls the marker back.
+ * Preserve the intent on a known post-commit failure: a rejected atomic write
+ * may already have published its destination. Other apply failures retain the
+ * existing marker-clear behavior; this is not a classification of all I/O errors
+ * as pre-mutation refusals. Broader unknown-outcome handling remains separate.
  */
 async function applyOrClearIntent(
   root: string,
@@ -159,6 +157,7 @@ async function applyOrClearIntent(
   try {
     return await apply();
   } catch (err) {
+    if (err instanceof AtomicWritePostCommitError) throw err;
     await writeRun(root, run); // restore the pre-intent record (clears pendingOutput)
     throw err;
   }

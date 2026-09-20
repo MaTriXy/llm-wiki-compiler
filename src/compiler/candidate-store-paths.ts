@@ -1,16 +1,16 @@
 /**
  * @file src/compiler/candidate-store-paths.ts
- * @description Literal owned-directory classification for review candidate
- * stores. Every existing lexical component below the project root must be a
- * real, non-symlink directory at its canonical location. Only `ENOENT` on a
- * literal component means the namespace is absent; aliases, broken links,
- * non-directories, permission faults, and other I/O failures are unavailable.
+ * @description Confined directory classification for review candidate stores.
+ * Ordinary paths retain public in-root alias support. Explicit strict scans
+ * require literal directories; both modes bind canonical paths and inodes and
+ * reject escapes, broken links, non-directories and unavailable components.
  */
 
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, realpath, stat } from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
 import { isSafeFilenameComponent } from "../profile/identity.js";
+import { confineUnderRoot, isInsideDir } from "../utils/path-confine.js";
 
 /** Stable identity captured for one literal candidate directory. */
 export interface CandidateDirectoryIdentity {
@@ -76,35 +76,45 @@ function binding(
 }
 
 /**
- * Classify one literal owned candidate directory. The walk inspects `.llmwiki`
- * and every deeper existing component with `lstat`, so a broken intermediate
- * symlink can never collapse into an absent final directory.
+ * Bind a confined candidate directory, optionally requiring literal components.
+ * Inspect each component with lstat before resolving aliases, so broken links
+ * cannot collapse into apparent absence and outside-root targets are rejected.
  */
 export async function captureCandidateDirectoryBinding(
   root: string,
   dir: string,
+  requireLiteral = false,
 ): Promise<CandidateDirectoryBinding | null> {
   const segments = ownedSegments(root, dir);
   const realRoot = await realpath(root).catch(() => null);
   if (realRoot === null) throw new UnsafeCandidateDirError();
   let lexical = path.resolve(root);
   let finalInfo: Stats | null = null;
+  let realDir = realRoot;
   for (let index = 0; index < segments.length; index += 1) {
     lexical = path.join(lexical, segments[index]!);
     finalInfo = await inspectComponent(lexical);
     if (finalInfo === null) return null;
-    if (finalInfo.isSymbolicLink() || !finalInfo.isDirectory()) {
-      throw new UnsafeCandidateDirError();
-    }
-    const observed = await realpath(lexical).catch(() => null);
     const expected = path.join(realRoot, ...segments.slice(0, index + 1));
-    if (observed !== expected) throw new UnsafeCandidateDirError();
+    const observed = await resolveComponent(lexical, realRoot, requireLiteral ? expected : undefined, finalInfo);
+    if (finalInfo.isSymbolicLink()) finalInfo = await stat(observed);
+    if (!finalInfo.isDirectory()) throw new UnsafeCandidateDirError();
+    realDir = observed;
   }
   if (finalInfo === null) throw new UnsafeCandidateDirError();
-  return binding(lexical, path.join(realRoot, ...segments), finalInfo);
+  return binding(lexical, realDir, finalInfo);
 }
 
-/** Resolve one safe candidate leaf through the literal namespace classifier. */
+/** Resolve one observed component under the root, enforcing literal mode when requested. */
+async function resolveComponent(lexical: string, realRoot: string, expected: string | undefined, info: Stats): Promise<string> {
+  if (expected !== undefined && info.isSymbolicLink()) throw new UnsafeCandidateDirError();
+  const observed = await realpath(lexical).catch(() => null);
+  if (observed === null || !isInsideDir(observed, realRoot)) throw new UnsafeCandidateDirError();
+  if (expected !== undefined && observed !== expected) throw new UnsafeCandidateDirError();
+  return observed;
+}
+
+/** Resolve a safe candidate leaf while retaining the public lexical path form. */
 export async function confinedCandidateFilePath(
   root: string,
   dir: string,
@@ -112,14 +122,15 @@ export async function confinedCandidateFilePath(
   onUnsafeId: (id: string) => Error,
 ): Promise<string> {
   if (!isSafeFilenameComponent(id)) throw onUnsafeId(id);
-  const captured = await captureCandidateDirectoryBinding(root, dir);
-  const realRoot = await realpath(root).catch(() => null);
-  if (realRoot === null) throw new UnsafeCandidateDirError();
-  const ownedDir = captured?.realDir ?? path.join(realRoot, ...ownedSegments(root, dir));
-  return path.join(ownedDir, `${id}${CANDIDATE_EXT}`);
+  await captureCandidateDirectoryBinding(root, dir);
+  try {
+    return await confineUnderRoot(path.join(dir, `${id}${CANDIDATE_EXT}`), root, { mustExist: false });
+  } catch {
+    throw new UnsafeCandidateDirError();
+  }
 }
 
-/** Resolve one existing literal candidate directory, or null when absent. */
+/** Resolve one confined candidate directory, including in-root aliases. */
 export async function resolveConfinedCandidatesDir(
   root: string,
   dir: string,

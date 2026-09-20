@@ -6,7 +6,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { mintBundleId, mintOperationRunId, mutationId, type BundleId } from "../../src/operation-bundles/ids.js";
+import { mintBundleId, mintOperationRunId, mutationId, type BundleId, type MutationId } from "../../src/operation-bundles/ids.js";
 import { operationAuditBinding, type OperationAuditBinding } from "../../src/operation-bundles/audit-binding.js";
 import { writePayloadCreateOnly } from "../../src/operation-bundles/payload-store.js";
 import type { AdapterContext } from "../../src/operation-bundles/adapter-types.js";
@@ -25,7 +25,7 @@ export function digestOf(bytes: Buffer): OperationDigest {
 export interface BindingSet {
   bundleId: BundleId;
   binding: OperationAuditBinding;
-  onDisk: OperationBinding;
+  onDisk: OperationBinding & { mutationId: MutationId };
 }
 
 export function makeBinding(index = 0): BindingSet {

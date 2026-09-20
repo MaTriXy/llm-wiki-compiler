@@ -9,9 +9,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { writeCandidate } from "../src/compiler/candidates.js";
 import { CandidateCustodyUnavailableError } from "../src/compiler/candidate-custody.js";
-import { UnsafeCandidateDirError } from "../src/compiler/candidate-store-paths.js";
 import { promoteStagedEntityPage, stageEntityPage } from "../src/trust/staging.js";
 import { buildResearchLiteProject, RESEARCH_LITE_PROFILE } from "./fixtures/profile-fixtures.js";
+import { validateProfile } from "../src/profile/validate.js";
 import { expectCLIFailure, runCLI } from "./fixtures/run-cli.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
 
@@ -72,14 +72,15 @@ describe("Decision 20 approval namespace precondition", () => {
   it("shared typed promotion refuses the alias before SDK live writes", async () => {
     await buildResearchLiteProject(root.dir);
     const staged = await stageEntityPage(root.dir, {
-      entityType: "papers", slug: "typed-authority", profile: RESEARCH_LITE_PROFILE,
+      entityType: "papers", slug: "typed-authority", profile: validateProfile(RESEARCH_LITE_PROFILE).profile,
       body: "---\ntitle: Typed Authority\n---\n\n# Typed Authority\n", existingStagedCount: 0,
     });
     const pending = path.join(root.dir, ".llmwiki", "candidates", `${staged.id}.json`);
     await aliasArchive();
 
     await expect(promoteStagedEntityPage(root.dir, staged.id))
-      .rejects.toBeInstanceOf(UnsafeCandidateDirError);
+      // Public in-root aliases are allowed; sharing pending/archive custody is not.
+      .rejects.toBeInstanceOf(CandidateCustodyUnavailableError);
     await expect(access(path.join(root.dir, "wiki", "papers", "typed-authority.md")))
       .rejects.toMatchObject({ code: "ENOENT" });
     expect(JSON.parse(await readFile(pending, "utf8")).id).toBe(staged.id);
@@ -88,7 +89,7 @@ describe("Decision 20 approval namespace precondition", () => {
   it.runIf(CAN_TEST_POSIX_MODES)("typed promotion refuses read-only pending before live writes", async () => {
     await buildResearchLiteProject(root.dir);
     const staged = await stageEntityPage(root.dir, {
-      entityType: "papers", slug: "typed-read-only", profile: RESEARCH_LITE_PROFILE,
+      entityType: "papers", slug: "typed-read-only", profile: validateProfile(RESEARCH_LITE_PROFILE).profile,
       body: "---\ntitle: Typed Read Only\n---\n\n# Typed Read Only\n", existingStagedCount: 0,
     });
     const candidates = path.join(root.dir, ".llmwiki", "candidates");

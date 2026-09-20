@@ -12,6 +12,12 @@
  * A slice that legitimately changes a corpus file must update this manifest, which is
  * exactly the explicit disposition the migration requires. The friction is the feature.
  *
+ * RE-BASELINED 2026-09-19 for test typing only: key-reset helper arguments now
+ * use PreparationRunId; the shared actor id is mutable string-typed for capture
+ * probes; QTN-009 omits the unused runId from its evidence-location argument.
+ * Only those three whole-file hashes and QTN-009's body hash changed. No assertion,
+ * scenario identity, classification, or production reach was removed or weakened.
+ *
  * RE-BASELINED 2026-08-08 by the prune/sweep surface slice, and here is the whole of
  * what moved, so the diff is reviewable as a claim rather than as a hash churn:
  *
@@ -168,7 +174,7 @@ export const FROZEN_REGRESSIONS = [
   },
   {
     path: "test/preparations/key-reset.test.ts",
-    fileSha256: "d686cd944b372f813c88c4a85f1c6bd35f6d0e7e2ca3b7ba4f57ea789b4e7f86",
+    fileSha256: "0b296ca62fe8da7baca4fd932c38e89d931bc44edc0bf897cb88024ca19da0e5",
     scenarios: [
       { id: "PLA-REG-RST-001", title: "records an intent and returns a continuation secret on the first pass", bodySha256: "051ac05936034d5cd2184dec5cf82bd70939be1d5a06cef2f8085e60e65f313d", operation: "reset", evidence: "ordinary", reachesProduction: "resetPreparationKeyEpochLocked" },
       { id: "PLA-REG-RST-002", title: "quarantines all authority and installs one fresh epoch on the token-bearing rerun", bodySha256: "b874356ad9606d29189939791d5e53a1855ad116f972d5ae41c4c2e307493ab7", operation: "reset", evidence: "durability", reachesProduction: "resetPreparationKeyEpochLocked" },
@@ -194,7 +200,7 @@ export const FROZEN_REGRESSIONS = [
   },
   {
     path: "test/preparations/lifecycle-fixture.ts",
-    fileSha256: "a4a46d444f807a72131764ce47a19371cee2b2ae128d31c06f514f4c806311d2",
+    fileSha256: "98a749a06ba324f3bb669d7d1c2368c18677ad0d294f34f243ddf1f48365e7cd",
     scenarios: [
 
     ],
@@ -234,7 +240,7 @@ export const FROZEN_REGRESSIONS = [
   },
   {
     path: "test/preparations/quarantine.test.ts",
-    fileSha256: "4cc90db105189eff352620273acf6932998fdc131fa798c086583929d3f518be",
+    fileSha256: "766a4815dda86639f25b217095a5388190a772f7a204a2a0b7c57a08c7fea982",
     scenarios: [
       { id: "PLA-REG-QTN-001", title: "moves an integrity-invalid run byte-for-byte and stops counting it as active", bodySha256: "39b3133c2fefa28981e2b1919d9cbebc227c92370997df333dfd79c7d80a5eca", operation: "quarantine", evidence: "ordinary", reachesProduction: "quarantinePreparationRunLocked" },
       { id: "PLA-REG-QTN-002", title: "is idempotent: a re-run resumes the same unit and returns the same objects", bodySha256: "544011045126b1d38218f8eb96cb15a0e169c6f0af3e03100afa3e39205ec0d3", operation: "quarantine", evidence: "durability", reachesProduction: "quarantinePreparationRunLocked" },
@@ -244,7 +250,7 @@ export const FROZEN_REGRESSIONS = [
       { id: "PLA-REG-QTN-006", title: "refuses to purge an incomplete unit", bodySha256: "2ee5a07d6c993f80bff8d08ec10f3a4602befdfe048533e2a6933e52413ce181", operation: "purge", evidence: "adversarial", reachesProduction: "purgeQuarantineUnitLocked" },
       { id: "PLA-REG-QTN-007", title: "refuses a fresh plan whose source changed after the plan became durable", bodySha256: "d5a417168643eea015a26a43c6b21954c2abe759b0bd3948dc2df53d8983525d", operation: "quarantine", evidence: "durability", reachesProduction: "quarantinePreparationRunLocked" },
       { id: "PLA-REG-QTN-008", title: "refuses to complete when planned bytes sit at the destination beside a live source", bodySha256: "f0b9a6cd9a7d9cf9c61cc8a811ed8873088852ab66624d38cca11f700747019b", operation: "quarantine", evidence: "adversarial", reachesProduction: "quarantinePreparationRunLocked" },
-      { id: "PLA-REG-QTN-009", title: "quarantines evidence larger than the old private hash ceiling", bodySha256: "20a158bce7e1daf2cd411b33962fd388caba2ba821269a76be198ce2ed90c304", operation: "quarantine", evidence: "adversarial", reachesProduction: "quarantinePreparationRunLocked" },
+      { id: "PLA-REG-QTN-009", title: "quarantines evidence larger than the old private hash ceiling", bodySha256: "1d24633a1d1b70f0b8008b874d9bf50d0e5328a154a1bb6870ac445e362960ce", operation: "quarantine", evidence: "adversarial", reachesProduction: "quarantinePreparationRunLocked" },
       { id: "PLA-REG-QTN-010", title: "completes a commit interrupted after the link but before the source unlink", bodySha256: "4f65a16a322b93c2a33373ba5c1801a1b9b83f8157173207a1495982f1fad27e", operation: "quarantine", evidence: "ordinary", reachesProduction: "quarantinePreparationRunLocked" },
       { id: "PLA-REG-QTN-011", title: "refuses to plan a destructive scope from an incomplete inventory", bodySha256: "ac13e72cf7766f93f97976d62f0332f433ae0bdb51ccd9aedb8fd6d6c8c6c2ef", operation: "quarantine", evidence: "adversarial", reachesProduction: "quarantinePreparationRunLocked" },
       { id: "PLA-REG-QTN-012", title: "refuses to purge through a unit symlinked out of the project, deleting nothing", bodySha256: "5839a69d4403ca99ad84449bb86ae14dfa98db9bee587fbe6fc464b64b424cbf", operation: "purge", evidence: "adversarial", reachesProduction: "purgeQuarantineUnitLocked" },

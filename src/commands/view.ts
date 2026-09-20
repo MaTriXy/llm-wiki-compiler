@@ -49,7 +49,7 @@ interface ViewCommandOptions {
 export default async function viewCommand(options: ViewCommandOptions): Promise<void> {
   const { host, port } = resolveBindConfig(options);
   const root = process.cwd();
-  const handle = await startViewer({ root, host, port });
+  const handle = await startViewer({ root, host, port, workflowJourneys: false });
   const url = buildReadyUrl(handle.host, handle.port);
   process.stdout.write(`Viewer ready at ${url}\n`);
   if (options.open) openInBrowser(url);

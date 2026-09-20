@@ -8,7 +8,8 @@
 import { describe, it, expect } from "vitest";
 import { projectionCriticality } from "../../src/operation-bundles/adapters/projection.js";
 import { canonicalBytes } from "../../src/profile/templates/signing/canonical.js";
-import type { OperationDigest, ProjectionCriticality, ProjectionOperationMutation } from "../../src/operation-bundles/types.js";
+import type { OperationDigest, ProjectionOperationMutation } from "../../src/operation-bundles/types.js";
+import type { ProjectionCriticality } from "../../src/operation-bundles/run-types.js";
 import { makeBinding } from "./adapter-fixtures.js";
 
 const RECIPE_DIGEST = `sha256:${"6".repeat(64)}` as OperationDigest;

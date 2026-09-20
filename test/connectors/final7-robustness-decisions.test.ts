@@ -1,7 +1,7 @@
 /**
  * @file test/connectors/final7-robustness-decisions.test.ts
- * @description Decision 16 regressions preserve unrelated same-target review
- * intents and resolve fallible staged-change clock metadata before persistence.
+ * @description Preserve public first-stage candidate canonicalization and
+ * resolve fallible staged-change clock metadata before persistence.
  */
 
 import { readFile } from "node:fs/promises";
@@ -13,6 +13,7 @@ import { runConnector } from "../../src/connectors/run.js";
 import { stageEntityPage } from "../../src/trust/staging.js";
 import { snapshotCandidateQueue } from "../fixtures/candidate-queue.js";
 import { buildResearchLiteProject, RESEARCH_LITE_PROFILE } from "../fixtures/profile-fixtures.js";
+import { validateProfile } from "../../src/profile/validate.js";
 import { useTempRoot } from "../fixtures/temp-root.js";
 import { activateFixtureConnector } from "./run-test-fixtures.js";
 
@@ -30,7 +31,7 @@ function fixtureFetch(): Promise<ConfinedFetchResult> {
 describe("Final7 robustness decisions", () => {
   afterEach(() => { delete process.env.LLMWIKI_CONNECTORS; });
 
-  it("mints a fresh connector review intent beside an unrelated same-target candidate", async () => {
+  it("canonicalizes the first connector stage onto an existing same-target candidate", async () => {
     await activateFixtureConnector(root.dir);
     const manual = await writeFreshCandidate(root.dir, {
       title: "Manual", slug: "fixture-story-1", summary: "", sources: [],
@@ -45,9 +46,9 @@ describe("Final7 robustness decisions", () => {
 
     expect(result.kind).toBe("staged");
     if (result.kind !== "staged") throw new Error(`expected staged, got ${result.kind}`);
-    expect(result.candidateIds[0]).not.toBe(manual.id);
-    expect(await readFile(file, "utf8")).toBe(before);
-    expect(await listCandidates(root.dir)).toHaveLength(2);
+    expect(result.candidateIds[0]).toBe(manual.id);
+    expect(await readFile(file, "utf8")).not.toBe(before);
+    expect(await listCandidates(root.dir)).toHaveLength(1);
   });
 
   it("calls a throwing staged clock before candidate persistence", async () => {
@@ -56,7 +57,7 @@ describe("Final7 robustness decisions", () => {
 
     await expect(stageEntityPage(root.dir, {
       entityType: "papers", slug: "linear-attention", body: BODY,
-      profile: RESEARCH_LITE_PROFILE, existingStagedCount: 0,
+      profile: validateProfile(RESEARCH_LITE_PROFILE).profile, existingStagedCount: 0,
       now: () => { throw new Error("clock failed"); },
     })).rejects.toThrow("clock failed");
 
@@ -70,7 +71,7 @@ describe("Final7 robustness decisions", () => {
 
     const staged = await stageEntityPage(root.dir, {
       entityType: "papers", slug: "linear-attention", body: BODY,
-      profile: RESEARCH_LITE_PROFILE, existingStagedCount: 0,
+      profile: validateProfile(RESEARCH_LITE_PROFILE).profile, existingStagedCount: 0,
       now: () => { calls += 1; return fixed; },
     });
 

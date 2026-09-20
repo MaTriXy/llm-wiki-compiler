@@ -32,6 +32,7 @@ import {
   tieredReport, type LintTierV1, type TieredLintReportV1, type TieredResultGroupV1,
 } from "./tiers.js";
 import { lintProfileEntities } from "../profile/lint.js";
+import type { PageScope } from "./rules-shared.js";
 
 /** Rule-only lint checks that don't depend on the schema layer. */
 /**
@@ -112,11 +113,14 @@ async function profileGroup(root: string): Promise<TieredResultGroupV1[]> {
  * registries and the profile appendix produce them, which is the order the
  * frozen parity suites pin — so this must never sort or regroup.
  */
-async function collectTieredGroups(root: string): Promise<TieredResultGroupV1[]> {
+async function collectTieredGroups(root: string, scope: PageScope = "generic"): Promise<TieredResultGroupV1[]> {
   const schema = await loadSchema(root);
   const freshness = await buildFreshnessSnapshot(root);
   const [plain, schemaGroups, freshnessGroups] = await Promise.all([
-    Promise.all(RULES_WITHOUT_SCHEMA.map(async (entry) => ({ tier: entry.tier, results: await entry.rule(root) }))),
+    Promise.all(RULES_WITHOUT_SCHEMA.map(async (entry) => ({
+      tier: entry.tier,
+      results: await (entry.rule === checkBrokenWikilinks ? checkBrokenWikilinks(root, scope) : entry.rule(root)),
+    }))),
     Promise.all(RULES_WITH_SCHEMA.map(async (entry) => ({ tier: entry.tier, results: await entry.rule(root, schema) }))),
     Promise.all(RULES_WITH_FRESHNESS.map(async (entry) => ({ tier: entry.tier, results: await entry.rule(root, freshness) }))),
   ]);
@@ -181,7 +185,8 @@ export async function lintByTier(root: string): Promise<TieredLintReportV1> {
  */
 export async function lintBothViews(
   root: string,
+  scope: PageScope = "generic",
 ): Promise<{ summary: LintSummary; tiered: TieredLintReportV1 }> {
-  const groups = await collectTieredGroups(root);
+  const groups = await collectTieredGroups(root, scope);
   return { summary: summarize(groups.flatMap((group) => group.results)), tiered: tieredReport(groups) };
 }

@@ -9,6 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { executePhaseAttempt } from "../../src/preparations/attempts/execute.js";
 import { hostHandlerLegRunner, type HostHandlerLegInputV1 } from "../../src/preparations/attempts/host-handler.js";
 import type { HostHandlerRefV1, PreparationHostHandlerRegistryV1 } from "../../src/preparations/attempts/types.js";
@@ -55,7 +56,7 @@ describe("preparation attempt host-handler leg", () => {
   });
 
   it("fails closed when the ref does not match the sealed executor", async () => {
-    const drifted: HostHandlerRefV1 = { ...REF, handlerContractDigest: `sha256:${"d".repeat(64)}` };
+    const drifted: HostHandlerRefV1 = { ...REF, handlerContractDigest: parseSha256Digest(`sha256:${"d".repeat(64)}`) };
     await expect(hostHandlerLegRunner(legInput({ ref: drifted }))(legCtx())).rejects.toThrow(/ref does not match the sealed executor/);
   });
 
@@ -67,7 +68,7 @@ describe("preparation attempt host-handler leg", () => {
     const substituted: PreparationHostHandlerRegistryV1 = {
       resolve: () => ({
         handler: { execute: async () => ({ kind: "completed", succeededWithWarnings: false, outputs: [] }) },
-        descriptor: { ...fakeRegistry().resolve(REF).descriptor, handlerContractDigest: `sha256:${"c".repeat(64)}` },
+        descriptor: { ...fakeRegistry().resolve(REF).descriptor, handlerContractDigest: parseSha256Digest(`sha256:${"c".repeat(64)}`) },
       }),
     };
     await expect(hostHandlerLegRunner(legInput({ registry: substituted }))(legCtx())).rejects.toThrow(/does not bind the sealed handler/);

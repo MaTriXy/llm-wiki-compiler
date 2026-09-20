@@ -27,7 +27,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("viewer run-list + stale-navigation guard", () => {
   it("lists a complete run as a link and keeps an incomplete row inert", async () => {
-    const envelope = { runs: [
+    const envelope = { workflowJourneys: true, runs: [
       { runId: "r1", workflow: "build", classification: "current", status: "running", currentStage: "plan" },
       { runId: "r2", problem: "run store unreadable" },
     ] };

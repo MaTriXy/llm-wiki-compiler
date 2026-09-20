@@ -46,7 +46,7 @@
 import type { ProfilePack, EntityTypeDef, FieldDef, FieldType, LifecycleDef, RelationTypeDef, WorkflowDef, WorkflowStageDef } from "./types.js";
 import { BODY_TIER_TOKEN } from "./types.js";
 import { isSlugSafe } from "./identity.js";
-import { RESERVED_CORE_VERBS } from "./reserved-verbs.js";
+import { PROFILE_V1_RESERVED_VERBS } from "./reserved-verbs.js";
 import { assert, lifecycleStates } from "./validate-helpers.js";
 import { validateWorkflowActions } from "./validate-workflow-actions.js";
 import { assertRelationRequirementsDeclared } from "./validate-relation-requirements.js";
@@ -568,7 +568,7 @@ function validateProjectionFile(wf: string, def: WorkflowDef): void {
 /**
  * Validate the optional `workflows` block (fail-closed). Each workflow key must
  * be slug-safe and must NOT collide with a reserved core CLI verb (see
- * {@link RESERVED_CORE_VERBS}). Within a workflow, every stage id must be
+ * {@link PROFILE_V1_RESERVED_VERBS}). Within a workflow, every stage id must be
  * slug-safe and unique, every `reads`/`writes` entry must reference a declared
  * entity type, any `gate` must match `<kind>:<id>` for kind ∈ {trust,human,agent},
  * any stage `previousIds` rename source must be slug-safe, must not alias a current
@@ -588,7 +588,7 @@ function validateWorkflows(
   const declared = new Set(Object.keys(entities));
   for (const [wf, def] of Object.entries(workflows)) {
     assert(isSlugSafe(wf), `workflow key '${wf}' must be slug-safe`);
-    assert(!RESERVED_CORE_VERBS.has(wf), `workflow id '${wf}' is reserved — it collides with a core CLI verb`);
+    assert(!PROFILE_V1_RESERVED_VERBS.has(wf), `workflow id '${wf}' is reserved — it collides with a core CLI verb`);
     const seen = new Set<string>();
     const priorStages: WorkflowStageDef[] = [];
     for (const stage of def.stages) {

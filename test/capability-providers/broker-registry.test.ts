@@ -13,7 +13,7 @@ import {
 } from "../../src/capability-providers/brokers/receipts.js";
 import { parseBrokerRequestEnvelope } from "../../src/capability-providers/brokers/types.js";
 import {
-  parseBrokerId, parseEffectId, parseInvocationId, parseSha256Digest,
+  parseBrokerId, parseEffectId, parseInvocationId, parseSha256Digest, parseSemanticVersion,
 } from "../../src/capability-providers/ids.js";
 
 const EXPECTED_BROKERS = [
@@ -121,7 +121,7 @@ function receiptInput() {
     effectId: parseEffectId("effect-one"), invocationId: parseInvocationId("invocation-one"),
     providerPinDigest: digest("1"), grantSnapshotDigest: digest("2"),
     effectPlanEntryDigest: digest("3"), brokerId: parseBrokerId("remote-effect"),
-    brokerContractVersion: "1.0.0", effectClass: "remote-write",
+    brokerContractVersion: parseSemanticVersion("1.0.0"), effectClass: "remote-write",
     targetIdentity: "remote-target", requestDigest: digest("a"),
     approvedRequestDigest: digest("a"), idempotencyKey: "idempotency-one",
     startedAt: "2026-07-18T12:00:00.000Z", completedAt: "2026-07-18T12:00:01.000Z",

@@ -7,11 +7,9 @@
  * pre-filter when available, then page-level embeddings, then an LLM fallback
  * over LIVE, surface-eligible, pageId-keyed candidates.
  *
- * BOTH embedding-driven legs degrade rather than abort (D29 fix ii): a failed
- * chunk pre-filter falls through to page-level retrieval, and a failed
- * page-level embed falls through to the LLM/index fallback with an
- * `embedding-degraded` warning — so a keyless agent still answers with a v3
- * store present.
+ * A failed chunk pre-filter falls through to page-level retrieval. Page-level
+ * failures propagate by default; explicit fallback retains the D29 recovery
+ * capability with an `embedding-degraded` warning.
  */
 
 import * as output from "../utils/output.js";
@@ -35,6 +33,7 @@ import {
   withStaleWarning,
   type SelectedPageRef,
   type SearchWarning,
+  type RetrievalOptions,
 } from "../search/retrieval.js";
 import type { PageId } from "../utils/page-id.js";
 import { selectPages } from "./page-selection.js";
@@ -101,6 +100,7 @@ export async function selectRelevantPages(
   question: string,
   debug: boolean,
   pageScope?: readonly string[],
+  options: RetrievalOptions = {},
 ): Promise<SelectedPages> {
   const profile = await loadProfile(root);
   const outcome = narrowToScope(await loadEmbeddingsForSearch(root), pageScope);
@@ -123,7 +123,7 @@ export async function selectRelevantPages(
   if (outcome.store) {
     const chunkSelection = await trySelectViaChunks(root, outcome.store, question, debug, profile, stalePageIds);
     if (chunkSelection) return enrich(chunkSelection);
-    const candidates = await tryFindRelevantPages(root, outcome.store, question, profile);
+    const candidates = await tryFindRelevantPages(root, outcome.store, question, profile, options);
     stalePageIds.push(...candidates.stalePageIds);
     if (candidates.warning) degradeWarnings.push(candidates.warning);
     if (candidates.hits.length > 0) return enrich(await selectFromCandidates(question, candidates.hits));
@@ -133,7 +133,7 @@ export async function selectRelevantPages(
   return enrich({ refs, reasoning, chunks: [], warnings: [] });
 }
 
-/** Page-level candidate hits plus an optional degrade warning (never throws). */
+/** Page-level candidate hits plus an optional opt-in recovery warning. */
 interface PageLookup {
   hits: Awaited<ReturnType<typeof findRelevantPagesV3>>["hits"];
   stalePageIds: PageId[];
@@ -141,24 +141,21 @@ interface PageLookup {
 }
 
 /**
- * Page-level candidate lookup over the v3 store that never throws — the same
- * degrade-and-continue contract `tryFindRelevantChunks` gives the chunk leg
- * (D29 fix ii). An embedding failure (e.g. a keyless embedder while a v3 store
- * is present) degrades to zero hits with an `embedding-degraded` warning, so
- * the caller falls through to the LLM/index fallback — which needs no embedder
- * — instead of aborting the whole query.
+ * Preserve public page-level embedding errors unless fallback is requested.
+ * Recovery is reported as data rather than an additional stdout diagnostic.
  */
 async function tryFindRelevantPages(
   root: string,
   store: NonNullable<Awaited<ReturnType<typeof loadEmbeddingsForSearch>>["store"]>,
   question: string,
   profile: Awaited<ReturnType<typeof loadProfile>>,
+  options: RetrievalOptions,
 ): Promise<PageLookup> {
   try {
     return await findRelevantPagesV3(root, store, "search", question, EMBEDDING_TOP_K, profile);
   } catch (err) {
+    if (options.embeddingFailure !== "fallback") throw err;
     const message = err instanceof Error ? err.message : String(err);
-    output.status("!", output.dim(`Page-level retrieval unavailable (${message}); falling back.`));
     return {
       hits: [],
       stalePageIds: [],

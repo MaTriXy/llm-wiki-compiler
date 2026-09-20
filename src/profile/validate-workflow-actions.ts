@@ -20,7 +20,7 @@ import type {
   EntityId,
 } from "./types.js";
 import { isSlugSafe, parseEntityId, EntityIdError } from "./identity.js";
-import { RESERVED_CORE_VERBS } from "./reserved-verbs.js";
+import { PROFILE_V1_RESERVED_VERBS } from "./reserved-verbs.js";
 import { ProfileValidationError } from "./errors.js";
 import { assert, parseGrammarGate } from "./validate-helpers.js";
 
@@ -44,8 +44,8 @@ function assertActionIdWellFormed(actionId: string): void {
   for (const segment of segments) {
     assert(isSlugSafe(segment), `workflow action id '${actionId}' segment '${segment}' must be slug-safe`);
   }
-  assert(!RESERVED_CORE_VERBS.has(actionId), `workflow action id '${actionId}' is reserved — it collides with a core CLI verb`);
-  assert(!RESERVED_CORE_VERBS.has(segments[0]), `workflow action id '${actionId}' first segment '${segments[0]}' is reserved — it collides with a core CLI verb`);
+  assert(!PROFILE_V1_RESERVED_VERBS.has(actionId), `workflow action id '${actionId}' is reserved — it collides with a core CLI verb`);
+  assert(!PROFILE_V1_RESERVED_VERBS.has(segments[0]), `workflow action id '${actionId}' first segment '${segments[0]}' is reserved — it collides with a core CLI verb`);
 }
 
 /**

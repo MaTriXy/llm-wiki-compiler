@@ -42,10 +42,10 @@ function validDraft(slug: string) {
 }
 
 describe("candidate JSON validation (Issue C)", () => {
-  it("refuses mutation when malformed retained authority prevents safe deduplication", async () => {
+  it("preserves public candidate writing when an unrelated record is malformed", async () => {
     await writeMalformedCandidate(root.dir, "bad.json", "{broken");
-    await expect(writeCandidate(root.dir, validDraft("must-not-land"))).rejects.toThrow("candidate record is malformed");
-    expect(await listCandidates(root.dir)).toEqual([]);
+    const written = await writeCandidate(root.dir, validDraft("good-slug"));
+    expect((await listCandidates(root.dir)).map(candidate => candidate.id)).toEqual([written.id]);
   });
   it("skips truncated/unparseable JSON and still lists valid candidates", async () => {
     const valid = await writeCandidate(root.dir, validDraft("good-slug"));

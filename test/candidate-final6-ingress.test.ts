@@ -20,6 +20,7 @@ import {
   candidatePath,
 } from "../src/compiler/candidate-paths.js";
 import { stageEntityPage } from "../src/trust/staging.js";
+import { validateProfile } from "../src/profile/validate.js";
 import { CANDIDATES_DIR } from "../src/utils/constants.js";
 import { RESEARCH_LITE_PROFILE } from "./fixtures/profile-fixtures.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
@@ -52,7 +53,7 @@ function stageWithSlug(slug: unknown): Promise<unknown> {
     entityType: "papers",
     slug: slug as string,
     body: BODY,
-    profile: RESEARCH_LITE_PROFILE,
+    profile: validateProfile(RESEARCH_LITE_PROFILE).profile,
     existingStagedCount: 0,
   });
 }

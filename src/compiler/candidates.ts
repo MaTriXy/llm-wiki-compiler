@@ -21,6 +21,7 @@ import { realpath, unlink } from "fs/promises";
 import { atomicWrite } from "../utils/markdown.js";
 import {
   assertCandidateSlug,
+  assertWritableCandidateId,
   candidatePath,
 } from "./candidate-paths.js";
 import {
@@ -31,7 +32,7 @@ import {
 } from "./candidate-read.js";
 import {
   candidateTargetKey,
-  selectCandidateEntriesForMutation,
+  selectReadableCandidateEntriesForMutation,
 } from "./candidate-selection.js";
 import type { ReviewCandidate, SourceState } from "../utils/types.js";
 import type { HeldReason, ReviewMode } from "../review/policy.js";
@@ -42,7 +43,6 @@ import {
   assertCandidateNamespacesHealthy,
   captureCandidateCustody,
   CandidateCustodyUnavailableError,
-  MAX_CANDIDATE_RECORD_BYTES,
   moveCandidateWithCustody,
   observeCandidateCustody,
   type CandidateCustodyReceipt,
@@ -77,14 +77,6 @@ export {
   FreshCandidateIdExhaustedError,
 } from "./candidate-publication.js";
 export type { FreshCandidateWriteOptions } from "./candidate-publication.js";
-
-/** Typed refusal when serialized candidate authority exceeds the read cap. */
-export class CandidateRecordCapacityError extends Error {
-  constructor() {
-    super(`candidate record exceeds ${MAX_CANDIDATE_RECORD_BYTES} bytes`);
-    this.name = "CandidateRecordCapacityError";
-  }
-}
 
 /** Input shape for creating a new candidate (id + timestamp generated here). */
 export interface CandidateDraft {
@@ -197,7 +189,7 @@ export async function writeCandidate(
 ): Promise<ReviewCandidate> {
   const generatedId = writableCandidateId(draft.slug, 0, options);
   const targetKey = candidateTargetKey(draft);
-  const matches = await selectCandidateEntriesForMutation(
+  const matches = await selectReadableCandidateEntriesForMutation(
     root,
     (candidate) => candidateTargetKey(candidate) === targetKey,
   );
@@ -219,7 +211,7 @@ export async function writeFreshCandidate(
   return publishNewCandidate(root, draft, firstId, options);
 }
 
-/** Materialize one bounded candidate publication. */
+/** Materialize one public candidate publication. */
 function candidatePublication(draft: CandidateDraft, id: string): CandidatePublication<ReviewCandidate> {
   const candidate = buildCandidate(draft, id);
   return { candidate, serialized: serializeCandidate(candidate) };
@@ -245,8 +237,9 @@ async function replaceCanonicalCandidate(
   duplicates: readonly CandidateFileEntry[],
   options: CandidateWriteOptions,
 ): Promise<ReviewCandidate> {
+  assertWritableCandidateId(receipt.fileId);
   await options.beforePublishForTest?.(receipt.fileId, 0);
-  if (await observeCandidateCustody(root, receipt) !== "restored") {
+  if (await observeCandidateCustody(root, receipt, "public") !== "restored") {
     throw new CandidateCustodyUnavailableError();
   }
   const publication = candidatePublication(draft, receipt.fileId);
@@ -257,13 +250,9 @@ async function replaceCanonicalCandidate(
   return publication.candidate;
 }
 
-/** Serialize exactly once and refuse before any candidate-store mutation. */
+/** Preserve the public writer's serialization without a new record-size cap. */
 function serializeCandidate(candidate: ReviewCandidate): string {
-  const serialized = JSON.stringify(candidate, null, 2);
-  if (Buffer.byteLength(serialized, "utf8") > MAX_CANDIDATE_RECORD_BYTES) {
-    throw new CandidateRecordCapacityError();
-  }
-  return serialized;
+  return JSON.stringify(candidate, null, 2);
 }
 
 /** Build a ReviewCandidate from a draft and chosen id. */
@@ -327,9 +316,9 @@ async function deleteCandidateWithCustody(
   root: string,
   receipt: CandidateCustodyReceipt,
 ): Promise<boolean> {
-  const captured = captureCandidateCustodyReceipt(receipt);
+  const captured = captureCandidateCustodyReceipt(receipt, "public");
   await assertCandidateNamespacesHealthy(root);
-  if (await observeCandidateCustody(root, captured) !== "restored") {
+  if (await observeCandidateCustody(root, captured, "public") !== "restored") {
     throw new CandidateCustodyUnavailableError();
   }
   await assertCandidateNamespacesHealthy(root);
@@ -349,7 +338,7 @@ export async function deleteCandidate(
   hooks: CandidateDeletionHooks = {},
 ): Promise<boolean> {
   await assertCandidateNamespacesHealthy(root);
-  const custody = await captureCandidateCustody(root, id);
+  const custody = await captureCandidateCustody(root, id, undefined, "public");
   if (custody === null) return false;
   await hooks.afterCustodyForTest?.(id);
   return deleteCandidateWithCustody(root, custody.receipt);
@@ -373,7 +362,7 @@ export async function deleteCandidateBySlug(
   hooks: CandidateDeletionHooks = {},
 ): Promise<boolean> {
   assertCandidateSlug(slug);
-  const matching = await selectCandidateEntriesForMutation(
+  const matching = await selectReadableCandidateEntriesForMutation(
     root,
     (candidate) => candidateTargetKey(candidate) === `concepts/${slug}`,
   );
@@ -393,12 +382,12 @@ export async function deleteCandidateBySlug(
  * @returns True when the candidate was found and archived.
  */
 export async function archiveCandidate(root: string, id: string): Promise<boolean> {
-  const custody = await captureCandidateCustody(root, id);
+  const custody = await captureCandidateCustody(root, id, undefined, "public");
   if (custody === null) return false;
   return moveCandidateWithCustody({
     root,
     fileId: id,
     direction: "archive",
     receipt: custody.receipt,
-  });
+  }, "public");
 }

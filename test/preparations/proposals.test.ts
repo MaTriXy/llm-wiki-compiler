@@ -8,6 +8,7 @@
  */
 
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -28,7 +29,7 @@ const ATTEMPT = `pat_${"9".repeat(64)}` as AttemptId;
 
 const sourceRef: EvidenceRefV1 = {
   kind: "provider-output", mediaType: "application/json", provenanceLabel: "provider-output",
-  digest: `sha256:${"5".repeat(64)}`, byteCount: 256, sensitivity: "ordinary", retention: "until-handoff",
+  digest: parseSha256Digest(`sha256:${"5".repeat(64)}`), byteCount: 256, sensitivity: "ordinary", retention: "until-handoff",
   producer: { kind: "provider", providerPinDigest: PROVIDER_PIN, attemptId: ATTEMPT }, untrusted: true,
 };
 

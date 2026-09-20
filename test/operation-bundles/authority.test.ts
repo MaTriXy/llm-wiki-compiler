@@ -47,7 +47,7 @@ describe("authoritySnapshotDigest", () => {
   });
 
   it("fails closed on a non-digest component", () => {
-    const bad = { ...sampleSnapshot(), grantDigest: "not-a-digest" } as OperationAuthoritySnapshot;
+    const bad = { ...sampleSnapshot(), grantDigest: "not-a-digest" } as unknown as OperationAuthoritySnapshot;
     expect(() => authoritySnapshotDigest(bad)).toThrow();
   });
 

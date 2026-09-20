@@ -36,7 +36,7 @@ const EMPTY_INVENTORY: OperationEpochInventory = {
   cancelRequests: { count: 0, bytes: 0, health: "ok" }, orphans: { count: 0, bytes: 0, health: "ok" },
 };
 const ACTOR: OperationPrincipal = { id: "operator", surface: "cli", grants: [] };
-const DIGEST = `sha256:${"9".repeat(64)}`;
+const DIGEST = `sha256:${"9".repeat(64)}` as const;
 const AT = "2026-07-17T02:00:00.000Z";
 const OWNER = { pid: 515, processStartTime: AT };
 let root: string;
@@ -337,7 +337,7 @@ describe("operation run durable store", () => {
     const fixture = await runFixture(1);
     let run = await createOperationRunLocked(root, fixture.input);
     run = await appendControlTransition(root, fixture.binding, operationRunPredecessor(run), {
-      type: "recovery-required", code: "bundle-recovery-required", actor: ACTOR, at: AT,
+      type: "recovery-required", code: "run-record-headroom-exhausted", actor: ACTOR, at: AT,
     });
     const body = Buffer.from("evidence");
     const evidence = { digest: `sha256:${createHash("sha256").update(body).digest("hex")}` as const, byteCount: body.byteLength, type: "observation", provenance: "controller" };

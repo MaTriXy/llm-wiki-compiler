@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { acquireLock, releaseLock } from "../src/utils/lock.js";
 import { LLMWIKI_DIR } from "../src/utils/constants.js";
@@ -55,7 +55,8 @@ async function leaf(): Promise<string | null> {
 
 /** Plant a lock leaf naming a LIVE holder in the pre-fix identity format. */
 async function plantLegacyHeldLock(): Promise<string> {
-  const content = JSON.stringify({ pid: livePid, startTime: LEGACY_RENDERING });
+  const startTime = execFileSync("ps", ["-o", "lstart=", "-p", String(livePid)]).toString().trim();
+  const content = JSON.stringify({ pid: livePid, startTime });
   await writeFile(path.join(root, LLMWIKI_DIR, "lock"), content, "utf-8");
   return content;
 }
@@ -88,10 +89,11 @@ describe("consumer 1: project-lock reclamation", () => {
 
   it("writes the new identity format on a fresh acquire", async () => {
     expect(await acquireLock(root, { quiet: true })).toBe(true);
-    const parsed = JSON.parse(await leaf() ?? "{}") as { pid: number; startTime?: string };
+    const parsed = JSON.parse(await leaf() ?? "{}") as { pid: number; startTime?: string; identity?: string };
     expect(parsed.pid).toBe(process.pid);
     // VERSIONED, which is the whole reason the migration is detectable at all.
-    expect(parsed.startTime).toMatch(/^unix:\d+$/u);
+    expect(parsed.identity).toMatch(/^unix:\d+$/u);
+    expect(parsed.startTime).toBe(execFileSync("ps", ["-o", "lstart=", "-p", String(process.pid)]).toString().trim());
     await releaseLock(root);
   });
 });

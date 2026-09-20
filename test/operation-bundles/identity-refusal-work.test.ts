@@ -40,15 +40,15 @@ function observeIdentityWork(action: () => void): WorkObservations {
     if (typeof value === "string") observed.byteLength.push(value.length);
     return byteLength(value as string, encoding);
   }) as typeof Buffer.byteLength);
-  vi.spyOn(String.prototype, "normalize").mockImplementation(function (form?: string) {
+  vi.spyOn(String.prototype, "normalize").mockImplementation(function (this: string, form?: string) {
     observed.normalize.push(this.length);
     return normalize.call(this, form as "NFC");
   });
-  vi.spyOn(RegExp.prototype, "test").mockImplementation(function (value: string) {
+  vi.spyOn(RegExp.prototype, "test").mockImplementation(function (this: RegExp, value: string) {
     if (typeof value === "string") observed.regex.push(value.length);
     return regexTest.call(this, value);
   });
-  vi.spyOn(String.prototype, "startsWith").mockImplementation(function (search, position) {
+  vi.spyOn(String.prototype, "startsWith").mockImplementation(function (this: string, search, position) {
     observed.startsWith.push(this.length);
     return startsWith.call(this, search, position);
   });
@@ -59,7 +59,7 @@ function observeIdentityWork(action: () => void): WorkObservations {
 /** Assert every observed scanner input was bounded independently of the hostile value. */
 function expectBoundedWork(observed: WorkObservations): void {
   for (const lengths of Object.values(observed)) {
-    expect(lengths.every((length) => length <= SAFE_SCAN_LIMIT)).toBe(true);
+    expect(lengths.every((length: number) => length <= SAFE_SCAN_LIMIT)).toBe(true);
   }
 }
 

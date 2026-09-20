@@ -13,6 +13,7 @@ import { appendConnectorEvent } from "../../src/connectors/audit.js";
 import { stageConnectorCandidate } from "../../src/connectors/stage-candidate.js";
 import { readEvents } from "../../src/events/store-read.js";
 import { RESEARCH_LITE_PROFILE } from "../fixtures/profile-fixtures.js";
+import { validateProfile } from "../../src/profile/validate.js";
 import { useTempRoot } from "../fixtures/temp-root.js";
 
 const root = useTempRoot();
@@ -52,7 +53,7 @@ describe("connector candidate boundary rechecks", () => {
         fetchedAt: "2026-01-01T00:00:00.000Z", contentHash: "a".repeat(64),
         draftContentHash: "b".repeat(64), idempotencyKey: "c".repeat(64),
       },
-    }, RESEARCH_LITE_PROFILE, receipts)).rejects
+    }, validateProfile(RESEARCH_LITE_PROFILE).profile, receipts)).rejects
       .toBeInstanceOf(ConnectorCandidateBatchOverflowError);
 
     expect(existsSync(path.join(root.dir, ".llmwiki", "candidates"))).toBe(false);

@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { parsePreparationPlan } from "../../src/preparations/plan-parse.js";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   authorGateProof, evaluateGateFreshness, requireFreshApproval, revalidateApprovedGateProof,
   type GateAuthorityState,
@@ -54,7 +55,7 @@ describe("gate authority drift", () => {
   it("reports drifted when the current input digest changes", () => {
     const original = state(gate);
     const proof = approve(original);
-    const swapped: GateAuthorityState = { ...original, currentInput: { ...original.currentInput, digest: `sha256:${"e".repeat(64)}` } };
+    const swapped: GateAuthorityState = { ...original, currentInput: { ...original.currentInput, digest: parseSha256Digest(`sha256:${"e".repeat(64)}`) } };
     expect(evaluateGateFreshness(proof.fact, swapped)).toBe("drifted");
   });
 
@@ -83,11 +84,11 @@ describe("gate authority drift", () => {
     const proof = authorGateProof({ principal: cli, choice: "approved", decisionIndex: 0, at: AT, authoritative: { ...current, currentEffectPlanDigest: DIGEST } }).summary;
     const binding = { planDigest: proof.planDigest, phaseDigest: proof.phaseDigest, inputDigest: proof.inputDigest, effectDigest: proof.effectDigest, authorityDigest: proof.authorityDigest };
     expect(() => revalidateApprovedGateProof(proof, binding)).not.toThrow();
-    expect(() => revalidateApprovedGateProof(proof, { ...binding, phaseDigest: `sha256:${"6".repeat(64)}` })).toThrow(/not-fresh/);
-    expect(() => revalidateApprovedGateProof(proof, { ...binding, inputDigest: `sha256:${"9".repeat(64)}` })).toThrow(/not-fresh/);
-    expect(() => revalidateApprovedGateProof(proof, { ...binding, effectDigest: `sha256:${"8".repeat(64)}` })).toThrow(/not-fresh/);
-    expect(() => revalidateApprovedGateProof(proof, { ...binding, authorityDigest: `sha256:${"7".repeat(64)}` })).toThrow(/not-fresh/);
+    expect(() => revalidateApprovedGateProof(proof, { ...binding, phaseDigest: parseSha256Digest(`sha256:${"6".repeat(64)}`) })).toThrow(/not-fresh/);
+    expect(() => revalidateApprovedGateProof(proof, { ...binding, inputDigest: parseSha256Digest(`sha256:${"9".repeat(64)}`) })).toThrow(/not-fresh/);
+    expect(() => revalidateApprovedGateProof(proof, { ...binding, effectDigest: parseSha256Digest(`sha256:${"8".repeat(64)}`) })).toThrow(/not-fresh/);
+    expect(() => revalidateApprovedGateProof(proof, { ...binding, authorityDigest: parseSha256Digest(`sha256:${"7".repeat(64)}`) })).toThrow(/not-fresh/);
   });
 });
 
-const DIGEST = `sha256:${"a".repeat(64)}` as const;
+const DIGEST = parseSha256Digest(`sha256:${"a".repeat(64)}`);

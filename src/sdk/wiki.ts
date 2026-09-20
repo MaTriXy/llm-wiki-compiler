@@ -103,10 +103,10 @@ export function createWiki(options: CreateWikiOptions): Wiki {
         return compileAndReport(root, opts);
       }),
 
-    search: (question) =>
+    search: (question, opts = {}) =>
       runQuiet(async () => {
         ensureProviderAvailable();
-        const { refs, warnings } = await pickSearchRefs(root, question);
+        const { refs, warnings } = await pickSearchRefs(root, question, opts);
         const pages = await loadSelectedRefs(root, refs);
         return { pages, refs, warnings };
       }),

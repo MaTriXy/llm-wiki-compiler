@@ -16,14 +16,14 @@ import {
   signOperationRun,
 } from "../../src/operation-bundles/run-integrity.js";
 import type { OperationPrincipal } from "../../src/operation-bundles/principal.js";
-import type { OperationTransitionPayload, OperationTransitionType } from "../../src/operation-bundles/run-types.js";
+import type { OperationTransitionPayload, OperationTransitionType, OperationRunBinding, OperationEvidenceReference } from "../../src/operation-bundles/run-types.js";
 import { runFixture } from "./run-fixture.js";
 import { useTempRoot } from "../fixtures/temp-root.js";
 
 const KEY = Buffer.alloc(32, 7);
 const AT = "2026-07-17T00:00:00.000Z";
 const ACTOR: OperationPrincipal = { id: "local-operator", surface: "cli", grants: [] };
-const MANIFEST_DIGEST = `sha256:${"a".repeat(64)}`;
+const MANIFEST_DIGEST = `sha256:${"a".repeat(64)}` as const;
 const OWNER = { pid: 91, processStartTime: AT };
 const EVIDENCE = { digest: MANIFEST_DIGEST, byteCount: 1, type: "observation", provenance: "test" };
 const root = useTempRoot();
@@ -80,7 +80,7 @@ describe("operation run parsing", () => {
 
   it("rejects wrong manifest, run, workspace, bundle, and key-epoch bindings", () => {
     const { signed, binding } = fixture();
-    const wrong = [
+    const wrong: OperationRunBinding[] = [
       { ...binding, manifestDigest: `sha256:${"b".repeat(64)}` },
       { ...binding, runId: mintOperationRunId() },
       { ...binding, workspaceId: "other" },
@@ -140,7 +140,7 @@ describe("operation run parsing", () => {
     const evidence = {
       kind: "evidence-over-limit" as const, digest: EVIDENCE.digest,
       byteCount: MAX_RUN_EVIDENCE_BLOB_BYTES + 1, excerpt: "bounded",
-    };
+    } as unknown as OperationEvidenceReference; // Deliberately invalid wire data exercises the parser.
     const applied = transition(started, "mutation-applied", "applying", {
       kind: "mutation", mutationId: id, evidence,
     });

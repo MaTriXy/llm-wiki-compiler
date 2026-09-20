@@ -105,14 +105,14 @@ describe("Final8 connector queue authority", () => {
     expect(await countCandidates(root.dir)).toBe(200);
   });
 
-  it("refuses 200 unrelated candidates before fetching", async () => {
+  it("preserves the staged-write budget after fetching", async () => {
     await prepareUnrelatedQueue(200);
     const fetches = { value: 0 };
 
     const result = await runCounted(fetches);
 
     await expectUnavailableWithoutEvent(result);
-    expect(fetches.value).toBe(0);
+    expect(fetches.value).toBe(1);
   });
 
   it("admits a full queue when one selected predecessor makes room", async () => {
@@ -123,6 +123,14 @@ describe("Final8 connector queue authority", () => {
 
     expect(result.kind).toBe("superseded");
     expect(await countCandidates(root.dir)).toBe(200);
+  });
+
+  it("permits a no-op in an already over-budget legacy queue", async () => {
+    await prepareUnrelatedQueue(200);
+    await plantConnectorCandidate(root.dir, "selected", { contentHash: "d".repeat(64) });
+    const result = await runFixture();
+    expect(result).toEqual({ kind: "noop", candidateIds: ["selected"] });
+    expect(await countCandidates(root.dir)).toBe(201);
   });
 
   it("refuses concurrent drift from 199 to 200 after the fetch", async () => {

@@ -6,7 +6,7 @@
  */
 
 import { MAX_CONNECTOR_INPUT_BYTES } from "./audit.js";
-import { captureExactRecord, RuntimeCaptureError } from "../utils/runtime-capture.js";
+import { captureOwnDataRecord, RuntimeCaptureError } from "../utils/runtime-capture.js";
 import { isWellFormedUnicode } from "../utils/well-formed-unicode.js";
 
 /** Fixed refusal returned by the connector input boundary. */
@@ -47,16 +47,20 @@ export function captureConnectorInputs(
 ): ConnectorInputCapture | ConnectorInputRefusal {
   let record: Readonly<Record<string, unknown>>;
   try {
-    record = captureExactRecord(value, required);
+    record = captureOwnDataRecord(value);
   } catch (error) {
     if (error instanceof RuntimeCaptureError) return { kind: "refused", reason: INVALID_INPUTS };
     throw error;
   }
   const inputs = Object.create(null) as Record<string, string>;
-  for (const key of required) {
+  for (const key of Object.keys(record)) {
+    if (!required.includes(key)) return { kind: "refused", reason: `unknown connector input: ${key}` };
     const captured = captureInputValue(key, record[key]);
     if (typeof captured !== "string") return captured;
     inputs[key] = captured;
+  }
+  for (const key of required) {
+    if (!Object.hasOwn(inputs, key)) return { kind: "refused", reason: `missing connector input: ${key}` };
   }
   return { kind: "ok", inputs: Object.freeze(inputs) };
 }

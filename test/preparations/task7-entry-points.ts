@@ -16,7 +16,7 @@ import * as intentCompiler from "../../src/preparations/intent-compiler.js";
 import { decideReconciliation, reconciliationSetDigest } from "../../src/preparations/reconciliation.js";
 import { authorSelectionDecision } from "../../src/preparations/selection.js";
 import {
-  HANDLER_DIGEST, baseRequest, cleanCompleteness, compiler, contract, evidence,
+  HANDLER_DIGEST, baseRequest, compiler, contract, evidence,
   identitySetRef, pageTarget, proposals, sets,
 } from "./task7-fixture.js";
 import type { GateProofSummaryV1 } from "../../src/preparations/run-types.js";

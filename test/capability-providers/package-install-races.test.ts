@@ -105,7 +105,7 @@ describe("provider package-cache confinement", () => {
     const { paths, root } = await racePaths();
     const outside = path.join(root, "outside"); await mkdir(outside);
     await expect(installBuiltinFixture(paths, fixture, {
-      afterPackageStagingOpenForTest: async (staging) => {
+      afterPackageStagingOpenForTest: async (staging: string) => {
         const directory = path.dirname(staging);
         await rename(directory, `${directory}-moved`); await symlink(outside, directory);
       },
@@ -177,7 +177,7 @@ describe("provider download confinement", () => {
     await expect(installRemoteProvider(paths, {
       coordinate: COORDINATE, confirmedPackageDigest: String(fixture.envelope.payloadDigest),
       confirmedIndexDigest: canonicalDigest(fixture.index), seams: distributionSeams(fixture),
-      afterDownloadOpenForTest: async (leaf) => {
+      afterDownloadOpenForTest: async (leaf: string) => {
         const directory = path.dirname(leaf);
         await rename(directory, `${directory}-moved`); await symlink(outside, directory);
       },

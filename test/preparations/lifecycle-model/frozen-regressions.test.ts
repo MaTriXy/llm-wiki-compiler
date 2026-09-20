@@ -24,6 +24,7 @@ import {
 import { scenarioBodies, scenarioReach } from "./reach.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
+type FrozenScenario = (typeof FROZEN_REGRESSIONS)[number]["scenarios"][number];
 
 /** Where a frozen case's named production entry point must actually be exported from. */
 const PRODUCTION_DIRECTORIES = ["src/preparations", "src/utils"];
@@ -36,7 +37,7 @@ async function currentScenarios(relativePath: string): Promise<Map<string, strin
 
 describe("frozen Task 9 regression corpus", () => {
   it("assigns every frozen scenario a unique stable id and a body digest", () => {
-    const scenarios = FROZEN_REGRESSIONS.flatMap((file) => file.scenarios);
+    const scenarios = FROZEN_REGRESSIONS.flatMap<FrozenScenario>((file) => file.scenarios);
     const ids = scenarios.map((scenario) => scenario.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.every((id) => /^PLA-REG-[A-Z]+-\d{3}$/.test(id))).toBe(true);
@@ -89,7 +90,7 @@ describe("frozen Task 9 regression corpus", () => {
   it("classifies every frozen case by operation and evidence class", () => {
     // Without these, the corpus records THAT a case exists but not what kind of evidence
     // it is, so the mix could drift from adversarial toward happy-path unnoticed.
-    const scenarios = FROZEN_REGRESSIONS.flatMap((file) => file.scenarios);
+    const scenarios = FROZEN_REGRESSIONS.flatMap<FrozenScenario>((file) => file.scenarios);
     const wrong = scenarios.filter((scenario) =>
       !FROZEN_OPERATIONS.includes(scenario.operation) || !FROZEN_EVIDENCE_CLASSES.includes(scenario.evidence));
     expect(wrong.map((scenario) => scenario.id)).toEqual([]);
@@ -106,7 +107,7 @@ describe("frozen Task 9 regression corpus", () => {
     // a case claiming an operation reaches that operation's driver, and a case claiming
     // `shared` reaches no destructive driver at all (or it was mislabelled).
     const drivers = new Set<string>(Object.values(OPERATION_DRIVERS));
-    const disagreeing = FROZEN_REGRESSIONS.flatMap((file) => file.scenarios).filter((scenario) => {
+    const disagreeing = FROZEN_REGRESSIONS.flatMap<FrozenScenario>((file) => file.scenarios).filter((scenario) => {
       const expected = OPERATION_DRIVERS[scenario.operation as keyof typeof OPERATION_DRIVERS];
       return expected === undefined
         ? drivers.has(scenario.reachesProduction)
@@ -122,7 +123,7 @@ describe("frozen Task 9 regression corpus", () => {
     // touches. Freezing the reviewed answer is what makes a reclassification a
     // deliberate, reviewable edit rather than something that slips through whichever
     // static check happens to be weakest.
-    const rows = FROZEN_REGRESSIONS.flatMap((file) => file.scenarios).map((scenario) =>
+    const rows = FROZEN_REGRESSIONS.flatMap<FrozenScenario>((file) => file.scenarios).map((scenario) =>
       [scenario.id, scenario.operation, scenario.evidence, scenario.reachesProduction].join(" "));
     const digest = createHash("sha256").update(rows.join("|"), "utf8").digest("hex");
     expect(digest, "classification changed; if intended, review each record and update "
@@ -135,7 +136,7 @@ describe("frozen Task 9 regression corpus", () => {
     // stops an ambiguous case from being relabelled `shared` with an incidental helper —
     // a path builder is genuinely called and genuinely exported, and proves nothing.
     const allowed = new Set<string>(SHARED_CONSUMER_ENTRY_POINTS);
-    const unjustified = FROZEN_REGRESSIONS.flatMap((file) => file.scenarios)
+    const unjustified = FROZEN_REGRESSIONS.flatMap<FrozenScenario>((file) => file.scenarios)
       .filter((scenario) => scenario.operation === "shared" && !allowed.has(scenario.reachesProduction));
     expect(unjustified.map((scenario) => `${scenario.id} -> ${scenario.reachesProduction}`)).toEqual([]);
   });

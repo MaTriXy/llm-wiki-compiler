@@ -128,19 +128,14 @@ export async function writePruneReceipts(input: {
 }): Promise<void> {
   const paths = lifecyclePruneUnitPaths(input.namespace, input.unitId);
   await mkdir(paths.unitRoot, { recursive: true });
+  const runId = input.runId === undefined
+    ? (input.operation === "prune" ? `run-${input.unitId}` : null)
+    : input.runId;
   const common = {
     schemaVersion: 1 as const,
     operation: input.operation,
     unitId: input.unitId,
-    ...((input.runId === undefined
-      ? (input.operation === "prune" ? `run-${input.unitId}` : null)
-      : input.runId) === null
-      ? {}
-      : {
-        runId: input.runId === undefined
-          ? `run-${input.unitId}`
-          : input.runId,
-      }),
+    ...(runId === null ? {} : { runId }),
     keyEpochId: input.keyEpochId,
     objects: [...input.objects],
     actor: ACTOR,

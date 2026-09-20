@@ -1,7 +1,7 @@
 /**
  * @file test/connectors/final6-bounds.test.ts
  * @description Final6 connector regressions bind one canonical identity and
- * enforce the explicit 200-candidate selection ceiling before side effects.
+ * preserve public no-op behavior beyond the new direct-adapter batch ceiling.
  */
 
 import { existsSync } from "node:fs";
@@ -106,19 +106,19 @@ describe("Final6 connector identity and selection bounds", () => {
     expect(fetches.value).toBe(1);
   });
 
-  it("stops at candidate 201 with zero durable or external side effects", async () => {
+  it("keeps a 201-candidate no-op byte-identical while retaining its normal audit", async () => {
     await activateFixtureConnector(root.dir);
     await enableRateLimit();
-    await plantConnectorCandidateBatch(root.dir, 201);
+    const ids = await plantConnectorCandidateBatch(root.dir, 201);
     const before = await snapshotCandidateQueue(root.dir);
     const fetches = { value: 0 };
 
     const result = await runBoundedFixture(fetches);
 
-    expect(result).toEqual({ kind: "unavailable", reason: "connector candidate store unavailable" });
-    expect(fetches.value).toBe(0);
-    expect(existsSync(rateStamp())).toBe(false);
-    expect((await readEvents(root.dir)).events).toEqual([]);
+    expect(result).toEqual({ kind: "noop", candidateIds: ids });
+    expect(fetches.value).toBe(1);
+    expect(existsSync(rateStamp())).toBe(true);
+    expect((await readEvents(root.dir)).events).toHaveLength(1);
     expect(await snapshotCandidateQueue(root.dir)).toEqual(before);
   });
 });

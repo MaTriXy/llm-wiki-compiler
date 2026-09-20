@@ -9,13 +9,14 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { sealAttemptContext } from "../../src/preparations/attempts/start.js";
 import { buildCheckpointRef, checkpointDigest, classifyCheckpointResume } from "../../src/preparations/attempts/checkpoint.js";
 import type { SealAuthorityExtrasV1 } from "../../src/preparations/attempts/types.js";
 import type { EvidenceRefV1 } from "../../src/preparations/types.js";
 
-const D = `sha256:${"a".repeat(64)}` as const;
-const OTHER = `sha256:${"b".repeat(64)}` as const;
+const D = parseSha256Digest(`sha256:${"a".repeat(64)}`);
+const OTHER = parseSha256Digest(`sha256:${"b".repeat(64)}`);
 
 const manifest = () => ({
   planDigest: D, plan: {

@@ -118,6 +118,10 @@ function buildChunkProvenance(chunks: ChunkCitation[]): string {
 
 /** Options for generateAnswer — programmatic-friendly. */
 interface GenerateAnswerOptions {
+  /** Opt into embedding-error recovery; scoped/review queries default to fallback. */
+  embeddingFailure?: "throw" | "fallback";
+  /** Report/filter to hydrated grounding. Scoped/review queries always use this mode. */
+  grounding?: "hydrated";
   /** Persist the answer as a wiki query page when set. */
   save?: boolean;
   /**
@@ -158,7 +162,11 @@ export async function generateAnswer(
     throw new Error("Wiki index not found. Run `llmwiki compile` first.");
   }
 
-  const selection = await selectRelevantPages(root, question, Boolean(options.debug), options.pageScope);
+  const scopedOrReview = options.pageScope !== undefined || options.review === true;
+  const hydratedGrounding = scopedOrReview || options.grounding === "hydrated";
+  const selection = await selectRelevantPages(root, question, Boolean(options.debug), options.pageScope, {
+    embeddingFailure: options.embeddingFailure ?? (scopedOrReview ? "fallback" : "throw"),
+  });
   // Human/log surfaces use the QUALIFIED pageId so same-slug pages
   // (`concepts/foo` vs `papers/foo`) are distinguishable; the structured
   // `selectedPages` API field stays bare slugs for back-compat (buildResultFields).
@@ -168,48 +176,30 @@ export async function generateAnswer(
 
   // Hydrate via the qualified-id loader (confined, namespace-correct per pageId):
   // a `papers/foo` ref loads wiki/<papers-dir>/foo.md, never wiki/concepts/foo.md.
-  // The hydrated pairs — NOT the selection — are the grounding identity the
-  // result reports (D29 fix i): hydration silently drops absent/malformed
-  // pages, and a page the model never saw must not be cited as grounding.
+  // Scoped/review and explicitly hydrated queries use the live pairs as their
+  // grounding identity. Ordinary public queries retain their selected-ref contract.
   const hydratedPairs = await loadSelectedRefRecords(root, selection.refs);
   const pagesContent = renderRefRecords(hydratedPairs);
   verbose(`context pack: ${pagesContent.length} chars`);
 
   if (!pagesContent) {
-    return buildEmptyResult(selection, hydratedPairs);
+    return buildEmptyResult(selection, hydratedGrounding ? hydratedPairs : undefined);
   }
 
-  // The prompt must contain ONLY content whose page is in the reported
-  // grounding: chunk retrieval keeps more excerpts (CHUNK_RERANK_KEEP) than
-  // the page collapse keeps refs (QUERY_PAGE_LIMIT), and a hydration drop can
-  // orphan an excerpt — either way, text from a page the result does not name
-  // must never reach the model, so excerpts are filtered to hydrated parents.
+  // Hydrated mode restricts excerpts to the reported live parents; ordinary
+  // queries preserve the public prompt, including excerpts beyond the ref cap.
   const hydratedIds = new Set(hydratedPairs.map((pair) => pair.pageId));
-  const promptChunks = selection.chunks.filter((chunk) => hydratedIds.has(chunk.pageId));
+  const promptChunks = hydratedGrounding
+    ? selection.chunks.filter((chunk) => hydratedIds.has(chunk.pageId)) : selection.chunks;
   const answer = await callAnswerLLM(question, pagesContent, promptChunks, options.onToken);
   const saved = await maybeSaveQueryPage(root, question, answer, Boolean(options.save), Boolean(options.review));
 
-  // JOURNALLED ONLY ON THE CRYSTALLIZING PATH. Answering a question is a READ,
-  // and a read that silently appends to `log.md` is neither what an operator
-  // expects nor what the parity contract allows: a non-crystallizing ask must
-  // leave the filesystem byte-identical. Saving an answer is a write already,
-  // so journalling it records something that genuinely happened.
-  //
-  // Still journalled HERE rather than in the CLI command, so a saved MCP query
-  // is captured on the same terms as a saved CLI one.
-  //
-  // Logged after the answer is produced — matching compile, which logs after
-  // finalization — so a mid-flight LLM failure records nothing.
-  //
-  // The `--review` path is EXCLUDED: it proposes a candidate, it does not write
-  // a wiki page, so journalling a completed `query` write would record something
-  // that has not happened yet. The write is journalled when `review approve`
-  // actually lands the page.
-  // The durable log records the HYDRATED grounding — the same identity the
-  // result returns — never the pre-hydration selection, so a dropped page is
-  // not permanently journalled as grounding it never provided.
-  const resultFields = buildResultFields(selection, hydratedPairs);
-  if (options.save === true && options.review !== true) {
+  // Preserve the public activity log for ordinary CLI/MCP questions, even when
+  // not saved as pages. Explicitly scoped reads and review proposals retain
+  // their no-activity-log contract; a saved scoped answer is a write.
+  // Log only after generation succeeds, using the selected grounding policy.
+  const resultFields = buildResultFields(selection, hydratedGrounding ? hydratedPairs : undefined);
+  if (options.review !== true && (options.save === true || options.pageScope === undefined)) {
     await appendLog(root, "query", question, {
       details: resultFields.pageIds.length > 0 ? [`Pages: ${formatWikilinkList(resultFields.pageIds)}`] : [],
     });
@@ -239,26 +229,23 @@ function renderRefRecord({ pageId, record }: PageRecordWithId): string {
 }
 
 /** Build the empty-pages result while preserving any debug/chunk context. */
-function buildEmptyResult(selection: SelectedPages, hydratedPairs: PageRecordWithId[]): QueryResult {
+function buildEmptyResult(selection: SelectedPages, hydratedPairs?: PageRecordWithId[]): QueryResult {
   return { answer: "", ...buildResultFields(selection, hydratedPairs) };
 }
 
 /**
  * The shared identity/diagnostic fields of a {@link QueryResult}, built from
- * the HYDRATED pairs — the pages actually rendered into the answer prompt — so
- * the result never names a page the model did not see (D29 fix i). A selected
- * ref whose page failed to hydrate is dropped from the identity fields and
- * surfaced as a `page-hydration-dropped` warning instead; the legacy display
- * slugs stay DERIVED from the same hydrated identity (back-compat).
+ * selected refs by default, matching public behavior. With hydrated pairs,
+ * drop unreadable refs and report them as `page-hydration-dropped` warnings.
  */
 function buildResultFields(
   selection: SelectedPages,
-  hydratedPairs: PageRecordWithId[],
+  hydratedPairs?: PageRecordWithId[],
 ): Omit<QueryResult, "answer" | "saved"> {
-  const hydratedIds = new Set(hydratedPairs.map((pair) => pair.pageId));
-  const refs = selection.refs.filter((ref) => hydratedIds.has(ref.pageId));
+  const hydratedIds = hydratedPairs && new Set(hydratedPairs.map((pair) => pair.pageId));
+  const refs = hydratedIds ? selection.refs.filter((ref) => hydratedIds.has(ref.pageId)) : selection.refs;
   const droppedIds = selection.refs
-    .filter((ref) => !hydratedIds.has(ref.pageId))
+    .filter((ref) => hydratedIds && !hydratedIds.has(ref.pageId))
     .map((ref) => ref.pageId);
   return {
     selectedPages: refs.map((ref) => slugFromPageId(ref.pageId)),

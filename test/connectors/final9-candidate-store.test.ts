@@ -1,7 +1,7 @@
 /**
  * @file test/connectors/final9-candidate-store.test.ts
  * @description Decision 19 integration regressions require connector preflight
- * to validate both literal candidate namespaces before fetch and require exact
+ * to validate both confined candidate namespaces before fetch and require exact
  * compensation before translating a late namespace failure.
  */
 
@@ -90,14 +90,25 @@ describe("Final9 connector candidate namespace gate", () => {
   afterEach(() => { delete process.env.LLMWIKI_CONNECTORS; });
 
   it.each([
-    ["pending", "stable"], ["pending", "dangling"], ["pending", "loop"], ["pending", "file"],
-    ["archive", "stable"], ["archive", "dangling"], ["archive", "loop"], ["archive", "file"],
+    ["pending", "dangling"], ["pending", "loop"], ["pending", "file"],
+    ["archive", "dangling"], ["archive", "loop"], ["archive", "file"],
   ] as const)("refuses a %s %s fault before rate or fetch", async (namespace, kind) => {
     await activateFixtureConnector(root.dir);
     await installFault(namespace, kind);
     const fetches = { value: 0 };
 
     await expectInitialRefusal(fetches);
+  });
+
+  it.each(["pending", "archive"] as const)("preserves public %s alias behavior", async (namespace) => {
+    await activateFixtureConnector(root.dir);
+    await installFault(namespace, "stable");
+    const fetches = { value: 0 };
+    const result = await runFixture({ fetcher: countedFixtureFetch(fetches) });
+
+    expect(fetches.value).toBe(1);
+    // The public atomic writer refuses a directly symlinked publication parent.
+    expect(result.kind).toBe(namespace === "pending" ? "unavailable" : "staged");
   });
 
   it("refuses an unreadable archive before rate or fetch", async () => {
@@ -114,7 +125,7 @@ describe("Final9 connector candidate namespace gate", () => {
     }
   });
 
-  it("maps a late namespace failure only after empty compensation settles", async () => {
+  it("allows a late confined archive alias when no predecessor needs retention", async () => {
     await activateFixtureConnector(root.dir);
 
     const result = await runFixture({
@@ -122,8 +133,7 @@ describe("Final9 connector candidate namespace gate", () => {
       beforeCandidateStageForTest: aliasArchive,
     });
 
-    expect(result).toEqual(STORE_UNAVAILABLE);
-    expect((await readEvents(root.dir)).events).toEqual([]);
+    expect(result.kind).toBe("staged");
   });
 
   it("lets recovery-required win when a late alias hides archived authority", async () => {
@@ -145,7 +155,7 @@ describe("Final9 connector candidate namespace gate", () => {
     expect(existsSync(path.join(candidates, "selected.json"))).toBe(false);
   });
 
-  it("maps aggregate scan exhaustion before fetch with zero effects", async () => {
+  it("does not apply a strict whole-store byte budget to ordinary connector discovery", async () => {
     await activateFixtureConnector(root.dir);
     await plantConnectorCandidate(root.dir, "unrelated", { idempotencyKey: "b".repeat(64) });
     const fetches = { value: 0 };
@@ -156,6 +166,7 @@ describe("Final9 connector candidate namespace gate", () => {
 
     const result = await runFixture(deps);
 
-    await expectUnavailableWithoutEffects(result, fetches);
+    expect(result.kind).toBe("staged");
+    expect(fetches.value).toBe(1);
   });
 });

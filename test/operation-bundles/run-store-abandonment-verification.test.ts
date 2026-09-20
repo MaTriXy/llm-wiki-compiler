@@ -40,7 +40,7 @@ async function parkedFixture() {
   const fixture = runFixture({ key: key.key, actor: ACTOR, at: AT, authoritativeMutationCount: 1 });
   let run = await createOperationRunLocked(root, fixture.input);
   run = await appendControlTransition(root, fixture.binding, operationRunPredecessor(run), {
-    type: "recovery-required", code: "bundle-recovery-required", actor: ACTOR, at: AT,
+    type: "recovery-required", code: "run-record-headroom-exhausted", actor: ACTOR, at: AT,
   });
   return { ...fixture, run, paths: operationPaths(root, fixture.binding.workspaceId) };
 }

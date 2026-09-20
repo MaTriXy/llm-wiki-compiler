@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { canonicalBytes } from "../../src/profile/templates/signing/canonical.js";
 import {
   preparationKeyEpochId, signPreparationRun, verifyPreparationRunIntegrity,
@@ -35,7 +36,7 @@ describe("preparation run integrity", () => {
 
   it("rejects a binding whose manifest digest names a different preparation", () => {
     const text = signedRunText(genesisContent());
-    expect(() => parsePreparationRun(text, { ...fixtureBinding(), manifestDigest: `sha256:${"9".repeat(64)}` })).toThrow();
+    expect(() => parsePreparationRun(text, { ...fixtureBinding(), manifestDigest: parseSha256Digest(`sha256:${"9".repeat(64)}`) })).toThrow();
   });
 
   it("detects interior transition removal even when re-signed", () => {

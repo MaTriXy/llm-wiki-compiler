@@ -9,6 +9,7 @@
  */
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -33,8 +34,8 @@ afterEach(async () => { await staged.cleanup(); await rm(custodyRoot, { recursiv
 function completedWithArtifact(evidencePath: string, claimedHex: string): ProviderInvokeFn {
   return async () => ({ kind: "completed", admitted: {
     outcome: "succeeded",
-    acceptedArtifacts: [{ outputId: "report", mediaType: "application/json", digest: `sha256:${claimedHex}`, byteCount: BYTES.byteLength,
-      evidence: { evidencePath, digest: `sha256:${claimedHex}`, byteCount: BYTES.byteLength } }],
+    acceptedArtifacts: [{ outputId: "report", mediaType: "application/json", digest: parseSha256Digest(`sha256:${claimedHex}`), byteCount: BYTES.byteLength,
+      evidence: { evidencePath, digest: parseSha256Digest(`sha256:${claimedHex}`), byteCount: BYTES.byteLength } }],
     counts: { declared: 1, acceptedArtifacts: 1, requiredMissing: 0, receipts: 0 },
     receipts: [], usage: { brokerRequestCount: 0, tokenCount: "unobserved", costMicros: "unobserved" },
     untrusted: { untrusted: true, providerReportedCounts: null, warnings: null, output: null } } });
@@ -69,9 +70,9 @@ describe("preparation attempt recustody", () => {
     const validHex = createHash("sha256").update(valid).digest("hex");
     await writeFile(path.join(custodyRoot, validHex), valid);
     const ref = (hex: string, byteCount: number) => ({
-      kind: "provider-output", mediaType: "application/json", provenanceLabel: "p", digest: `sha256:${hex}` as const,
+      kind: "provider-output", mediaType: "application/json", provenanceLabel: "p", digest: parseSha256Digest(`sha256:${hex}`),
       byteCount, sensitivity: "ordinary" as const, retention: "audit" as const,
-      producer: { kind: "host" as const, contractDigest: `sha256:${"2".repeat(64)}` as const }, untrusted: true as const,
+      producer: { kind: "host" as const, contractDigest: parseSha256Digest(`sha256:${"2".repeat(64)}`) }, untrusted: true as const,
     });
     const pendingEvidence = [
       { ref: ref(validHex, valid.byteLength), tempPath: path.join(custodyRoot, validHex) },
@@ -89,7 +90,7 @@ describe("preparation attempt recustody", () => {
   it("publishes nothing to the authoritative store when the commit parks on drift", async () => {
     const output = path.join(custodyRoot, "out.json");
     await writeFile(output, BYTES);
-    const drifted = providerAuthority({ providerPinDigest: `sha256:${"f".repeat(64)}` });
+    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
     const request = attemptRequest(staged, {
       authorityResolver: driftingResolver(providerAuthority(), drifted), leg: leg(completedWithArtifact(output, HEX)),
     });

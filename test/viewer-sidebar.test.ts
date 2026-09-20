@@ -13,9 +13,9 @@ import {
   flushMicrotasks,
   jsonResponse,
   mountViewerDom,
-  type EmbeddedPage,
   type FetchResponder,
 } from "./fixtures/viewer-jsdom.js";
+import type { ViewerPage } from "../src/viewer/types.js";
 
 const PAGES_BASE = {
   project: { title: "demo", rootName: "demo" },
@@ -33,7 +33,8 @@ interface Freshness {
 }
 
 /** A `/api/pages` row carrying freshness — superset of the embedded blob row. */
-interface PageRow extends EmbeddedPage {
+interface PageRow extends Pick<ViewerPage, "id" | "pageDirectory" | "slug" | "title"> {
+  kind: "concept";
   freshness: Freshness;
 }
 

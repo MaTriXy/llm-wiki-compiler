@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   CompletenessAuthorityError, assertCompletenessPermitsSuccess, deriveCompleteness,
 } from "../../src/preparations/completeness.js";
@@ -90,8 +91,8 @@ describe("T7-B2 the class container is captured, never trusted", () => {
 
 describe("T7-B3 stored source evidence is the digested source evidence", () => {
   it("refuses a source-evidence accessor that answers differently on a later read", () => {
-    const shown: EvidenceRefV1 = { ...evidence, digest: `sha256:${"a".repeat(64)}` };
-    const digested: EvidenceRefV1 = { ...evidence, digest: `sha256:${"b".repeat(64)}` };
+    const shown: EvidenceRefV1 = { ...evidence, digest: parseSha256Digest(`sha256:${"a".repeat(64)}`) };
+    const digested: EvidenceRefV1 = { ...evidence, digest: parseSha256Digest(`sha256:${"b".repeat(64)}`) };
     let reads = 0;
     const input = {
       contract, attemptId: ATTEMPT, providerPinDigest: PROVIDER_PIN,
@@ -107,12 +108,12 @@ describe("T7-B3 stored source evidence is the digested source evidence", () => {
   it("binds provenance to exactly the evidence the proposal carries", () => {
     const only = normalizeProviderProposals({
       contract, attemptId: ATTEMPT, providerPinDigest: PROVIDER_PIN,
-      sourceEvidenceRefs: [{ ...evidence, digest: `sha256:${"b".repeat(64)}` }],
+      sourceEvidenceRefs: [{ ...evidence, digest: parseSha256Digest(`sha256:${"b".repeat(64)}`) }],
       drafts: [{ proposalKind: "entity-fact", proposedValue: 1 }],
     });
     const other = normalizeProviderProposals({
       contract, attemptId: ATTEMPT, providerPinDigest: PROVIDER_PIN,
-      sourceEvidenceRefs: [{ ...evidence, digest: `sha256:${"a".repeat(64)}` }],
+      sourceEvidenceRefs: [{ ...evidence, digest: parseSha256Digest(`sha256:${"a".repeat(64)}`) }],
       drafts: [{ proposalKind: "entity-fact", proposedValue: 1 }],
     });
     expect(only[0]!.sourceEvidenceRefs[0]!.digest).toBe(`sha256:${"b".repeat(64)}`);

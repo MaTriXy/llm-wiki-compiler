@@ -27,6 +27,15 @@ let root = "";
 
 beforeEach(async () => {
   root = await mkdtemp(path.join(tmpdir(), "fix-preview-cli-"));
+  await mkdir(path.join(root, ".llmwiki"));
+  await writeFile(path.join(root, ".llmwiki", "profile.json"), JSON.stringify({
+    schemaVersion: 1, profileId: "research",
+    entities: {
+      ideas: { directory: "wiki/research-concepts" },
+      methods: { directory: "wiki/methods" },
+      papers: { directory: "wiki/research/papers" },
+    },
+  }));
   await mkdir(path.join(root, "wiki", "research-concepts"), { recursive: true });
   await mkdir(path.join(root, "wiki", "methods"), { recursive: true });
   // The fixable shape: the page's FILENAME differs from its TITLE.

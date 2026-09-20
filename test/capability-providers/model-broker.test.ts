@@ -9,14 +9,14 @@ import {
   createHostBrokerDispatcher, dispatchHostBrokerRequest, readHostBrokerUsage,
 } from "../../src/capability-providers/brokers/dispatch.js";
 import { getEventListeners } from "node:events";
-import { hostModelQuoteDigest } from "../../src/capability-providers/brokers/model.js";
+import { hostModelQuoteDigest, type HostModelBrokerV1, type HostModelQuoteRequestV1 as ModelQuoteRequest, type HostModelInvocationRequestV1 as ModelInvocationRequest } from "../../src/capability-providers/brokers/model.js";
 import { withModelDeadline } from "../../src/capability-providers/brokers/model-execution.js";
 import { createInvocationDeadline } from "../../src/capability-providers/brokers/deadline.js";
 import {
   hostPriceTableDigest, writeOperatorPriceTable,
 } from "../../src/capability-providers/authority/pricing.js";
 import type { HostPriceTableV1 } from "../../src/capability-providers/authority/types.js";
-import { parseInvocationId } from "../../src/capability-providers/ids.js";
+import { parseInvocationId, parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   brokerAtom, brokerEnvelope, prepareBrokerAuthority, useBrokerFixtures,
 } from "./broker-fixture.js";
@@ -138,7 +138,7 @@ describe("model broker", () => {
 
   it.each([
     ["identity", (quote: ReturnType<typeof modelQuote>) => ({ ...quote, service: "wrong" })],
-    ["digest", (quote: ReturnType<typeof modelQuote>) => ({ ...quote, quoteDigest: `sha256:${"f".repeat(64)}` })],
+    ["digest", (quote: ReturnType<typeof modelQuote>) => ({ ...quote, quoteDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) })],
     ["usage", (quote: ReturnType<typeof modelQuote>) => ({
       ...quote, maximumBillableTokens: quote.maximumBillableTokens + 1,
     })],
@@ -238,8 +238,6 @@ function modelBroker(complete: LLMProvider["complete"], withUsage: boolean) {
   };
 }
 
-interface ModelQuoteRequest { readonly requestDigest: string; readonly maximumOutputTokens: number }
-interface ModelInvocationRequest { readonly requestDigest: string; readonly quoteDigest: string }
 class ClassProvider implements LLMProvider {
   calls = 0;
   async complete() { this.calls += 1; return "legacy"; }
@@ -253,11 +251,11 @@ function modelQuote(request: ModelQuoteRequest, inputTokens: number) {
     inputTokens, maximumOutputTokens: request.maximumOutputTokens,
     maximumBillableTokens: inputTokens + request.maximumOutputTokens,
   };
-  return { ...quote, quoteDigest: hostModelQuoteDigest(quote as never) };
+  return { ...quote, quoteDigest: hostModelQuoteDigest(quote) };
 }
 
 async function setup(
-  model: ReturnType<typeof modelBroker>,
+  model: HostModelBrokerV1,
   brokerMaximumOverrides?: Parameters<typeof prepareBrokerAuthority>[0]["brokerMaximumOverrides"],
   deadlineSignal?: AbortSignal,
 ) {

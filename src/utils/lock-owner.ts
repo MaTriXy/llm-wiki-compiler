@@ -85,6 +85,8 @@ export interface LockOwner {
   pid: number;
   /** The holder's process start time, when the leaf carried one (new format). */
   startTime?: string;
+  /** Present on dual-format lock records, including unrecognised future formats. */
+  identity?: string;
 }
 
 /** This process's start time, populated only when lock behavior first needs it. */
@@ -97,12 +99,29 @@ function selfStartTime(): string | null {
   return cachedSelfStartTime;
 }
 
-/** The serialized owner record written into a FRESH lock leaf (new format). */
+/**
+ * Dual-write the public ambient timestamp and the new epoch identity. Old readers
+ * ignore identity and retain their baseline comparison; new readers prefer it.
+ * Mixed-version readers retain the baseline timezone hazard, not a new format
+ * mismatch. Omitting startTime would disable old readers' PID-reuse recovery.
+ */
 export function serializeOwner(pid: number): string {
-  const startTime = pid === process.pid ? selfStartTime() : readProcessStartTime(pid);
-  // Omit startTime when unreadable so a reader never treats "" as a real identity;
-  // such a leaf simply degrades to PID-only liveness (best-effort, back-compat).
-  return JSON.stringify(startTime === null ? { pid } : { pid, startTime });
+  const identity = pid === process.pid ? selfStartTime() : readProcessStartTime(pid);
+  const startTime = readLegacyProcessStartTime(pid);
+  return JSON.stringify({ pid, ...(startTime === null ? {} : { startTime }),
+    ...(identity === null ? {} : { identity }) });
+}
+
+/** Read the exact ambient ps rendering used by public lock readers and writers. */
+function readLegacyProcessStartTime(pid: number): string | null {
+  try {
+    const out = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], {
+      stdio: ["ignore", "pipe", "ignore"],
+    }).toString().trim();
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -147,10 +166,13 @@ function legacyOwner(text: string): LockOwner | null {
 function parseJsonOwner(text: string): LockOwner | null | undefined {
   if (!text.startsWith("{")) return undefined;
   try {
-    const obj = JSON.parse(text) as { pid?: unknown; startTime?: unknown };
+    const obj = JSON.parse(text) as { pid?: unknown; startTime?: unknown; identity?: unknown };
     if (typeof obj.pid !== "number" || !Number.isFinite(obj.pid)) return null;
-    const startTime = typeof obj.startTime === "string" ? obj.startTime : undefined;
-    return { pid: obj.pid, startTime };
+    // Keep the in-memory owner contract used by strict lease consumers: its
+    // startTime is the preferred identity, regardless of the wire field name.
+    const identity = typeof obj.identity === "string" ? obj.identity : obj.startTime;
+    const startTime = typeof identity === "string" ? identity : undefined;
+    return { pid: obj.pid, startTime, ...(typeof obj.identity === "string" ? { identity: obj.identity } : {}) };
   } catch {
     return null;
   }
@@ -421,4 +443,18 @@ export function classifyOwnerLiveness(owner: LockOwner): OwnerLiveness {
  */
 export function isOwnerStale(owner: LockOwner): boolean {
   return classifyOwnerLiveness(owner) === "stale";
+}
+
+/**
+ * Public lock-file compatibility: old timestamp-only records use the baseline
+ * ambient comparison. Strict runtime lease classification remains epoch-only.
+ * Existing epoch-in-startTime internal records continue through the strict path.
+ */
+export function isLockRecordStale(owner: LockOwner): boolean {
+  if (owner.identity !== undefined || owner.startTime === undefined || owner.startTime.startsWith(IDENTITY_PREFIX)) {
+    return isOwnerStale(owner);
+  }
+  if (!isProcessAlive(owner.pid)) return true;
+  const current = readLegacyProcessStartTime(owner.pid);
+  return current !== null && current !== owner.startTime;
 }

@@ -79,15 +79,13 @@ describe("lock liveness — PID-reuse safety (M8b)", () => {
     expect(await leaf()).toContain(String(process.pid));
   });
 
-  it("does NOT reclaim a live holder recorded in the LEGACY rendered format", async () => {
-    // THE MIGRATION GUARD at the lock level. Every leaf written before the
-    // timezone fix holds a rendered date string; treating that as a mismatch
-    // would take the lock from a live holder on first read, in every existing
-    // project at once — the defect the fix exists to remove, caused by the fix.
+  it("preserves public PID-reuse reclamation for a mismatching legacy timestamp", async () => {
+    // Public readers compare ambient timestamps. A 1970 timestamp cannot name
+    // this process; restoring that comparison avoids stranding old lock files.
     const planted = JSON.stringify({ pid: process.pid, startTime: "Thu Jan  1 00:00:00 1970" });
     await plant(planted);
-    expect(await acquireLock(root)).toBe(false);
-    expect(await leaf()).toBe(planted);
+    expect(await acquireLock(root)).toBe(true);
+    expect(await leaf()).not.toBe(planted);
   });
 
   it("respects a lock with a MATCHING live PID + startTime (not reclaimed)", async () => {

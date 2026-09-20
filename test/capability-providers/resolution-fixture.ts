@@ -93,7 +93,7 @@ export async function installForeignArtifactFixture(
   const artifacts = payload.artifacts as Array<Record<string, unknown>>;
   const host = artifacts.find((item) => item.os === process.platform && item.architecture === process.arch);
   if (!host) throw new Error("fixture has no host artifact");
-  const foreign = { ...host, artifactId: "foreign-artifact", os: "foreign-os", architecture: "foreign-arch" };
+  const foreign: Record<string, unknown> = { ...host, artifactId: "foreign-artifact", os: "foreign-os", architecture: "foreign-arch" };
   artifacts.push(foreign);
   (manifest.platformArtifacts as Array<Record<string, unknown>>).push({
     artifactId: foreign.artifactId, os: foreign.os, architecture: foreign.architecture,

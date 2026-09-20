@@ -9,6 +9,7 @@ import {
   createHostBrokerDispatcher, dispatchHostBrokerRequest,
 } from "../../src/capability-providers/brokers/dispatch.js";
 import type { HostEffectStateAuthorityV1 } from "../../src/capability-providers/brokers/dispatch.js";
+import type { HostMutationExecutorV1 } from "../../src/capability-providers/brokers/remote-effect.js";
 import { parseInvocationId, parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   brokerAtom, brokerEffectId, brokerEnvelope, plannedEffect, prepareBrokerAuthority,
@@ -114,7 +115,8 @@ describe("remote-effect broker", () => {
   });
 
   it("maps a hostile mutating ok observation to recorded outcome-unknown", async () => {
-    const execute = vi.fn(async () => ({ outcome: "ok" }));
+    // Deliberately violate the adapter result contract to exercise runtime refusal.
+    const execute = vi.fn(async () => ({ outcome: "ok" as never }));
     const { dispatcher, request, createDispatcher } = await setup(execute);
     const result = await dispatchHostBrokerRequest(dispatcher, request);
     expect(result).toMatchObject({ status: "outcome-unknown", receipt: {
@@ -163,7 +165,7 @@ async function expectEffectStateFailure(
 }
 
 async function setup(
-  execute: (...args: never[]) => Promise<unknown>, options: SetupOptions = {},
+  execute: HostMutationExecutorV1, options: SetupOptions = {},
 ) {
   const request = brokerEnvelope("remote-effect", {
     operation: "deploy-release", parameters: { release: "v1" },

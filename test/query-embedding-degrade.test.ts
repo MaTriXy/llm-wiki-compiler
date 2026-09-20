@@ -40,7 +40,11 @@ async function seedRootWithPageStore(): Promise<string> {
 }
 
 describe("page-level embedding failure degrades to the fallback", () => {
-  it("answers via LLM/index selection and carries the embedding-degraded warning", async () => {
+  it.each([
+    { embeddingFailure: "fallback" as const },
+    { pageScope: ["concepts/alpha"] },
+    { review: true },
+  ])("answers via fallback only when opted in: %j", async (options) => {
     const root = await seedRootWithPageStore();
     const embed = vi.fn(async () => {
       throw new Error("no embedding credentials");
@@ -49,7 +53,10 @@ describe("page-level embedding failure degrades to the fallback", () => {
       { embed, embedBatch: embed } as unknown as ReturnType<typeof providerMod.getProvider>,
     );
 
-    const result = await generateAnswer(root, "what is alpha?");
+    await expect(generateAnswer(root, "what is alpha?")).rejects.toThrow("no embedding credentials");
+    await expect(generateAnswer(root, "what is alpha?", { ...options, embeddingFailure: "throw" }))
+      .rejects.toThrow("no embedding credentials");
+    const result = await generateAnswer(root, "what is alpha?", options);
     // PRECONDITION pinned: the v3 store was loaded and the embed call was
     // actually reached — the degrade is witnessed, not vacuously absent.
     expect(embed, "the embedding path was never reached").toHaveBeenCalled();

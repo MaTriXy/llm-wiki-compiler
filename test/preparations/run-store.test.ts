@@ -28,7 +28,7 @@ import type { PreparationRunBinding } from "../../src/preparations/run-types.js"
 
 const root = useTempRoot();
 const ACTOR = { id: "operator", surface: "cli" } as const;
-const PHASE = `phi_${"a".repeat(64)}`;
+const PHASE = `phi_${"a".repeat(64)}` as const;
 
 /** Stage a preparation and return its authenticated run binding. */
 async function stageBinding(): Promise<PreparationRunBinding> {

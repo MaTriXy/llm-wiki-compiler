@@ -11,6 +11,7 @@ import {
   writeOperatorPriceTable,
 } from "../../src/capability-providers/authority/pricing.js";
 import { installResolutionFixture, removeResolutionFixture, type ResolutionFixture } from "./resolution-fixture.js";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 
 const fixtures: ResolutionFixture[] = [];
 afterEach(async () => Promise.all(fixtures.splice(0).map(removeResolutionFixture)));
@@ -63,7 +64,7 @@ describe("host-owned provider pricing", () => {
     const { fixture, digest } = await trackedPriceTable();
     await expect(resolveHostPrice(fixture.paths, { ...priceRequest(), modelOrSku: "unknown" }, digest,
       new Date("2026-07-18T12:00:00Z"))).rejects.toThrow(/pricing.*unavailable/i);
-    await expect(resolveHostPrice(fixture.paths, priceRequest(), `sha256:${"f".repeat(64)}`,
+    await expect(resolveHostPrice(fixture.paths, priceRequest(), parseSha256Digest(`sha256:${"f".repeat(64)}`),
       new Date("2026-07-18T12:00:00Z"))).rejects.toThrow(/pricing.*drift/i);
     await expect(resolveHostPrice(fixture.paths, priceRequest(), digest,
       new Date("2027-07-18T12:00:00Z"))).rejects.toThrow(/pricing.*unavailable/i);

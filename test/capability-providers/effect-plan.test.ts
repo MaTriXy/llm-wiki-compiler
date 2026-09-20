@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   effectPlanDigest, matchEffectPlanEntry, parseEffectPlan,
 } from "../../src/capability-providers/authority/effect-plan.js";
-import { parseEffectId, parseSha256Digest } from "../../src/capability-providers/ids.js";
+import { parseEffectId, parseSha256Digest, parseBrokerId, parseSemanticVersion } from "../../src/capability-providers/ids.js";
 
 describe("provider effect plans", () => {
   it("matches only one exact preauthorized mutating request", () => {
@@ -64,7 +64,7 @@ describe("provider effect plans", () => {
   });
 });
 
-function effectPlan(entries: readonly ReturnType<typeof effectEntry>[]) {
+function effectPlan(entries: readonly unknown[]) {
   return { schemaVersion: 1, bounds: bounds(100), entries };
 }
 
@@ -81,7 +81,7 @@ function effectEntry() {
 function effectRequest() {
   return {
     effectId: parseEffectId("effect-one"), effectClass: "remote-write",
-    brokerId: "remote-broker", brokerContractVersion: "1.0.0",
+    brokerId: parseBrokerId("remote-broker"), brokerContractVersion: parseSemanticVersion("1.0.0"),
     targetIdentity: "remote-target", requestDigest: parseSha256Digest(`sha256:${"d".repeat(64)}`),
     idempotencyKey: "idempotency-one", expectedBounds: { requests: 1, bytes: 1024 },
     requiredConfirmationClass: "operator", rollbackSemantics: "follow-up-effect-only" as const,

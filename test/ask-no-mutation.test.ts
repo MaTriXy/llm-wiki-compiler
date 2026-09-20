@@ -1,12 +1,9 @@
 /**
  * @file test/ask-no-mutation.test.ts
- * @description AS-1 §4.5 / PRD AS-05: a non-crystallizing question leaves the
- * filesystem BYTE-IDENTICAL, on the CLI route and the MCP route alike.
- *
- * ANSWERING A QUESTION IS A READ. It used to append to `log.md` even without
- * `--save` — hidden journalling that broke the parity contract and surprised
- * anyone who assumed a query was read-only. Saving an answer is a write
- * already, so journalling rides that path instead.
+ * @description Public ordinary queries retain activity logging on CLI and MCP.
+ * Their only allowed filesystem change without saving is log.md; opt-in scoped
+ * reads retain the new read-only contract. This deliberately supersedes the
+ * internal AS-1 default-no-log behavior to preserve public compatibility.
  *
  * THE MCP ROUTE IS EXERCISED, NOT INFERRED. Both surfaces call the same
  * `generateAnswer`, so it is tempting to test one and reason about the other —
@@ -58,7 +55,7 @@ async function mcpQueryHandler(root: string): Promise<(args: Record<string, unkn
 }
 
 describe("asking a question without saving", () => {
-  it("changes NOTHING on the CLI route", async () => {
+  it("changes only the public activity log on the CLI route", async () => {
     const root = await project("ask-cli");
     const { generateAnswer } = await import("../src/commands/query.js");
     const before = await fingerprint(root);
@@ -67,10 +64,10 @@ describe("asking a question without saving", () => {
 
     await generateAnswer(root, "scaling?");
 
-    expect(changed(before, await fingerprint(root))).toEqual([]);
+    expect(changed(before, await fingerprint(root))).toEqual(["log.md"]);
   });
 
-  it("changes NOTHING on the MCP route", async () => {
+  it("changes only the public activity log on the MCP route", async () => {
     const root = await project("ask-mcp");
     const handler = await mcpQueryHandler(root);
     const before = await fingerprint(root);
@@ -78,12 +75,20 @@ describe("asking a question without saving", () => {
 
     await handler({ question: "scaling?" });
 
+    expect(changed(before, await fingerprint(root))).toEqual(["log.md"]);
+  });
+
+  it("keeps an explicitly scoped read byte-identical", async () => {
+    const root = await project("ask-scoped");
+    const { generateAnswer } = await import("../src/commands/query.js");
+    const before = await fingerprint(root);
+    expect(before.size).toBeGreaterThan(0);
+    await generateAnswer(root, "scaling?", { pageScope: ["concepts/foo", "papers/foo"] });
     expect(changed(before, await fingerprint(root))).toEqual([]);
   });
 
   it("DOES journal when the answer is saved — the write path is unchanged", async () => {
-    // The complement, so "changes nothing" cannot be satisfied by a build that
-    // simply never journals: the crystallizing path must still record.
+    // Saving remains an explicit write as well as recording query activity.
     const root = await project("ask-saved");
     const { generateAnswer } = await import("../src/commands/query.js");
     const before = await fingerprint(root);

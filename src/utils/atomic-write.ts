@@ -95,12 +95,25 @@ export class AtomicWriteNoReplaceDurabilityUnsupportedError extends Error {
   }
 }
 
+/** Rename succeeded, but subsequent verification or durability did not complete. */
+export class AtomicWritePostCommitError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = "AtomicWritePostCommitError";
+  }
+}
+
 /** Snapshot mutable caller bytes before any filesystem await can yield control. */
 function snapshotContent(content: string | Uint8Array): string | Buffer {
   return typeof content === "string" ? content : Buffer.from(content);
 }
 
-/** Atomically write a file through a random O_EXCL temp and rename. */
+/**
+ * Atomically write a file through a random O_EXCL temp and rename.
+ * Rejection does not prove the destination is unchanged: a post-rename parent
+ * or durability check can fail after publication. Callers must retain recovery
+ * evidence and reconcile the destination before retrying a non-idempotent action.
+ */
 export async function atomicWrite(
   filePath: string,
   content: string | Uint8Array,
@@ -350,17 +363,28 @@ async function writeViaTemp(
   beforeDirectorySync?: (dir: string) => Promise<void>,
 ): Promise<void> {
   const temp = await writeBoundTemp(filePath, content, mode, binding, durable || strictDurability);
+  let renamed = false;
   try {
     await commitBoundTemp(temp, binding, (tmpPath) => rename(tmpPath, filePath));
-    if (strictDurability) await assertPublishedDestination(filePath, temp.handle, binding);
-    else if (binding !== undefined) await assertCurrentParent(binding);
+    renamed = true;
+    await assertCommittedTemp(filePath, temp.handle, binding, strictDurability);
     if (strictDurability) await fsyncDirectoryChain(path.dirname(filePath), binding, beforeDirectorySync);
     else if (durable) await fsyncDir(path.dirname(filePath));
-    if (strictDurability) await assertPublishedDestination(filePath, temp.handle, binding);
-    else if (binding !== undefined) await assertCurrentParent(binding);
+    await assertCommittedTemp(filePath, temp.handle, binding, strictDurability);
+  } catch (error) {
+    if (renamed) throw new AtomicWritePostCommitError(error);
+    throw error;
   } finally {
     await temp.handle.close().catch(() => {});
   }
+}
+
+/** Recheck the committed destination at the caller's requested assurance level. */
+async function assertCommittedTemp(
+  filePath: string, handle: FileHandle, binding: ParentBinding | undefined, strict: boolean,
+): Promise<void> {
+  if (strict) await assertPublishedDestination(filePath, handle, binding);
+  else if (binding !== undefined) await assertCurrentParent(binding);
 }
 
 /** Link a synced same-directory temp, leaving collision or fsync faults visible. */

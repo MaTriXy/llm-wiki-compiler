@@ -217,9 +217,11 @@ export function isRedirect(statusCode: number): boolean {
 }
 
 export function redirectPreservesRequest(statusCode: number, method: ConfinedFetchMethod): boolean {
+  // Preserve public GET redirect handling; every destination is still confined.
+  if (method === "GET") return isRedirect(statusCode);
   if (statusCode === 307 || statusCode === 308) return true;
   return (statusCode === 301 || statusCode === 302 || statusCode === 303)
-    && (method === "GET" || method === "HEAD");
+    && method === "HEAD";
 }
 
 export function firstHeader(value: string | string[] | number | undefined): string | undefined {

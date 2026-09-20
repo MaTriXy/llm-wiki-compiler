@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { useTempRoot } from "../fixtures/temp-root.js";
 import { handoffPreparation, HandoffError } from "../../src/preparations/handoff.js";
 import { readPreparationRun } from "../../src/preparations/run-store.js";
@@ -57,7 +58,7 @@ describe("network-free idempotent handoff", () => {
   it("refuses a run that is not handoff-ready and creates no bundle", async () => {
     const binding = await stageReadyPreparation(root.dir);
     // Fabricate drift by pointing the binding at a wrong manifest digest.
-    const drifted = { ...binding, manifestDigest: `sha256:${"c".repeat(64)}` as const };
+    const drifted = { ...binding, manifestDigest: parseSha256Digest(`sha256:${"c".repeat(64)}`) };
     await expect(handoffPreparation(root.dir, handoffRequest(drifted))).rejects.toMatchObject({ code: "not-handoff-ready" });
     expect((await scanOperationInventory(root.dir)).manifests.length).toBe(0);
   });

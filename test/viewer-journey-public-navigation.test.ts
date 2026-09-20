@@ -11,7 +11,7 @@ const RUN = { runId: "run-1", workflow: "build", status: "running", classificati
 function respond(url: string): Response | null {
   if (url.endsWith("/api/pages")) return jsonResponse({ pages: [], counts: {}, profileId: "test", stateStatus: "ok" });
   if (url.endsWith("/api/health")) return jsonResponse({ lint: null });
-  if (url.endsWith("/api/workflow-runs")) return jsonResponse({ runs: [RUN] });
+  if (url.endsWith("/api/workflow-runs")) return jsonResponse({ runs: [RUN], workflowJourneys: true });
   if (url.endsWith("/api/workflows/build/runs/run-1")) return jsonResponse({ ...RUN, stages: [] });
   return null;
 }

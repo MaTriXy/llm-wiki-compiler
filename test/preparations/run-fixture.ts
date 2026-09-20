@@ -7,6 +7,7 @@
  */
 
 import { canonicalBytes } from "../../src/profile/templates/signing/canonical.js";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   appendPreparationTransition, createInitialPreparationRun, preparationKeyEpochId,
   preparationRunBinding, signPreparationRun,
@@ -17,7 +18,7 @@ import type {
 
 const RUN_ID = `prr_${"1".repeat(32)}` as const;
 const PREPARATION_ID = `prp_${"2".repeat(32)}` as const;
-const MANIFEST_DIGEST = `sha256:${"3".repeat(64)}` as const;
+const MANIFEST_DIGEST = parseSha256Digest(`sha256:${"3".repeat(64)}`);
 
 /** The fixed 32-byte test key used to sign in-memory run records. */
 export function testKey(): Buffer {

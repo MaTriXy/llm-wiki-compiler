@@ -45,7 +45,7 @@ import { lookupAction } from "./actions.js";
 import { readRun } from "./store.js";
 import { ActionDeniedError, ActionInputError, ActionRunWorkflowMismatchError, RunUnavailableError } from "./errors.js";
 import { assertRunOwnership } from "./with-lock.js";
-import { RuntimeCaptureError, deepCaptureData } from "../utils/runtime-capture.js";
+import { captureActionInputValues } from "./action-input-snapshot.js";
 import {
   confirmHumanGateInteractively,
   nonInteractiveHumanGateIo,
@@ -183,8 +183,12 @@ async function dispatchGate(root: string, def: WorkflowActionDef, normalized: Re
   const parsed = parseGate(def.gate as string);
   if (parsed === null) throw new ActionDeniedError(def.label, "cli", "malformed gate");
   const runId = await scopedRunId(root, def, normalized, true);
-  const challenge = await resolveGateChallenge(root, runId, parsed.id);
   if (parsed.kind === "human") {
+    if (!io.stdinIsTty || !io.stdoutIsTty) {
+      await confirmHumanGateInteractively(parsed.id, io);
+      throw new ActionDeniedError(def.label, "cli", "human gate not interactively confirmed");
+    }
+    const challenge = await resolveGateChallenge(root, runId, parsed.id);
     if (!(await confirmHumanGateInteractively(parsed.id, io, challenge.subjectDigest))) {
       throw new ActionDeniedError(def.label, "cli", "human gate not interactively confirmed");
     }
@@ -289,39 +293,6 @@ async function dispatchOperation(root: string, def: WorkflowActionDef, normalize
 }
 
 /**
- * Snapshot the caller's inputs as an immutable data-only tree, or refuse.
- *
- * DEEP, NOT ONE LEVEL, and that is the difference between a fix and a
- * half-measure: `coerceField` returns a declared `string[]` BY REFERENCE, so a
- * top-level copy leaves the array aliased and a caller mutating an element after
- * the call still changes what the run durably records. Measured before it was
- * written — `["original"]` became `["substituted"]` on disk.
- *
- * NO LEGITIMATE INPUT IS NEWLY REFUSED, and this is a subset argument rather
- * than a survey of today's callers: {@link validateActionInputs} accepts only
- * `string`, `number`, `boolean`, `string[]` and `entityRef`, every one of which
- * is plain data, and it rejects any undeclared key outright. So the values that
- * can survive validation were always a subset of what deep capture admits; what
- * changes is only that accessors, proxies and non-plain prototypes are refused
- * BEFORE they are invoked rather than after.
- *
- * The refusal is {@link ActionInputError} because that is what this boundary
- * already raises for an input it will not accept. It carries the action id
- * rather than the action's label — the label lives in the profile, and the whole
- * point of this call is that it happens before the profile is read.
- */
-function captureActionInputs(actionId: string, inputs: Record<string, unknown>): Record<string, unknown> {
-  try {
-    return deepCaptureData(inputs) as Record<string, unknown>;
-  } catch (error) {
-    if (error instanceof RuntimeCaptureError) {
-      throw new ActionInputError(actionId, "inputs must be a plain object of data values");
-    }
-    throw error;
-  }
-}
-
-/**
  * Execute a declared workflow action under the composed authority.
  *
  * Resolves the action by OWN-property lookup ({@link UnknownActionError} on an
@@ -355,14 +326,7 @@ export async function runAction(
   surface: ActionSurface,
   humanGateIo: HumanGateIo = nonInteractiveHumanGateIo(),
 ): Promise<ActionRunResult> {
-  // CAPTURED IN THE SYNCHRONOUS PROLOGUE, BEFORE THE FIRST AWAIT (D-10-9). This
-  // answers two independent questions and both were open: WHEN the caller's
-  // object is read, and HOW. The profile load below opened a window in which the
-  // caller could rewrite its own object — measured, a run started with
-  // `{count: 1}` recorded `count: 2` — and the own-key gate in
-  // `validateActionInputs` then read each field with a plain `[[Get]]`, so an
-  // accessor executed. Answering one of those does not touch the other.
-  const captured = captureActionInputs(actionId, inputs);
+  const captured = captureActionInputValues(actionId, inputs);
   const { profile } = await loadProfile(root);
   const declared = lookupAction(profile, actionId);
   const def = { ...declared, label: actionLabelForPresentation(profile, declared.label) };

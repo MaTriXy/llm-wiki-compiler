@@ -30,10 +30,10 @@ async function enableRateState(): Promise<void> {
 describe("Final7 split-lock candidate overflow", () => {
   afterEach(() => { delete process.env.LLMWIKI_CONNECTORS; });
 
-  it("refuses locked entry 201 after the already-started fetch and rate stamp", async () => {
+  it("includes a late 201st entry in the public no-op result and audit", async () => {
     await activateFixtureConnector(root.dir);
     await enableRateState();
-    await plantConnectorCandidateBatch(root.dir, 200);
+    const ids = await plantConnectorCandidateBatch(root.dir, 200);
     let fetches = 0;
     const fetcher = async (): Promise<ConfinedFetchResult> => {
       fetches += 1;
@@ -46,9 +46,9 @@ describe("Final7 split-lock candidate overflow", () => {
 
     const result = await runConnector(root.dir, "fixture", { id: "story-1" }, { fetcher, now: NOW });
 
-    expect(result).toEqual({ kind: "unavailable", reason: "connector candidate store unavailable" });
+    expect(result).toEqual({ kind: "noop", candidateIds: [...ids, "bound-200"] });
     expect(fetches).toBe(1);
     expect(existsSync(path.join(root.dir, ".llmwiki", "connectors", "fixture.last-fetch.json"))).toBe(true);
-    expect((await readEvents(root.dir)).events).toEqual([]);
+    expect((await readEvents(root.dir)).events).toHaveLength(1);
   });
 });

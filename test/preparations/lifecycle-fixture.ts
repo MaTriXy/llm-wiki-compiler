@@ -27,7 +27,7 @@ import type { PreparationManifestV1 } from "../../src/preparations/manifest-pars
 import type { PreparationRunBinding } from "../../src/preparations/run-types.js";
 import { fixturePlan, stageRequest } from "./store-fixture.js";
 
-const ACTOR = { id: "operator", surface: "cli" } as const;
+const ACTOR: { id: string; surface: "cli" } = { id: "operator", surface: "cli" };
 
 /** Stage one durable preparation and return its exact current run binding. */
 export async function stagePreparation(root: string): Promise<{ binding: PreparationRunBinding; manifest: PreparationManifestV1 }> {

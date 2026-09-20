@@ -1,9 +1,8 @@
 /**
  * @file test/candidate-namespace-final9.test.ts
- * @description Decision 19 regressions require candidate-store authority to
- * remain at literal non-symlinked `.llmwiki/candidates` namespaces. Stable
- * in-project aliases, broken links, and non-directory ancestors must never be
- * interpreted as an empty queue or an authorized write/delete location.
+ * @description Public candidate paths accept confined directory aliases for
+ * reads and removal. Broken links and non-directory ancestors remain errors;
+ * atomic publication still refuses a symlinked immediate parent.
  */
 
 import { chmod, lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
@@ -24,6 +23,7 @@ import { CANDIDATES_ARCHIVE_DIR } from "../src/utils/constants.js";
 import { CandidateCustodyUnavailableError } from "../src/compiler/candidate-custody.js";
 import { readCandidateEntryForMutation } from "../src/compiler/candidate-read.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
+import { CandidatePublicationUnavailableError } from "../src/compiler/candidate-publication.js";
 
 const root = useTempRoot();
 
@@ -65,27 +65,27 @@ async function withUnreadablePending(
   return path.join(dir, `${candidate.id}.json`);
 }
 
-describe("Final9 literal candidate namespaces", () => {
-  it("rejects a stable in-project pending alias instead of listing its bytes", async () => {
+describe("Confined candidate namespaces", () => {
+  it("lists a stable in-project pending alias", async () => {
     await plantInProjectAlias();
 
-    await expect(listCandidates(root.dir)).rejects.toBeInstanceOf(UnsafeCandidateDirError);
+    expect((await listCandidates(root.dir)).map((entry) => entry.id)).toEqual(["planted"]);
   });
 
   it("rejects a stable in-project pending alias before writing alternate bytes", async () => {
     const planted = await plantInProjectAlias();
     const before = await readFile(planted, "utf8");
 
-    await expect(writeCandidate(root.dir, draft())).rejects.toBeInstanceOf(UnsafeCandidateDirError);
+    await expect(writeCandidate(root.dir, draft())).rejects.toBeInstanceOf(CandidatePublicationUnavailableError);
     expect(await readFile(planted, "utf8")).toBe(before);
   });
 
-  it("rejects a stable in-project pending alias before reading or deleting", async () => {
+  it("reads and deletes through a stable in-project pending alias", async () => {
     const planted = await plantInProjectAlias();
 
-    await expect(readCandidate(root.dir, "planted")).rejects.toBeInstanceOf(UnsafeCandidateDirError);
-    await expect(deleteCandidate(root.dir, "planted")).rejects.toBeInstanceOf(UnsafeCandidateDirError);
-    expect(await readFile(planted, "utf8")).toBe(candidateRecord("planted"));
+    expect((await readCandidate(root.dir, "planted"))?.id).toBe("planted");
+    await expect(deleteCandidate(root.dir, "planted")).resolves.toBe(true);
+    await expect(lstat(planted)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it.each(["dangling", "loop"])("rejects a %s pending link instead of reporting empty", async (kind) => {
@@ -97,13 +97,13 @@ describe("Final9 literal candidate namespaces", () => {
     await expect(listCandidates(root.dir)).rejects.toBeInstanceOf(UnsafeCandidateDirError);
   });
 
-  it("rejects a symlinked .llmwiki lexical ancestor even when it stays in-project", async () => {
+  it("reads a symlinked .llmwiki ancestor that stays in-project", async () => {
     const alternate = path.join(root.dir, "alternate-private", "candidates");
     await mkdir(alternate, { recursive: true });
     await writeFile(path.join(alternate, "planted.json"), candidateRecord("planted"));
     await symlink(path.dirname(alternate), path.join(root.dir, ".llmwiki"));
 
-    await expect(listCandidates(root.dir)).rejects.toBeInstanceOf(UnsafeCandidateDirError);
+    expect((await listCandidates(root.dir)).map((entry) => entry.id)).toEqual(["planted"]);
   });
 
   it("rejects a regular file at the pending directory path with the typed boundary", async () => {
@@ -154,8 +154,13 @@ describe("Final9 literal candidate namespaces", () => {
         await symlink(target, archive);
       }
 
-      await expect(resolveConfinedCandidatesDir(root.dir, CANDIDATES_ARCHIVE_DIR))
-        .rejects.toBeInstanceOf(UnsafeCandidateDirError);
+      if (kind === "alias") {
+        expect(await resolveConfinedCandidatesDir(root.dir, CANDIDATES_ARCHIVE_DIR))
+          .toMatch(/alternate-archive$/);
+      } else {
+        await expect(resolveConfinedCandidatesDir(root.dir, CANDIDATES_ARCHIVE_DIR))
+          .rejects.toBeInstanceOf(UnsafeCandidateDirError);
+      }
     },
   );
 });

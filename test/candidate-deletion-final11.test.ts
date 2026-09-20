@@ -15,7 +15,6 @@ import {
   type FreshCandidateWriteOptions,
 } from "../src/compiler/candidates.js";
 import { CandidateCustodyUnavailableError } from "../src/compiler/candidate-custody.js";
-import { UnsafeCandidateDirError } from "../src/compiler/candidate-store-paths.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
 
 const root = useTempRoot();
@@ -68,7 +67,7 @@ describe("Decision 20 direct candidate deletion authority", () => {
     await symlink(".", path.join(root.dir, ".llmwiki", "candidates", "archive"));
 
     await expect(deleteCandidate(root.dir, "direct-alias"))
-      .rejects.toBeInstanceOf(UnsafeCandidateDirError);
+      .rejects.toBeInstanceOf(CandidateCustodyUnavailableError);
     expect(await readFile(leaf, "utf8")).toContain("direct-alias");
   });
 

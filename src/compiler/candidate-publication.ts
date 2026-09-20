@@ -15,7 +15,7 @@ import {
 } from "../utils/atomic-write.js";
 import { CANDIDATES_ARCHIVE_DIR, CANDIDATES_DIR } from "../utils/constants.js";
 import { assertCandidateNamespacesHealthy } from "./candidate-custody.js";
-import { assertCandidateSlug, candidatePath } from "./candidate-paths.js";
+import { assertCandidateSlug, assertWritableCandidateId, candidatePath } from "./candidate-paths.js";
 import { assertCandidateIdsWritable } from "./candidate-selection.js";
 import { resolveConfinedCandidatesDir, UnsafeCandidateDirError } from "./candidate-store-paths.js";
 
@@ -48,7 +48,7 @@ export class CandidatePublicationUnavailableError extends Error {
   }
 }
 
-/** Candidate plus its already-bounded serialized authority. */
+/** Candidate plus its already-materialized serialized authority. */
 export interface CandidatePublication<T> {
   readonly candidate: T;
   readonly serialized: string;
@@ -68,6 +68,7 @@ export function writableCandidateId(
   assertCandidateSlug(slug);
   const id = options.idForAttemptForTest?.(slug, attempt) ?? randomCandidateId(slug);
   assertCandidateIdsWritable([id]);
+  assertWritableCandidateId(id);
   return id;
 }
 

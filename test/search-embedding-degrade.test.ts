@@ -43,11 +43,14 @@ describe("search embedding failure degrades to the fallback", () => {
       { embed, embedBatch: embed } as unknown as ReturnType<typeof providerMod.getProvider>,
     );
 
-    const { refs, warnings } = await pickSearchRefs(root, "what is alpha?");
+    const stdout = vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(pickSearchRefs(root, "what is alpha?")).rejects.toThrow("no embedding credentials");
+    const { refs, warnings } = await pickSearchRefs(root, "what is alpha?", { embeddingFailure: "fallback" });
     // PRECONDITION pinned: the v3 store was loaded and the embed call was
     // actually reached — the degrade is witnessed, not vacuously absent.
     expect(embed, "the embedding path was never reached").toHaveBeenCalled();
     expect(refs.map((ref) => ref.pageId)).toEqual(["concepts/alpha"]);
     expect(warnings.map((w) => w.code)).toContain("embedding-degraded");
+    expect(stdout).not.toHaveBeenCalled();
   });
 });

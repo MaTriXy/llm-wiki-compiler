@@ -12,13 +12,15 @@ import {
 } from "./candidate-supersession.js";
 import {
   ConnectorCandidateBatchOverflowError,
-  MAX_CONNECTOR_CANDIDATE_BATCH,
+  connectorCandidateBatchLimit,
 } from "./candidate-batch.js";
 import { captureCandidateCustodyReceipts } from "../compiler/candidate-custody-snapshot.js";
-import type { CandidateCustodyReceipt } from "../compiler/candidate-custody.js";
+import { CandidateCustodyUnavailableError, observeCandidateCustody,
+  type CandidateCustodyReceipt } from "../compiler/candidate-custody.js";
 import type { ProfilePack } from "../profile/types.js";
 import type { StagedChange } from "../trust/staged-change.js";
 import type { ConnectorProvenance } from "./types.js";
+import type { CandidateCustodyPolicy } from "../compiler/candidate-custody-limits.js";
 
 /** Draft fields required by the typed connector staging seam. */
 export interface ConnectorCandidateDraft {
@@ -42,14 +44,17 @@ export async function stageConnectorCandidate(
   mover?: CandidateMovePort,
   now?: () => Date,
   beforeStageForTest?: () => Promise<void>,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<ConnectorCandidateStageResult> {
   const capturedReceipts = captureCandidateCustodyReceipts(
     archivedReceipts,
-    MAX_CONNECTOR_CANDIDATE_BATCH,
+    connectorCandidateBatchLimit(policy),
     () => new ConnectorCandidateBatchOverflowError(),
+    policy,
   );
   try {
     await beforeStageForTest?.();
+    await assertArchivedPredecessors(root, capturedReceipts, policy);
     const change = await stageEntityPage(root, {
       entityType: draft.entityType,
       slug: draft.slug,
@@ -60,12 +65,24 @@ export async function stageConnectorCandidate(
       reviewMode: "connector",
       heldReasons: [{ code: "connector-fetched" }],
       connectorProvenance: draft.provenance,
-      freshCandidateId: true,
+      freshCandidateId: capturedReceipts.length > 0,
     });
     return { kind: "staged", change };
   } catch (error) {
-    const restored = await restoreArchivedCandidates(root, capturedReceipts, mover);
+    const restored = await restoreArchivedCandidates(root, capturedReceipts, mover, policy);
     if (restored.kind === "recovery-required") return restored;
     throw error;
+  }
+}
+
+/** Re-prove retained predecessors immediately before publishing their replacement. */
+async function assertArchivedPredecessors(
+  root: string, receipts: readonly CandidateCustodyReceipt[],
+  policy: CandidateCustodyPolicy,
+): Promise<void> {
+  for (const receipt of receipts) {
+    if (await observeCandidateCustody(root, receipt, policy) !== "archived") {
+      throw new CandidateCustodyUnavailableError();
+    }
   }
 }

@@ -61,6 +61,7 @@ describe("closed provider schema parsing", () => {
     expect(parsed.schema).toEqual(OBJECT_SCHEMA);
     expect(Object.isFrozen(parsed)).toBe(true);
     expect(Object.isFrozen(parsed.schema)).toBe(true);
+    if (!("properties" in parsed.schema)) throw new Error("expected object schema");
     expect(Object.isFrozen(parsed.schema.properties)).toBe(true);
   });
 

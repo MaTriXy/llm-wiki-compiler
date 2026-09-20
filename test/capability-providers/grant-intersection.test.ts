@@ -99,7 +99,7 @@ describe("effective provider grant intersection", () => {
   it.each(BOUND_LEGS)("refuses a negative or missing %s bound", async (leg) => {
     const prepared = await prepare([authorityAtom("source.read")]);
     const current = prepared.request[leg];
-    const invalid = leg === "resourceBounds" || leg === "surfaceCap"
+    const invalid = !("bounds" in current)
       ? { ...current, wallTimeMs: -1 } : { ...current, bounds: { ...current.bounds, wallTimeMs: -1 } };
     await expect(resolveEffectiveProviderGrant(prepared.fixture.paths, {
       ...prepared.request, [leg]: invalid,

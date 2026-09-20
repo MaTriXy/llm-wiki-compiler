@@ -26,7 +26,7 @@
  */
 
 import path from "node:path";
-import { findMatchesInContent, collectAllPages } from "./rules-shared.js";
+import { findMatchesInContent, collectAllPages, type PageScope } from "./rules-shared.js";
 import { listLinkResolvablePendingSlugs } from "../compiler/candidates.js";
 import { parseFrontmatter, slugify } from "../utils/markdown.js";
 
@@ -72,10 +72,10 @@ function pagesByTitleSlug(
  * @param root - Absolute project root.
  * @returns One entry per broken link: a concrete edit, or a recommendation.
  */
-export async function planLintFixes(root: string): Promise<LintFixPlanV1[]> {
-  // The SAME scope as checkBrokenWikilinks, by contract: a fix proposed for a
-  // page the linter never read would break their tested agreement.
-  const pages = await collectAllPages(root, "wiki-wide");
+export async function planLintFixes(root: string, scope: PageScope = "wiki-wide"): Promise<LintFixPlanV1[]> {
+  // Fix preview is an explicit new surface. Its scope matches the expanded
+  // check exposed by tiered CLI lint, not the unchanged legacy flat command.
+  const pages = await collectAllPages(root, scope);
   const existing = new Set(pages.map((page) => path.basename(page.filePath, ".md").toLowerCase()));
   // The SAME pending set the linter consults: a link the linter reports as
   // info-level pending-target is not broken, and "cannot be repaired

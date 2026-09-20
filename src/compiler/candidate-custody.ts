@@ -11,13 +11,13 @@
 
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { access, lstat, mkdir, opendir, rename } from "node:fs/promises";
+import { access, lstat, mkdir, opendir, realpath, rename } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { archivePath, assertCandidateId, candidatePath } from "./candidate-paths.js";
 import { CANDIDATES_ARCHIVE_DIR, CANDIDATES_DIR } from "../utils/constants.js";
 import { openConfinedLeaf } from "../utils/confined-read.js";
-import { MAX_CANDIDATE_RECORD_BYTES } from "./candidate-custody-limits.js";
+import { candidateByteLimit, type CandidateCustodyPolicy } from "./candidate-custody-limits.js";
 import {
   captureCandidateCustodyMoveRequest,
   captureCandidateCustodyReceipt,
@@ -69,6 +69,14 @@ export class CandidateCustodyUnavailableError extends Error {
   }
 }
 
+/** One unreadable leaf in a still-bound store; discovery may skip this file. */
+export class CandidateLeafUnavailableError extends CandidateCustodyUnavailableError {
+  constructor() {
+    super();
+    this.name = "CandidateLeafUnavailableError";
+  }
+}
+
 /** Exact observable candidate state used by archive and compensation. */
 export type CandidateCustodyState = "restored" | "archived" | "conflict";
 
@@ -109,7 +117,7 @@ function candidateLeaf(root: string, fileId: string, location: CandidateLocation
   return location === "pending" ? candidatePath(root, fileId) : archivePath(root, fileId);
 }
 
-/** Capture one real, non-symlinked, root-anchored directory identity. */
+/** Capture one confined, root-anchored directory identity. */
 async function captureDirectory(root: string, dir: string): Promise<DirectoryBinding | null> {
   const relative = path.relative(path.resolve(root), path.resolve(dir));
   return captureCandidateDirectoryBinding(root, relative);
@@ -139,8 +147,9 @@ async function captureStore(
 /** Capture one pending-store binding, distinguishing only genuine absence. */
 export async function captureCandidateStoreBinding(
   root: string,
+  requireLiteral = false,
 ): Promise<CandidateStoreBinding | null> {
-  return captureStore(root);
+  return captureCandidateDirectoryBinding(root, CANDIDATES_DIR, requireLiteral);
 }
 
 /** Prove effective access to one existing directory and rebind it afterward. */
@@ -267,7 +276,6 @@ async function consumeCustodyHandle(
   opened: Extract<Awaited<ReturnType<typeof openConfinedLeaf>>, { kind: "confirmed" }>,
 ): Promise<CustodyLeafRead> {
   try {
-    if (opened.size > MAX_CANDIDATE_RECORD_BYTES) return { kind: "unavailable" };
     const info = await opened.handle.stat();
     const identity = { dev: info.dev, ino: info.ino };
     const bytes = await readExactHandle(opened.handle, opened.size);
@@ -290,16 +298,20 @@ async function readCustodyLeaf(
   fileId: string,
   location: CandidateLocation,
   expectedStore?: CandidateFileIdentity,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<CustodyLeafRead> {
   const store = await captureStore(root, expectedStore);
   if (store === null) return { kind: "unavailable" };
-  const dir = candidateDir(root, location);
   const locationBinding = await captureLocationBinding(root, location, store);
   if (locationBinding.kind !== "ok") return locationBinding;
   const leaf = await candidateLeaf(root, fileId, location).catch(() => null);
   if (leaf === null) return { kind: "unavailable" };
-  const opened = await openConfinedLeaf(root, leaf, dir);
+  const opened = await openConfinedLeaf(await realpath(root), leaf, locationBinding.binding.realDir);
   if (opened.kind !== "confirmed") return opened;
+  if (opened.size > candidateByteLimit(policy)) {
+    await opened.handle.close().catch(() => {});
+    return { kind: "unavailable" };
+  }
   return consumeCustodyHandle(root, leaf, store, locationBinding.binding, opened);
 }
 
@@ -308,6 +320,7 @@ export async function captureCandidateCustody(
   root: string,
   fileId: string,
   expectedStore?: CandidateStoreBinding,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<CandidateCustodyRead | null> {
   assertCandidateId(fileId);
   // Preserve the store's public typed confinement refusal before custody can
@@ -321,16 +334,19 @@ export async function captureCandidateCustody(
   if (expectedStore && (store.dir !== expectedStore.dir || store.realDir !== expectedStore.realDir)) {
     throw new CandidateCustodyUnavailableError();
   }
-  const read = await readCustodyLeaf(root, fileId, "pending", store.identity);
+  const read = await readCustodyLeaf(root, fileId, "pending", store.identity, policy);
   if (read.kind === "absent") return null;
-  if (read.kind !== "ok") throw new CandidateCustodyUnavailableError();
+  if (read.kind !== "ok") {
+    await assertCandidateStoreBinding(root, store);
+    throw new CandidateLeafUnavailableError();
+  }
   const receipt = captureCandidateCustodyReceipt({
     fileId,
     byteCount: read.bytes.byteLength,
     sha256: sha256Bytes(read.bytes),
     fileIdentity: read.fileIdentity,
     storeIdentity: store.identity,
-  });
+  }, policy);
   return Object.freeze({
     bytes: read.bytes,
     receipt,
@@ -348,11 +364,12 @@ function matchesReceipt(read: CustodyLeafRead, receipt: CandidateCustodyReceipt)
 export async function observeCandidateCustody(
   root: string,
   receipt: CandidateCustodyReceipt,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<CandidateCustodyState> {
   try {
-    const captured = captureCandidateCustodyReceipt(receipt);
-    const pending = await readCustodyLeaf(root, captured.fileId, "pending", captured.storeIdentity);
-    const archived = await readCustodyLeaf(root, captured.fileId, "archive", captured.storeIdentity);
+    const captured = captureCandidateCustodyReceipt(receipt, policy);
+    const pending = await readCustodyLeaf(root, captured.fileId, "pending", captured.storeIdentity, policy);
+    const archived = await readCustodyLeaf(root, captured.fileId, "archive", captured.storeIdentity, policy);
     if (matchesReceipt(pending, captured) && archived.kind === "absent") return "restored";
     if (pending.kind === "absent" && matchesReceipt(archived, captured)) return "archived";
     return "conflict";
@@ -382,10 +399,11 @@ async function openMoveSource(
   request: CandidateCustodyMoveRequest,
   source: string,
   sourceDir: string,
+  policy: CandidateCustodyPolicy,
 ): Promise<FileHandle | null> {
-  const opened = await openConfinedLeaf(request.root, source, sourceDir);
+  const opened = await openConfinedLeaf(await realpath(request.root), source, sourceDir);
   if (opened.kind !== "confirmed") return null;
-  if (opened.size > MAX_CANDIDATE_RECORD_BYTES) {
+  if (opened.size > candidateByteLimit(policy)) {
     await opened.handle.close().catch(() => {});
     return null;
   }
@@ -442,20 +460,21 @@ async function movePaths(request: CandidateCustodyMoveRequest): Promise<[string,
  */
 export async function moveCandidateWithCustody(
   request: CandidateCustodyMoveRequest,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<boolean> {
-  const captured = captureCandidateCustodyMoveRequest(request);
+  const captured = captureCandidateCustodyMoveRequest(request, policy);
   let sourceHandle: FileHandle | null = null;
   try {
     const parents = await bindMoveParents(captured);
     if (parents === null) return false;
     const [source, destination] = await movePaths(captured);
-    sourceHandle = await openMoveSource(captured, source, parents.source.dir);
+    sourceHandle = await openMoveSource(captured, source, parents.source.realDir, policy);
     if (sourceHandle === null || !(await destinationIsAbsent(destination))) return false;
     if (!(await parentsStillBound(captured.root, parents))) return false;
     if (!(await handleStillBound(sourceHandle, source, captured.receipt.fileIdentity))) return false;
     if (!(await destinationIsAbsent(destination))) return false;
     await rename(source, destination);
-    return await observeCandidateCustody(captured.root, captured.receipt) === captured.direction + "d";
+    return await observeCandidateCustody(captured.root, captured.receipt, policy) === captured.direction + "d";
   } catch {
     return false;
   } finally {

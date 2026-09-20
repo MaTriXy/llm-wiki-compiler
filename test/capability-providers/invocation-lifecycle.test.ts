@@ -150,7 +150,7 @@ function expectAdmittedFailure(result: Awaited<ReturnType<typeof invokeCapabilit
 async function baseRequest<C extends ProviderBackendChannelV1 = ScriptedChannel>(
   frames: readonly unknown[],
   overrides: Partial<ProviderInvocationRequestV1> = {}, outputFiles: Record<string, string> = { report: REPORT_BYTES },
-  buildChannel: (outputDir: string) => C = ((outputDir: string) => new ScriptedChannel(frames, outputDir)) as (outputDir: string) => C,
+  buildChannel: (outputDir: string) => C | ScriptedChannel = (outputDir) => new ScriptedChannel(frames, outputDir),
 ) {
   const authority = overrides.brokers ? [brokerAtom({ kind: "network.https", brokerId: "https",
     operation: "fetch-large", target: "https://api.example", method: "GET" })] : [];

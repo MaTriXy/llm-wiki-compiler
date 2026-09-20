@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   SELECTION_BINDING_DIMENSIONS, SELECTION_BINDING_EXCLUSIONS, SelectionAuthorityError,
   authorSelectionDecision, capturePolicyContract, policyContractDigest,
@@ -26,13 +27,13 @@ const handlerRef: HostHandlerRefV1 = {
 
 const candidateSetRef: EvidenceRefV1 = {
   kind: "candidate-set", mediaType: "application/json", provenanceLabel: "host-derived",
-  digest: `sha256:${"1".repeat(64)}`, byteCount: 96, sensitivity: "ordinary", retention: "audit",
+  digest: parseSha256Digest(`sha256:${"1".repeat(64)}`), byteCount: 96, sensitivity: "ordinary", retention: "audit",
   producer: { kind: "host", contractDigest: HANDLER_DIGEST }, untrusted: true,
 };
 
 const rationaleRef: EvidenceRefV1 = {
   ...candidateSetRef, kind: "selection-rationale", provenanceLabel: "provider-output",
-  digest: `sha256:${"2".repeat(64)}`,
+  digest: parseSha256Digest(`sha256:${"2".repeat(64)}`),
 };
 
 /** A registry whose resolved contract can be perturbed per test. */

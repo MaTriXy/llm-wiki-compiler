@@ -37,7 +37,10 @@ export class UnsafeCandidateIdError extends Error {
 }
 
 /** Maximum UTF-8 bytes in a persisted candidate filename stem. */
-export const MAX_CANDIDATE_ID_BYTES = 229;
+export const MAX_CANDIDATE_ID_BYTES = 250;
+
+/** Atomic replacement also needs 21 bytes for its temporary filename suffix. */
+export const MAX_WRITABLE_CANDIDATE_ID_BYTES = 229;
 
 /** Maximum UTF-8 bytes before the generated `-` plus eight-hex suffix. */
 export const MAX_CANDIDATE_SLUG_BYTES = 220;
@@ -60,6 +63,11 @@ function assertCandidateComponent(
 /** Validate a physical candidate filename stem before any path operation. */
 export function assertCandidateId(id: unknown): asserts id is string {
   assertCandidateComponent("id", id, MAX_CANDIDATE_ID_BYTES);
+}
+
+/** Validate identities used for atomic content publication, not reads or moves. */
+export function assertWritableCandidateId(id: unknown): asserts id is string {
+  assertCandidateComponent("id", id, MAX_WRITABLE_CANDIDATE_ID_BYTES);
 }
 
 /** Validate a draft slug before appending the random candidate suffix. */

@@ -8,6 +8,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { parseInvocationId } from "../../src/capability-providers/ids.js";
+import type { HostMutationExecutorV1 } from "../../src/capability-providers/brokers/remote-effect.js";
+import type { HostRepositoryBrokerV1 } from "../../src/capability-providers/brokers/repository.js";
 import {
   createHostBrokerDispatcher, dispatchHostBrokerRequest,
 } from "../../src/capability-providers/brokers/dispatch.js";
@@ -141,7 +143,7 @@ describe("broker wall-time deadline", () => {
 
   it("settles a mutating effect as outcome-unknown when the deadline fires after transmission", async () => {
     const controller = new AbortController();
-    const execute = vi.fn((request: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+    const execute = vi.fn((request: { signal: AbortSignal }) => new Promise<never>((_resolve, reject) => {
       request.signal.addEventListener("abort", () => reject(new Error("deadline")), { once: true });
     }));
     const { dispatcher, request } = await mutatingDispatcher(execute, controller.signal);
@@ -155,7 +157,7 @@ describe("broker wall-time deadline", () => {
 });
 
 async function mutatingDispatcher(
-  execute: (...args: never[]) => Promise<unknown>, deadlineSignal: AbortSignal,
+  execute: HostMutationExecutorV1, deadlineSignal: AbortSignal,
   monotonicNowMs?: () => number, wallTimeMs?: number,
   effectState?: ReturnType<typeof effectStateAuthority>,
 ) {
@@ -180,7 +182,7 @@ async function mutatingDispatcher(
 }
 
 async function readOnlyDispatcher(
-  snapshot: (...args: never[]) => Promise<unknown>, deadlineSignal: AbortSignal,
+  snapshot: HostRepositoryBrokerV1["snapshot"], deadlineSignal: AbortSignal,
   boundOverrides?: Parameters<typeof prepareBrokerAuthority>[0]["boundOverrides"],
   monotonicNowMs?: () => number,
 ) {

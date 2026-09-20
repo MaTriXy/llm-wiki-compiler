@@ -19,6 +19,7 @@ import {
   captureConnectorCandidateIds,
 } from "./candidate-batch.js";
 import type { RunConnectorResult } from "./run.js";
+import type { CandidateCustodyPolicy } from "../compiler/candidate-custody-limits.js";
 
 /** Runtime byte cap applied to each connector input value. */
 export const MAX_CONNECTOR_INPUT_BYTES = 512;
@@ -67,12 +68,13 @@ export async function preflightAuditCapacity(
   identity: ConnectorAuditIdentity,
   supersedable: SupersedableCandidates,
   now?: () => Date,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<RunConnectorResult | null> {
   if (!(await acquireMutationLock(root, "ordinary", { quiet: true }))) {
     return { kind: "unavailable", reason: "connector event store locked" };
   }
   try {
-    await preflightEventAppend(root, upperBoundConnectorEvent(identity, supersedable, now));
+    await preflightEventAppend(root, upperBoundConnectorEvent(identity, supersedable, now, policy));
     return null;
   } finally {
     await releaseLock(root);
@@ -92,8 +94,9 @@ export function upperBoundConnectorEvent(
   identity: ConnectorAuditIdentity,
   supersedable: SupersedableCandidates,
   now?: () => Date,
+  policy: CandidateCustodyPolicy = "bounded",
 ): AppendEventInput {
-  const existingIds = captureConnectorCandidateIds(supersedable.existingIds);
+  const existingIds = captureConnectorCandidateIds(supersedable.existingIds, policy);
   assertConnectorCandidateBatchCount([supersedable.preflightStagedId]);
   const hash = "f".repeat(64);
   const payload: ConnectorFetchEventPayload = {
@@ -123,8 +126,9 @@ export async function appendConnectorEvent(
   noopCandidateIds: readonly string[],
   supersededCandidateIds: readonly string[],
   now?: () => Date,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<unknown> {
-  return appendEventLocked(root, connectorEvent(draft, stagedCandidateIds, noopCandidateIds, supersededCandidateIds, now));
+  return appendEventLocked(root, connectorEvent(draft, stagedCandidateIds, noopCandidateIds, supersededCandidateIds, now, policy));
 }
 
 /** Build the connector-fetch event payload without mutating the event store. */
@@ -134,10 +138,11 @@ export function connectorEvent(
   noopCandidateIds: readonly string[],
   supersededCandidateIds: readonly string[],
   now?: () => Date,
+  policy: CandidateCustodyPolicy = "bounded",
 ): AppendEventInput {
-  const staged = captureConnectorCandidateIds(stagedCandidateIds);
-  const noop = captureConnectorCandidateIds(noopCandidateIds);
-  const superseded = captureConnectorCandidateIds(supersededCandidateIds);
+  const staged = captureConnectorCandidateIds(stagedCandidateIds, policy);
+  const noop = captureConnectorCandidateIds(noopCandidateIds, policy);
+  const superseded = captureConnectorCandidateIds(supersededCandidateIds, policy);
   const payload: ConnectorFetchEventPayload = Object.freeze({
     connectorId: draft.provenance.connectorId,
     connectorVersion: draft.provenance.connectorVersion,

@@ -20,6 +20,7 @@ import { atomicWrite } from "../../utils/atomic-write.js";
 import { canonicalBytes } from "../../profile/templates/signing/canonical.js";
 import { readConfinedLeafBuffer } from "../../utils/confined-read.js";
 import { resolveExistingConfinedPrivateDir } from "../../utils/private-dir.js";
+import { legacyPrivateAliasHasNoEntries } from "../../utils/legacy-private-layout.js";
 import { LLMWIKI_DIR, PROFILE_FILE } from "../../utils/constants.js";
 import { parseActiveProductBinding } from "./parse.js";
 import { MAX_ACTIVE_PRODUCT_BINDING_BYTES } from "./types.js";
@@ -60,6 +61,9 @@ export async function readActiveProductBinding(root: string): Promise<ActiveBind
     root, activeProductBindingPath(root), privateDir(root), MAX_ACTIVE_PRODUCT_BINDING_BYTES,
     { requireSingleLink: true });
   if (read.kind === "absent") return { kind: "absent" };
+  if (read.kind === "unavailable" && await legacyPrivateAliasHasNoEntries(root, [ACTIVE_PRODUCT_FILENAME]).catch(() => false)) {
+    return { kind: "absent" };
+  }
   if (read.kind !== "ok") return { kind: "malformed", detail: "unsafe-leaf" };
   try {
     return { kind: "present", binding: parseActiveProductBinding(STRICT_UTF8.decode(read.body)) };

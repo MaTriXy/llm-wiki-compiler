@@ -70,7 +70,7 @@ function draft(payloads: readonly Buffer[]): OperationBundleDraft {
 /** Build one request with private payload snapshots and an injected fault. */
 function request(
   payloads: readonly Buffer[],
-  faultsForTest: NonNullable<StageOperationBundleRequest["faultsForTest"]>,
+  faultsForTest: NonNullable<StageOperationBundleRequest["faultsForTest"]> = {},
 ): StageOperationBundleRequest {
   return {
     draft: draft(payloads),

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { MAX_PROVIDER_LOGICAL_ID_SNAPSHOT_ITEMS } from "../../src/capability-providers/constants.js";
 import { planProviderCacheGarbageCollection, removeProviderInstallation } from "../../src/capability-providers/packages/remove.js";
 import {
-  enumerateExternalProviderReferences, withTrustedExternalProviderReferences, type ProviderPackageReferenceV1,
+  enumerateExternalProviderReferences, withTrustedExternalProviderReferences, type ProviderPackageReferenceV1, type WithLockedExternalProviderReferencesV1,
 } from "../../src/capability-providers/packages/reference-enumeration.js";
 import { readProviderInstallState } from "../../src/capability-providers/packages/state-store.js";
 import { installResolutionFixture, removeResolutionFixture, type ResolutionFixture } from "./resolution-fixture.js";
@@ -148,7 +148,7 @@ describe("trusted external provider reference scope", () => {
       paths: fixture.paths, packageDigest: fixture.pin.packageDigest,
       withLockedExternalReferences: async (_digest, operation) => operation([{
         owner: "product", referenceId: "autosci", packageDigest: "sha256:deadbeef",
-      } as ProviderPackageReferenceV1]),
+      } as unknown as ProviderPackageReferenceV1]),
     })).rejects.toThrow("provider reference enumeration is unavailable");
     await expectInstallation(fixture, true);
   });
@@ -190,8 +190,8 @@ async function removeInstalledFixture(fixture: ResolutionFixture): Promise<void>
 }
 
 /** Supply one fixed snapshot while preserving the production outer-fence shape. */
-function staticReferenceScope(references: readonly ProviderPackageReferenceV1[]) {
-  return async <Result>(_digest: string, operation: (values: readonly ProviderPackageReferenceV1[]) => Promise<Result>) => (
+function staticReferenceScope(references: readonly ProviderPackageReferenceV1[]): WithLockedExternalProviderReferencesV1 {
+  return async (_digest, operation) => (
     operation(references)
   );
 }

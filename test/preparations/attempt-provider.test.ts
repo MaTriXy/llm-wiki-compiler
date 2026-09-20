@@ -11,6 +11,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
+import type { PlatformArtifactV1 } from "../../src/capability-providers/packages/protocol.js";
 import { deriveAttemptId } from "../../src/preparations/ids.js";
 import { executePhaseAttempt } from "../../src/preparations/attempts/execute.js";
 import { providerInputSpecsContentExposureDigest, providerLegRunner, type ProviderInvokeFn } from "../../src/preparations/attempts/provider.js";
@@ -147,12 +149,12 @@ describe("preparation attempt provider leg", () => {
     const invoke: ProviderInvokeFn = async (req) => { received = req; return succeeded(req, HOST); };
     const request = providerRequest();
     const promise = leg(invoke, request)(sealedCtx());
-    const artifact = request.launch.artifact as { entrypointRelativePath: string; digest: string };
-    artifact.entrypointRelativePath = "/attacker"; artifact.digest = `sha256:${"e".repeat(64)}`;
+    const artifact = request.launch.artifact as { -readonly [K in keyof PlatformArtifactV1]: PlatformArtifactV1[K] };
+    artifact.entrypointRelativePath = "/attacker"; artifact.artifactDigest = parseSha256Digest(`sha256:${"e".repeat(64)}`);
     await promise;
-    const seen = received?.launch.artifact as { entrypointRelativePath: string; digest: string };
-    expect(seen.entrypointRelativePath).toBe("entry.js");
-    expect(seen.digest).toBe(PIN);
+    const seen = received?.launch.artifact;
+    expect(seen?.entrypointRelativePath).toBe("entry.js");
+    expect(seen?.artifactDigest).toBe(PIN);
   });
 
   it("intersects the sealed broker ceiling into the invocation envelope before invoking", async () => {

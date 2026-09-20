@@ -11,6 +11,7 @@ import {
 } from "../../src/operation-bundles/adapter-registry.js";
 import type { OperationStoreAdapter } from "../../src/operation-bundles/adapter-types.js";
 import { mintBundleId } from "../../src/operation-bundles/ids.js";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { deriveCompleteness, type PreparationCompletenessV1 } from "../../src/preparations/completeness.js";
 import {
   createOperationIntentCompilerV1, type HostMutationTargetV1, type IntentCompilationRequestV1,
@@ -28,7 +29,7 @@ export const ATTEMPT = `pat_${"4".repeat(64)}` as AttemptId;
 
 export const evidence: EvidenceRefV1 = {
   kind: "provider-output", mediaType: "application/json", provenanceLabel: "provider-output",
-  digest: `sha256:${"5".repeat(64)}`, byteCount: 32, sensitivity: "ordinary",
+  digest: parseSha256Digest(`sha256:${"5".repeat(64)}`), byteCount: 32, sensitivity: "ordinary",
   retention: "until-handoff",
   producer: { kind: "provider", providerPinDigest: PROVIDER_PIN, attemptId: ATTEMPT },
   untrusted: true,

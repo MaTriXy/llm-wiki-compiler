@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { canonicalDigest } from "../../src/profile/templates/signing/canonical.js";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { parsePreparationPlan } from "../../src/preparations/plan-parse.js";
 import {
   authorGateProof, GATE_DECISIONS, GateAuthorityError, PREPARATION_GATE_KINDS,
@@ -21,7 +22,7 @@ import { validPlan } from "./plan-fixture.js";
 const RUN_ID = `prr_${"1".repeat(32)}` as const;
 const PHASE = `phi_${"b".repeat(64)}` as const;
 const cli: PreparationPrincipal = { id: "operator", surface: "cli", grants: [] };
-const DIGEST = `sha256:${"a".repeat(64)}` as const;
+const DIGEST = parseSha256Digest(`sha256:${"a".repeat(64)}`);
 
 function authState(gate: PhaseGateContractV1, overrides: Partial<GateAuthorityState> = {}): GateAuthorityState {
   const plan = parsePreparationPlan(JSON.stringify(validPlan()));

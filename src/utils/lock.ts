@@ -36,7 +36,7 @@ import type { FileHandle } from "node:fs/promises";
 import path from "path";
 import { LOCK_FILE, MAX_LOCK_FILE_BYTES } from "./constants.js";
 import { resolveConfinedPrivateDir, resolveExistingConfinedPrivateDir } from "./private-dir.js";
-import { serializeOwner, parseOwner, isOwnerStale } from "./lock-owner.js";
+import { serializeOwner, parseOwner, isLockRecordStale } from "./lock-owner.js";
 import { publishLockRecord, type LockPublicationHooks } from "./lock-publication.js";
 import { acquireKeyedFifo } from "./keyed-fifo.js";
 import * as output from "./output.js";
@@ -258,7 +258,7 @@ async function acquireReclaimLock(reclaimPath: string): Promise<boolean> {
 /**
  * Publish the lock file carrying our OWNER record (`{pid, startTime}`).
  * Returns true if we published it, false if the name was already taken. The
- * recorded start time is the PID-reuse-safe liveness identity ({@link isOwnerStale});
+ * recorded start time is the PID-reuse-safe liveness identity ({@link isLockRecordStale});
  * a leaf with no start time (legacy build) is read back compatibly.
  *
  * The record is linked into place COMPLETE — see {@link publishLockRecord}. The
@@ -309,7 +309,7 @@ async function readLockOwner(lockPath: string): Promise<ReturnType<typeof parseO
  *
  * The leaf is read through {@link readLockOwner} (no-follow + fstat-capped), so a
  * `null` owner (absent / symlinked / oversize / non-regular / unparseable) is
- * stale. A readable owner is judged by {@link isOwnerStale}: a dead PID is stale
+ * stale. A readable owner is judged by {@link isLockRecordStale}: a dead PID is stale
  * (unchanged), AND — closing the PID-reuse wedge — a LIVE PID whose recorded start
  * time differs from the live process's current start time is ALSO stale. A legacy
  * leaf (bare PID, no start time) keeps the PID-only behavior. The reclaim flow is
@@ -318,7 +318,7 @@ async function readLockOwner(lockPath: string): Promise<ReturnType<typeof parseO
 async function isLockStale(lockPath: string): Promise<boolean> {
   const owner = await readLockOwner(lockPath);
   if (owner === null) return true;
-  return isOwnerStale(owner);
+  return isLockRecordStale(owner);
 }
 
 /**

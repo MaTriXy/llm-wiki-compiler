@@ -68,10 +68,8 @@ describe("runAction captures its inputs before the first await", () => {
     expect(await recordedTags(root, runId)).toEqual(["original"]);
   });
 
-  // THE ACCESSOR HALF, independent of the timing half: `validateActionInputs`
-  // proves the key is OWN and then reads it with a plain `[[Get]]`, so a caller's
-  // getter runs. Answering the WHEN question does not touch the HOW question.
-  it("never invokes an own accessor on the caller's inputs", async () => {
+  // Legacy getters remain supported, but no caller code runs after the snapshot.
+  it("resolves legacy accessors before the first await", async () => {
     const root = await makeTempRoot("runaction-capture-accessor");
     await installRunActionProfile(root);
     let reads = 0;
@@ -81,9 +79,12 @@ describe("runAction captures its inputs before the first await", () => {
       get() { reads += 1; return 1; },
     });
 
-    await runAction(root, "build.startn", inputs, "cli").catch(() => undefined);
-
-    expect(reads).toBe(0);
+    const pending = runAction(root, "build.startn", inputs, "cli");
+    const capturedReads = reads;
+    const result = await pending;
+    expect(capturedReads).toBeGreaterThan(0);
+    expect(reads).toBe(capturedReads);
+    expect(await recordedCount(root, (result.result as { runId: string }).runId)).toBe(1);
   });
 });
 
@@ -121,7 +122,7 @@ describe("startWorkflow captures its inputs before the first await", () => {
     expect(await recordedTags(root, run.runId)).toEqual(["original"]);
   });
 
-  it("never invokes an own accessor on the caller's inputs", async () => {
+  it("resolves legacy accessors before the first await", async () => {
     const root = await makeTempRoot("start-capture-accessor");
     await installRunActionProfile(root);
     let reads = 0;
@@ -131,9 +132,12 @@ describe("startWorkflow captures its inputs before the first await", () => {
       get() { reads += 1; return "getter-value"; },
     });
 
-    await startWorkflow(root, "build", inputs).catch(() => undefined);
-
-    expect(reads).toBe(0);
+    const pending = startWorkflow(root, "build", inputs);
+    const capturedReads = reads;
+    const run = await pending;
+    expect(capturedReads).toBeGreaterThan(0);
+    expect(reads).toBe(capturedReads);
+    expect(await recordedInputs(root, run.runId)).toEqual({ viaGetter: "getter-value" });
   });
 });
 

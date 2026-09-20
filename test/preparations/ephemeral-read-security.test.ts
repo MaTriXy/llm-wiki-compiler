@@ -11,6 +11,7 @@
  */
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -25,7 +26,7 @@ import {
   ephemeralProviderPlan, ephemeralRequest, ephemeralTwoPhasePlan, HOST, runFixtureRead, withEphemeralSandbox,
 } from "./ephemeral-fixture.js";
 
-const HOSTILE_PIN = `sha256:${"e".repeat(64)}` as const;
+const HOSTILE_PIN = parseSha256Digest(`sha256:${"e".repeat(64)}`);
 const USAGE = { brokerRequestCount: 0, tokenCount: "unobserved" as const, costMicros: "unobserved" as const };
 
 /** A completed provider invocation producing no artifact, receipt, or usage. */
@@ -103,7 +104,7 @@ describe("ephemeral read invocation binding", () => {
   });
 
   it("admits the same broker adapters once the sealed phase declares that broker plan", async () => {
-    const brokerPlanDigest = `sha256:${"c".repeat(64)}` as const;
+    const brokerPlanDigest = parseSha256Digest(`sha256:${"c".repeat(64)}`);
     const run = await withEphemeralSandbox(() => runFixtureRead(ephemeralRequest({
       plan: ephemeralBrokerPlan(),
       authorityResolver: { resolve: async () => ({ status: "ok", extras: providerAuthority({ brokerPlanDigest }) }) },
@@ -122,14 +123,14 @@ describe("ephemeral read invocation binding", () => {
   });
 
   it("rejects an authority resolution that declares a mutating effect plan", async () => {
-    const extras = providerAuthority({ effectPlanDigest: `sha256:${"d".repeat(64)}` });
+    const extras = providerAuthority({ effectPlanDigest: parseSha256Digest(`sha256:${"d".repeat(64)}`) });
     const run = await refuseWithoutLaunch(providerRequest(), { authorityResolver: { resolve: async () => ({ status: "ok", extras }) } });
     expect(run.result).toEqual({ status: "refused", reason: "external-effect-required" });
     expect(run.launched).toBe(false);
   });
 
   it("rejects an authority resolution whose broker plan is not the sealed phase's", async () => {
-    const extras = providerAuthority({ brokerPlanDigest: `sha256:${"b".repeat(64)}` });
+    const extras = providerAuthority({ brokerPlanDigest: parseSha256Digest(`sha256:${"b".repeat(64)}`) });
     const run = await refuseWithoutLaunch(providerRequest(), { authorityResolver: { resolve: async () => ({ status: "ok", extras }) } });
     expect(run.result).toEqual({ status: "refused", reason: "broker-plan-drift" });
     expect(run.launched).toBe(false);
@@ -192,8 +193,8 @@ describe("ephemeral read publication", () => {
     const staged = await stagePreparation();
     const invoke: ProviderInvokeFn = async () => ({ kind: "completed", admitted: {
       outcome: "succeeded",
-      acceptedArtifacts: [{ outputId: "answer", mediaType: "application/json", digest: `sha256:${hex}`, byteCount: bytes.byteLength,
-        evidence: { evidencePath: path.join(dir, "out.json"), digest: `sha256:${hex}`, byteCount: bytes.byteLength } }],
+      acceptedArtifacts: [{ outputId: "answer", mediaType: "application/json", digest: parseSha256Digest(`sha256:${hex}`), byteCount: bytes.byteLength,
+        evidence: { evidencePath: path.join(dir, "out.json"), digest: parseSha256Digest(`sha256:${hex}`), byteCount: bytes.byteLength } }],
       counts: { declared: 1, acceptedArtifacts: 1, requiredMissing: 0, receipts: 0 },
       receipts: [], usage: USAGE, untrusted: { untrusted: true, providerReportedCounts: null, warnings: null, output: null } } });
     const run = await withEphemeralSandbox(() => runFixtureRead(ephemeralRequest(), invoke));

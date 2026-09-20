@@ -332,7 +332,9 @@ function minimizeTerminalRun(run: WorkflowRun): WorkflowRun {
   const cleared: WorkflowRun = { ...withoutReceipts, inputs: {}, outputs: {} };
   return appendTerminalEvent(cleared, {
     type: "fields-truncated", at, actorKind: "system",
-    detail: "inputs/outputs/verifier receipts cleared to fit the run byte cap on termination",
+    detail: _receipts === undefined
+      ? "inputs/outputs cleared to fit the run byte cap on termination"
+      : "inputs/outputs/verifier receipts cleared to fit the run byte cap on termination",
   });
 }
 

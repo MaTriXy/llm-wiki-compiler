@@ -104,7 +104,8 @@ describe("every Task 7 entry point captures its inputs", () => {
   it.each(ENTRY_PROBES.map((probe) => [probe.name, probe] as const))(
     "%s refuses an array-like in place of a container", (_name, probe) => {
       if (probe.container !== undefined) {
-        expect(() => probe.invoke(arrayLike(probe.container()))).toThrow();
+        const container = probe.container;
+        expect(() => probe.invoke(arrayLike(container()))).toThrow();
         return;
       }
       const base = probe.record!();

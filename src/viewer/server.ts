@@ -44,11 +44,13 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1"]);
 /** Exact CSP string the spec mandates. Pinned here to keep the test contract obvious. */
 const CONTENT_SECURITY_POLICY =
   "default-src 'self'; script-src 'self'; style-src 'self'; " +
-  "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; " +
+  "img-src 'self' data:; font-src 'self'; connect-src 'self'; " +
   "frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'none'";
 
 /** Configuration knobs accepted by `startViewerServer`. */
 interface ViewerServerConfig {
+  /** Opt-in journey navigation; never advertised on a non-loopback bind. */
+  workflowJourneys?: boolean;
   /** Listening host. `--allow-lan` callers set this to a non-loopback bind address. */
   host: string;
   /** Listening port. `0` lets the OS pick a free port. */
@@ -118,6 +120,8 @@ export async function startViewerServer(
 
 /** Options for the public {@link startViewer} constructor. */
 export interface StartViewerOptions {
+  /** Show journey links on loopback; enabled by default for this new SDK constructor. */
+  workflowJourneys?: boolean;
   /** Absolute project root the viewer reads from. */
   root: string;
   /** Listening host. */
@@ -141,7 +145,8 @@ export async function startViewer(
 ): Promise<ViewerServerHandle> {
   const snapshot = await buildViewerSnapshot(options.root);
   const timeout = options.providerTimeoutMs;
-  const config = { host: options.host, port: options.port, ...(timeout === undefined ? {} : { providerTimeoutMs: timeout }) };
+  const config = { host: options.host, port: options.port, workflowJourneys: options.workflowJourneys ?? true,
+    ...(timeout === undefined ? {} : { providerTimeoutMs: timeout }) };
   return startViewerServer(snapshot, config, deps);
 }
 
@@ -203,6 +208,10 @@ async function routeLiveResources(
   config: ViewerServerConfig, deps: ViewerDeps,
 ): Promise<void> {
   const isLoopback = LOOPBACK_HOSTS.has(config.host);
+  if (parsedUrl.pathname === "/api/workflow-runs") {
+    const journeys = workflowJourneysEnabled(config, deps);
+    return handleApiWorkflowRuns(res, snapshot.root, journeys);
+  }
   if (parsedUrl.pathname === "/api/index") return handleApiIndex(res, snapshot, isLoopback);
   if (parsedUrl.pathname === "/api/search") return handleApiSearch(res, parsedUrl, snapshot);
   if (ARTIFACT_PATHS.has(parsedUrl.pathname)) return handleApiArtifact(res, snapshot, parsedUrl, isLoopback);
@@ -217,6 +226,12 @@ async function routeLiveResources(
   // there has a matching dispatch above. If it ever fires, the two
   // functions have drifted — fail loudly rather than silently 404.
   throw new Error(`route registration drift: no handler for ${parsedUrl.pathname}`);
+}
+
+/** Enable journey navigation only for loopback with an explicit opt-in or provider. */
+function workflowJourneysEnabled(config: ViewerServerConfig, deps: ViewerDeps): boolean {
+  return LOOPBACK_HOSTS.has(config.host) &&
+    (config.workflowJourneys === true || deps.liveStageProjectionProvider !== undefined);
 }
 
 /**
@@ -253,7 +268,6 @@ const SNAPSHOT_ONLY_HANDLERS: ReadonlyMap<
   ["/api/pages", handleApiPages],
   ["/api/health", handleApiHealth],
   ["/api/graph", handleApiGraph],
-  ["/api/workflow-runs", (res, snapshot) => handleApiWorkflowRuns(res, snapshot.root)],
   ["/api/reviews", (res, snapshot) => handleApiReviews(res, snapshot.root)],
 ]);
 
@@ -440,8 +454,9 @@ function handleApiGraph(res: ServerResponse, snapshot: ViewerSnapshot): void {
  * empty list. Strictly read-only: no run-state mutation, status fields only
  * (no machine-local paths).
  */
-async function handleApiWorkflowRuns(res: ServerResponse, root: string): Promise<void> {
-  writeJson(res, 200, buildWorkflowRunsEnvelope(await workflowStatus(root)));
+async function handleApiWorkflowRuns(res: ServerResponse, root: string, journeys: boolean): Promise<void> {
+  const envelope = buildWorkflowRunsEnvelope(await workflowStatus(root));
+  writeJson(res, 200, journeys ? { ...envelope, workflowJourneys: true } : envelope);
 }
 
 /**

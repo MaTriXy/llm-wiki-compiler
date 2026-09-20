@@ -141,7 +141,7 @@ describe("quarantine purge", () => {
     const { binding, runFile } = await tamperedRun(root.dir);
     const oversize = Buffer.alloc(4 * 1024 * 1024 + 1, 7);
     await writePreparationEvidenceCreateOnly(root.dir, {
-      workspaceId: binding.workspaceId, preparationId: binding.preparationId, runId: binding.runId,
+      workspaceId: binding.workspaceId, preparationId: binding.preparationId,
     }, oversize);
     const receipt = await quarantine(root.dir, binding);
     expect(receipt.kind).toBe("quarantine-completed");

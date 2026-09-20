@@ -11,12 +11,15 @@ import { describe, expect, it } from "vitest";
 import {
   UnsafeCandidateIdError,
   writeCandidate,
+  readCandidate,
+  archiveCandidate,
 } from "../src/compiler/candidates.js";
 import {
   archivePath,
   candidatePath,
   MAX_CANDIDATE_ID_BYTES,
   MAX_CANDIDATE_SLUG_BYTES,
+  MAX_WRITABLE_CANDIDATE_ID_BYTES,
 } from "../src/compiler/candidate-paths.js";
 import { CANDIDATES_DIR } from "../src/utils/constants.js";
 import { snapshotCandidateQueue } from "./fixtures/candidate-queue.js";
@@ -64,8 +67,9 @@ describe("candidate physical identity ceilings", () => {
     const extensionBytes = Buffer.byteLength(".json", "utf8");
     const tempSuffixBytes = Buffer.byteLength(ATOMIC_TEMP_SUFFIX, "utf8");
 
-    expect(MAX_CANDIDATE_ID_BYTES + extensionBytes + tempSuffixBytes).toBe(255);
-    expect(MAX_CANDIDATE_SLUG_BYTES + 1 + 8).toBe(MAX_CANDIDATE_ID_BYTES);
+    expect(MAX_WRITABLE_CANDIDATE_ID_BYTES + extensionBytes + tempSuffixBytes).toBe(255);
+    expect(MAX_CANDIDATE_SLUG_BYTES + 1 + 8).toBe(MAX_WRITABLE_CANDIDATE_ID_BYTES);
+    expect(MAX_CANDIDATE_ID_BYTES + extensionBytes).toBe(255);
   });
 
   it.each([219, 220])("accepts a %i-byte ASCII draft slug", async (bytes) => {
@@ -87,15 +91,15 @@ describe("candidate physical identity ceilings", () => {
     await expect(writeCandidate(root.dir, draftFor(rejected))).rejects.toBeInstanceOf(UnsafeCandidateIdError);
   });
 
-  it.each([228, 229])("accepts a direct %i-byte candidate id", async (bytes) => {
+  it.each([228, 229, 230, 250])("accepts a direct %i-byte candidate id", async (bytes) => {
     const id = "a".repeat(bytes);
 
     await expect(candidatePath(root.dir, id)).resolves.toContain(`${id}.json`);
     await expect(archivePath(root.dir, id)).resolves.toContain(`${id}.json`);
   });
 
-  it("rejects a direct 230-byte candidate id before path resolution", async () => {
-    const id = "a".repeat(230);
+  it("rejects a physically impossible 251-byte candidate id before path resolution", async () => {
+    const id = "a".repeat(251);
 
     await expect(candidatePath(root.dir, id)).rejects.toBeInstanceOf(UnsafeCandidateIdError);
     await expect(archivePath(root.dir, id)).rejects.toBeInstanceOf(UnsafeCandidateIdError);
@@ -103,8 +107,8 @@ describe("candidate physical identity ceilings", () => {
   });
 
   it("accepts and rejects exact multibyte id boundaries", async () => {
-    const accepted = `${"é".repeat(114)}a`;
-    const rejected = "é".repeat(115);
+    const accepted = "é".repeat(125);
+    const rejected = `${accepted}a`;
 
     await expect(candidatePath(root.dir, accepted)).resolves.toContain(`${accepted}.json`);
     await expect(candidatePath(root.dir, rejected)).rejects.toBeInstanceOf(UnsafeCandidateIdError);
@@ -121,7 +125,7 @@ describe("candidate physical identity ceilings", () => {
     expect(existsSync(path.join(root.dir, CANDIDATES_DIR))).toBe(false);
   });
 
-  it("does not let an over-cap legacy record become mutation authority", async () => {
+  it("does not atomically replace a legacy record without temporary-file headroom", async () => {
     const id = "a".repeat(230);
     await plantLegacyCandidate(id);
     const before = await snapshotCandidateQueue(root.dir);
@@ -130,5 +134,14 @@ describe("candidate physical identity ceilings", () => {
       .rejects.toBeInstanceOf(UnsafeCandidateIdError);
 
     expect(await snapshotCandidateQueue(root.dir)).toEqual(before);
+  });
+
+  it("reads and archives a valid legacy filename without needing write-temp headroom", async () => {
+    const id = "a".repeat(250);
+    await plantLegacyCandidate(id);
+    expect((await readCandidate(root.dir, id))?.id).toBe(id);
+    expect(await archiveCandidate(root.dir, id)).toBe(true);
+    expect(existsSync(await candidatePath(root.dir, id))).toBe(false);
+    expect(existsSync(await archivePath(root.dir, id))).toBe(true);
   });
 });

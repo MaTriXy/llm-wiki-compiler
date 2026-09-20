@@ -14,13 +14,14 @@ import {
   verifyOperationRunIntegrity,
 } from "../../src/operation-bundles/run-integrity.js";
 import type { OperationPrincipal } from "../../src/operation-bundles/principal.js";
+import type { OperationRunBinding } from "../../src/operation-bundles/run-types.js";
 import { runFixture } from "./run-fixture.js";
 
 const KEY = Buffer.alloc(32, 11);
 const OTHER_KEY = Buffer.alloc(32, 12);
 const ACTOR: OperationPrincipal = { id: "operator", surface: "cli", grants: [] };
 const AT = "2026-07-17T01:00:00.000Z";
-const DIGEST = `sha256:${"d".repeat(64)}`;
+const DIGEST = `sha256:${"d".repeat(64)}` as const;
 const OWNER = { pid: 77, processStartTime: AT };
 
 /** Create one signed applying run for integrity-tamper tests. */
@@ -70,7 +71,7 @@ describe("operation run integrity", () => {
 
   it("rejects each foreign manifest, run, workspace, bundle, and epoch binding", () => {
     const { signed, binding } = fixture();
-    const wrong = [
+    const wrong: OperationRunBinding[] = [
       { ...binding, manifestDigest: `sha256:${"e".repeat(64)}` },
       { ...binding, runId: mintOperationRunId() },
       { ...binding, workspaceId: "foreign" },

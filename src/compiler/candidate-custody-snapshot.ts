@@ -6,7 +6,7 @@
  */
 
 import { assertCandidateId } from "./candidate-paths.js";
-import { MAX_CANDIDATE_RECORD_BYTES } from "./candidate-custody-limits.js";
+import { candidateByteLimit, type CandidateCustodyPolicy } from "./candidate-custody-limits.js";
 import {
   captureDenseArray,
   captureExactRecord,
@@ -58,7 +58,9 @@ function captureCandidateFileIdentity(value: unknown): CandidateFileIdentity {
 }
 
 /** Capture one exact deeply frozen custody receipt. */
-export function captureCandidateCustodyReceipt(value: unknown): CandidateCustodyReceipt {
+export function captureCandidateCustodyReceipt(
+  value: unknown, policy: CandidateCustodyPolicy = "bounded",
+): CandidateCustodyReceipt {
   return atBoundary(() => {
     const record = captureExactRecord(value, [
       "fileId", "byteCount", "sha256", "fileIdentity", "storeIdentity",
@@ -66,7 +68,7 @@ export function captureCandidateCustodyReceipt(value: unknown): CandidateCustody
     if (typeof record.fileId !== "string") throw new CandidateCustodyBoundaryError();
     assertCandidateId(record.fileId);
     if (typeof record.byteCount !== "number" || !Number.isSafeInteger(record.byteCount) ||
-      record.byteCount < 0 || record.byteCount > MAX_CANDIDATE_RECORD_BYTES) {
+      record.byteCount < 0 || record.byteCount > candidateByteLimit(policy)) {
       throw new CandidateCustodyBoundaryError();
     }
     if (typeof record.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(record.sha256)) {
@@ -87,13 +89,14 @@ export function captureCandidateCustodyReceipts(
   value: unknown,
   maximum = 200,
   overflowError: () => Error = () => new CandidateCustodyBoundaryError(),
+  policy: CandidateCustodyPolicy = "bounded",
 ): readonly CandidateCustodyReceipt[] {
   let overflow: Error | undefined;
   try {
     return captureDenseArray(
       value,
       maximum,
-      captureCandidateCustodyReceipt,
+      (item) => captureCandidateCustodyReceipt(item, policy),
       () => {
         overflow = overflowError();
         return overflow;
@@ -113,14 +116,16 @@ function captureDirection(value: unknown): CandidateCustodyMoveDirection {
 }
 
 /** Capture one exact deeply frozen candidate move request. */
-export function captureCandidateCustodyMoveRequest(value: unknown): CandidateCustodyMoveRequest {
+export function captureCandidateCustodyMoveRequest(
+  value: unknown, policy: CandidateCustodyPolicy = "bounded",
+): CandidateCustodyMoveRequest {
   return atBoundary(() => {
     const record = captureExactRecord(value, ["root", "fileId", "direction", "receipt"]);
     if (typeof record.root !== "string" || typeof record.fileId !== "string") {
       throw new CandidateCustodyBoundaryError();
     }
     assertCandidateId(record.fileId);
-    const receipt = captureCandidateCustodyReceipt(record.receipt);
+    const receipt = captureCandidateCustodyReceipt(record.receipt, policy);
     if (receipt.fileId !== record.fileId) throw new CandidateCustodyBoundaryError();
     return Object.freeze({
       root: record.root,

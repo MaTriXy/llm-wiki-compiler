@@ -28,22 +28,25 @@ import {
   CandidateIdentityMismatchError,
   CandidateMutationScanCapacityError,
   selectCandidateEntriesForMutation,
-  selectCandidateEntriesForMutationWithTotal,
+  selectReadableCandidateEntriesForMutation,
   type CandidateMutationSelectionHooks,
 } from "../compiler/candidate-selection.js";
 import { DEFAULT_STAGED_WRITE_PER_SESSION } from "../trust/staged-change.js";
 import { UnsafeCandidateIdError } from "../compiler/candidate-paths.js";
 import {
   ConnectorCandidateBatchOverflowError,
+  connectorCandidateBatchLimit,
   MAX_CONNECTOR_CANDIDATE_BATCH,
 } from "./candidate-batch.js";
 import { connectorBlockFromBody } from "./origin.js";
 import {
   CandidateRecordMalformedError,
+  countCandidates,
   type CandidateFileEntry,
 } from "../compiler/candidate-read.js";
 import { captureDenseArray, captureExactRecord, captureOwnDataRecord } from "../utils/runtime-capture.js";
 import type { ReviewCandidate } from "../utils/types.js";
+import type { CandidateCustodyPolicy } from "../compiler/candidate-custody-limits.js";
 
 /** Host-owned move seam carrying root, exact file identity, direction, and receipt. */
 export interface CandidateMovePort {
@@ -56,7 +59,10 @@ export type CandidateSupersessionResult =
   | { kind: "failed-and-restored" }
   | { kind: "recovery-required"; candidateIds: readonly string[] };
 
-const DEFAULT_MOVE_PORT: CandidateMovePort = { move: moveCandidateWithCustody };
+/** Bind the trusted host policy outside the caller-supplied move request. */
+function defaultMovePort(policy: CandidateCustodyPolicy): CandidateMovePort {
+  return { move: (request) => moveCandidateWithCustody(request, policy) };
+}
 export const CONNECTOR_CANDIDATE_STORE_UNAVAILABLE =
   "connector candidate store unavailable";
 
@@ -110,17 +116,14 @@ export async function selectConnectorCandidateEntriesForRun(
 ): Promise<ConnectorCandidateEntriesResult> {
   try {
     await assertCandidateNamespacesHealthy(root);
-    const selection = await selectCandidateEntriesForMutationWithTotal(
+    const entries = await selectReadableCandidateEntriesForMutation(
       root,
       (candidate) => durableProvenance(candidate)?.idempotencyKey === idempotencyKey,
-      {
-        maxSelected: MAX_CONNECTOR_CANDIDATE_BATCH,
-        overflowError: () => new ConnectorCandidateBatchOverflowError(),
-      },
+      undefined,
       hooks,
     );
-    await assertCandidateMutationAccess(root, selection.entries.length > 0);
-    return selection;
+    await assertCandidateMutationAccess(root, entries.length > 0);
+    return { entries, totalPending: await countCandidates(root) };
   } catch (error) {
     if (error instanceof ConnectorCandidateBatchOverflowError ||
       error instanceof CandidateCustodyUnavailableError ||
@@ -144,25 +147,25 @@ export function includesConnectorContentHash(
 }
 
 /** Capture one direct entry's only mutation-authority fields. */
-function captureEntryReceipt(value: unknown): CandidateCustodyReceipt {
+function captureEntryReceipt(value: unknown, policy: CandidateCustodyPolicy): CandidateCustodyReceipt {
   const entry = captureExactRecord(value, ["fileId", "candidate", "custodyReceipt"]);
   const candidate = captureOwnDataRecord(entry.candidate);
   if (typeof entry.fileId !== "string" || candidate.id !== entry.fileId) {
     throw new CandidateCustodyBoundaryError();
   }
   assertCandidateIdsWritable([entry.fileId, typeof candidate.id === "string" ? candidate.id : null]);
-  const receipt = captureCandidateCustodyReceipt(entry.custodyReceipt);
+  const receipt = captureCandidateCustodyReceipt(entry.custodyReceipt, policy);
   if (receipt.fileId !== entry.fileId) throw new CandidateCustodyBoundaryError();
   return receipt;
 }
 
 /** Revalidate direct archive input and extract frozen receipts in input order. */
-function receiptsForEntries(entries: unknown): readonly CandidateCustodyReceipt[] {
+function receiptsForEntries(entries: unknown, policy: CandidateCustodyPolicy): readonly CandidateCustodyReceipt[] {
   try {
     return captureDenseArray(
       entries,
-      MAX_CONNECTOR_CANDIDATE_BATCH,
-      captureEntryReceipt,
+      connectorCandidateBatchLimit(policy),
+      (entry) => captureEntryReceipt(entry, policy),
       () => new ConnectorCandidateBatchOverflowError(),
     );
   } catch (error) {
@@ -173,11 +176,12 @@ function receiptsForEntries(entries: unknown): readonly CandidateCustodyReceipt[
 }
 
 /** Revalidate direct restore input before any path or move work. */
-function captureReceiptBatch(receipts: unknown): readonly CandidateCustodyReceipt[] {
+function captureReceiptBatch(receipts: unknown, policy: CandidateCustodyPolicy): readonly CandidateCustodyReceipt[] {
   return captureCandidateCustodyReceipts(
     receipts,
-    MAX_CONNECTOR_CANDIDATE_BATCH,
+    connectorCandidateBatchLimit(policy),
     () => new ConnectorCandidateBatchOverflowError(),
+    policy,
   );
 }
 
@@ -191,9 +195,11 @@ function moveRequest(
 }
 
 /** True only when every receipt proves the pending-only exact pre-state. */
-async function archivePreflight(root: string, receipts: readonly CandidateCustodyReceipt[]): Promise<boolean> {
+async function archivePreflight(
+  root: string, receipts: readonly CandidateCustodyReceipt[], policy: CandidateCustodyPolicy,
+): Promise<boolean> {
   for (const receipt of receipts) {
-    if (await observeCandidateCustody(root, receipt) !== "restored") return false;
+    if (await observeCandidateCustody(root, receipt, policy) !== "restored") return false;
   }
   return true;
 }
@@ -203,13 +209,14 @@ async function restoreReceipt(
   root: string,
   receipt: CandidateCustodyReceipt,
   mover: CandidateMovePort,
+  policy: CandidateCustodyPolicy,
 ): Promise<boolean> {
   try {
-    const before = await observeCandidateCustody(root, receipt);
+    const before = await observeCandidateCustody(root, receipt, policy);
     if (before === "restored") return true;
     if (before !== "archived") return false;
     await mover.move(moveRequest(root, receipt, "restore")).catch(() => false);
-    return await observeCandidateCustody(root, receipt) === "restored";
+    return await observeCandidateCustody(root, receipt, policy) === "restored";
   } catch {
     return false;
   }
@@ -220,10 +227,11 @@ async function compensateReceipts(
   root: string,
   receipts: readonly CandidateCustodyReceipt[],
   mover: CandidateMovePort,
+  policy: CandidateCustodyPolicy,
 ): Promise<CandidateSupersessionResult> {
   const candidateIds: string[] = [];
   for (const receipt of receipts) {
-    if (!(await restoreReceipt(root, receipt, mover))) candidateIds.push(receipt.fileId);
+    if (!(await restoreReceipt(root, receipt, mover, policy))) candidateIds.push(receipt.fileId);
   }
   return candidateIds.length === 0
     ? Object.freeze({ kind: "failed-and-restored" })
@@ -235,10 +243,11 @@ async function archiveReceipt(
   root: string,
   receipt: CandidateCustodyReceipt,
   mover: CandidateMovePort,
+  policy: CandidateCustodyPolicy,
 ): Promise<boolean> {
   try {
     const moved = await mover.move(moveRequest(root, receipt, "archive"));
-    return moved && await observeCandidateCustody(root, receipt) === "archived";
+    return moved && await observeCandidateCustody(root, receipt, policy) === "archived";
   } catch {
     return false;
   }
@@ -248,13 +257,15 @@ async function archiveReceipt(
 export async function archiveCandidatesWithUndo(
   root: string,
   entries: readonly CandidateFileEntry[],
-  mover: CandidateMovePort = DEFAULT_MOVE_PORT,
+  mover?: CandidateMovePort,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<CandidateSupersessionResult> {
-  const receipts = receiptsForEntries(entries);
-  if (!(await archivePreflight(root, receipts))) return compensateReceipts(root, receipts, mover);
+  const port = mover ?? defaultMovePort(policy);
+  const receipts = receiptsForEntries(entries, policy);
+  if (!(await archivePreflight(root, receipts, policy))) return compensateReceipts(root, receipts, port, policy);
   for (const receipt of receipts) {
-    if (await archiveReceipt(root, receipt, mover)) continue;
-    return compensateReceipts(root, receipts, mover);
+    if (await archiveReceipt(root, receipt, port, policy)) continue;
+    return compensateReceipts(root, receipts, port, policy);
   }
   return Object.freeze({ kind: "archived", receipts });
 }
@@ -263,8 +274,9 @@ export async function archiveCandidatesWithUndo(
 export async function restoreArchivedCandidates(
   root: string,
   receipts: readonly CandidateCustodyReceipt[],
-  mover: CandidateMovePort = DEFAULT_MOVE_PORT,
+  mover?: CandidateMovePort,
+  policy: CandidateCustodyPolicy = "bounded",
 ): Promise<CandidateSupersessionResult> {
-  const captured = captureReceiptBatch(receipts);
-  return compensateReceipts(root, captured, mover);
+  const captured = captureReceiptBatch(receipts, policy);
+  return compensateReceipts(root, captured, mover ?? defaultMovePort(policy), policy);
 }

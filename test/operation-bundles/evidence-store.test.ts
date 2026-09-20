@@ -76,7 +76,7 @@ describe("run-evidence store", () => {
     ["type", { workspaceId: "research", type: "", provenance: "controller" }],
     ["provenance", { workspaceId: "research", type: "observation", provenance: "" }],
   ])("validates %s before reporting evidence as over-limit", async (_caseName, override) => {
-    const location = { workspaceId: "research", runId: mintOperationRunId(), type: "observation", provenance: "controller", ...override };
+    const location = { runId: mintOperationRunId(), ...override };
     const bytes = Buffer.alloc(MAX_RUN_EVIDENCE_BLOB_BYTES + 1);
 
     await expect(writeRunEvidenceCreateOnly(root.dir, location as never, bytes)).rejects.toThrow();

@@ -21,7 +21,7 @@ const reject = (mutate: (plan: Plan) => Plan): void =>
 function ephemeralBase(): Plan {
   const plan = validPlan();
   plan.executionMode = "ephemeral-read";
-  plan.initialInputSet.retention = "terminal-only";
+  (plan.initialInputSet as Record<string, unknown>).retention = "terminal-only";
   plan.outputContract = { producingPhaseIds: ["join"] };
   phases(plan).splice(2, 1);
   phases(plan)[2].dependsOn = ["expand"];
@@ -57,7 +57,7 @@ describe("mode and atomicity consistency", () => {
   });
 
   it("rejects ephemeral handoff and repeat constructs", () => {
-    expect(() => parsePreparationPlan(planText((() => { const plan = ephemeralBase(); plan.outputContract.handoffCapacity = validPlan().outputContract.handoffCapacity; return plan; })()))).toThrow();
+    expect(() => parsePreparationPlan(planText((() => { const plan = ephemeralBase(); plan.outputContract.handoffCapacity = (validPlan().outputContract as Record<string, unknown>).handoffCapacity; return plan; })()))).toThrow();
     expect(() => parsePreparationPlan(planText((() => {
       const plan = ephemeralBase();
       phases(plan)[1].expansion = { kind: "bounded-repeat", maximumIterations: 2, continuation: { kind: "fixed-count", count: 1 }, limitDisposition: { kind: "fail-closed" } };

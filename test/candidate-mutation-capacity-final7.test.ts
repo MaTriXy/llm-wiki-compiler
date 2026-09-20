@@ -1,7 +1,7 @@
 /**
  * @file test/candidate-mutation-capacity-final7.test.ts
- * @description Decision 15 regressions bind candidate writers and strict
- * mutation enumeration to the same bounded store-authority contract.
+ * @description Public writers retain their record-size behavior while new
+ * strict custody interfaces enforce their explicit bounded-authority contract.
  */
 
 import { mkdir, stat, writeFile } from "node:fs/promises";
@@ -9,17 +9,18 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   readCandidate,
-  CandidateRecordCapacityError,
+  archiveCandidate,
+  deleteCandidate,
   writeCandidate,
   writeFreshCandidate,
   type CandidateDraft,
 } from "../src/compiler/candidates.js";
-import { MAX_CANDIDATE_RECORD_BYTES } from "../src/compiler/candidate-custody.js";
+import { captureCandidateCustody, CandidateCustodyUnavailableError,
+  MAX_CANDIDATE_RECORD_BYTES } from "../src/compiler/candidate-custody.js";
 import { listCandidates } from "../src/compiler/candidate-read.js";
 import { selectConnectorCandidateEntriesForRun } from "../src/connectors/candidate-supersession.js";
 import type { ConfinedFetchResult } from "../src/connectors/confined-fetch.js";
 import { runConnector } from "../src/connectors/run.js";
-import { snapshotCandidateQueue } from "./fixtures/candidate-queue.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
 import { plantConnectorCandidate } from "./connectors/final6-fixtures.js";
 import { activateFixtureConnector } from "./connectors/run-test-fixtures.js";
@@ -51,12 +52,6 @@ function fixtureFetch(): Promise<ConfinedFetchResult> {
   });
 }
 
-/** Require a writer capacity refusal and a byte-empty candidate queue. */
-async function expectCapacityRefusal(writing: Promise<unknown>): Promise<void> {
-  await expect(writing).rejects.toBeInstanceOf(CandidateRecordCapacityError);
-  expect(await snapshotCandidateQueue(root.dir)).toEqual({});
-}
-
 describe("Final7 candidate mutation capacity", () => {
   afterEach(() => { delete process.env.LLMWIKI_CONNECTORS; });
 
@@ -73,30 +68,34 @@ describe("Final7 candidate mutation capacity", () => {
   it.each([
     ["canonical", writeCandidate],
     ["fresh", writeFreshCandidate],
-  ] as const)("rejects cap-plus-one in the %s writer", async (_name, writer) => {
+  ] as const)("retains cap-plus-one support in the public %s writer", async (_name, writer) => {
     const body = bodyForRecordSize(MAX_CANDIDATE_RECORD_BYTES + 1);
 
-    await expectCapacityRefusal(writer(root.dir, draft(body)));
+    const candidate = await writer(root.dir, draft(body));
+    expect((await listCandidates(root.dir))[0]?.body).toBe(body);
+    await expect(captureCandidateCustody(root.dir, candidate.id))
+      .rejects.toBeInstanceOf(CandidateCustodyUnavailableError);
+    await expect(archiveCandidate(root.dir, candidate.id)).resolves.toBe(true);
   });
 
-  it("measures JSON escape expansion before writing", async () => {
+  it("supports public records whose JSON escaping exceeds the strict byte cap", async () => {
     const body = "\u0000".repeat(700_000);
     expect(Buffer.byteLength(body)).toBeLessThan(MAX_CANDIDATE_RECORD_BYTES);
 
-    await expectCapacityRefusal(writeFreshCandidate(root.dir, draft(body)));
+    const candidate = await writeFreshCandidate(root.dir, draft(body));
+    expect((await readCandidate(root.dir, candidate.id))?.body).toBe(body);
+    await expect(deleteCandidate(root.dir, candidate.id)).resolves.toBe(true);
   });
 
-  it("leaves duplicates byte-identical when an oversized replacement refuses", async () => {
-    await writeCandidate(root.dir, draft("small"));
-    const before = await snapshotCandidateQueue(root.dir);
-
-    await expect(writeCandidate(root.dir, draft("x".repeat(MAX_CANDIDATE_RECORD_BYTES))))
-      .rejects.toBeInstanceOf(CandidateRecordCapacityError);
-
-    expect(await snapshotCandidateQueue(root.dir)).toEqual(before);
+  it("canonicalizes large revisions under the original public candidate identity", async () => {
+    const first = await writeCandidate(root.dir, draft("small"));
+    const body = "x".repeat(MAX_CANDIDATE_RECORD_BYTES);
+    expect((await writeCandidate(root.dir, draft(body))).id).toBe(first.id);
+    expect((await writeCandidate(root.dir, draft("small again"))).id).toBe(first.id);
+    expect(await listCandidates(root.dir)).toHaveLength(1);
   });
 
-  it("keeps tolerant reads but blocks malformed mutation authority before fetch", async () => {
+  it("keeps normal connector discovery tolerant of unrelated malformed records", async () => {
     await activateFixtureConnector(root.dir);
     const dir = path.join(root.dir, ".llmwiki", "candidates");
     await mkdir(dir, { recursive: true });
@@ -107,12 +106,12 @@ describe("Final7 candidate mutation capacity", () => {
       fetcher: async () => { fetches += 1; return fixtureFetch(); },
     });
 
-    expect(result).toEqual({ kind: "unavailable", reason: "connector candidate store unavailable" });
-    expect(fetches).toBe(0);
-    expect(await listCandidates(root.dir)).toEqual([]);
+    expect(result.kind).toBe("staged");
+    expect(fetches).toBe(1);
+    expect(await listCandidates(root.dir)).toHaveLength(1);
   });
 
-  it("refuses JSON leaf 201 even when every record is unrelated", async () => {
+  it("can inspect 201 unrelated candidates without authorizing another staged write", async () => {
     for (let index = 0; index < 201; index += 1) {
       await plantConnectorCandidate(root.dir, `unrelated-${index}`, {
         idempotencyKey: "b".repeat(64),
@@ -121,10 +120,10 @@ describe("Final7 candidate mutation capacity", () => {
 
     const result = await selectConnectorCandidateEntriesForRun(root.dir, "a".repeat(64));
 
-    expect(result).toEqual({ kind: "unavailable", reason: "connector candidate store unavailable" });
+    expect(result).toMatchObject({ entries: [], totalPending: 201 });
   });
 
-  it("refuses direct directory entry 202 including the archive directory", async () => {
+  it("does not count unrelated directory entries as connector mutation authority", async () => {
     const dir = path.join(root.dir, ".llmwiki", "candidates");
     await mkdir(path.join(dir, "archive"), { recursive: true });
     await Promise.all(Array.from({ length: 201 }, (_, index) =>
@@ -132,6 +131,6 @@ describe("Final7 candidate mutation capacity", () => {
 
     const result = await selectConnectorCandidateEntriesForRun(root.dir, "a".repeat(64));
 
-    expect(result).toEqual({ kind: "unavailable", reason: "connector candidate store unavailable" });
+    expect(result).toMatchObject({ entries: [], totalPending: 0 });
   });
 });

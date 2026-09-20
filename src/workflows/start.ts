@@ -22,9 +22,9 @@ import { workflowDefDigest } from "../profile/workflow-digest.js";
 import { mintRunId, writeRun, runExists, readRun, listRuns, WorkflowRunIdCollisionError } from "./store.js";
 import { isTerminalStatus } from "./with-lock.js";
 import { currentActorIdentity } from "./actor-identity.js";
-import { WorkflowInputBoundsError, assertInputDepthWithinBounds } from "./input-bounds.js";
-import { RuntimeCaptureError, deepCaptureData } from "../utils/runtime-capture.js";
-import { MAX_WORKFLOW_INPUTS_BYTES, MAX_MINT_ATTEMPTS, MAX_ACTIVE_WORKFLOW_RUNS, MAX_TOTAL_WORKFLOW_RUNS } from "../utils/constants.js";
+import { snapshotWorkflowInputs } from "./input-snapshot.js";
+export { WorkflowInputsTooLargeError } from "./input-snapshot.js";
+import { MAX_MINT_ATTEMPTS, MAX_ACTIVE_WORKFLOW_RUNS, MAX_TOTAL_WORKFLOW_RUNS } from "../utils/constants.js";
 import { WORKFLOW_RUN_SCHEMA_VERSION, type WorkflowRun } from "./types.js";
 import type { WorkflowDef } from "../profile/types.js";
 import { resolveWorkflowProcessAuthority } from "./process-authority.js";
@@ -36,72 +36,6 @@ export class UnknownWorkflowError extends Error {
     super(`unknown workflow: ${JSON.stringify(workflowId)} is not declared in the active profile`);
     this.name = "UnknownWorkflowError";
   }
-}
-
-/**
- * Raised when a run's caller-supplied `inputs` serialize past
- * {@link MAX_WORKFLOW_INPUTS_BYTES}. `inputs` is the one run field a caller fully
- * controls, so bounding it BEFORE the record is built fails closed early with a
- * clear typed error — and keeps a within-cap record readable (no asymmetric-cap
- * brick). Nothing is written.
- */
-export class WorkflowInputsTooLargeError extends Error {
-  constructor(
-    /** The serialized `inputs` byte length that breached the cap. */
-    readonly bytes: number,
-  ) {
-    super(`workflow inputs are too large: ${bytes} bytes exceeds the cap of ${MAX_WORKFLOW_INPUTS_BYTES}`);
-    this.name = "WorkflowInputsTooLargeError";
-  }
-}
-
-/**
- * Snapshot the caller's inputs as an immutable data-only tree, or refuse.
- *
- * DEEP, NOT ONE LEVEL. A top-level own-data copy leaves every nested array and
- * object aliased to the caller's, and this path records the inputs VERBATIM —
- * there is no schema between the caller and the durable record — so an aliased
- * element is a value the run reports having been started with and was not.
- *
- * The refusal is {@link WorkflowInputBoundsError}, which is what this boundary
- * already raises for caller inputs whose SHAPE it will not accept.
- */
-function captureStartInputs(inputs: Record<string, unknown>): Record<string, unknown> {
-  try {
-    return deepCaptureData(inputs) as Record<string, unknown>;
-  } catch (error) {
-    // ONLY THE CAPTURE'S OWN REFUSAL becomes a typed input rejection; anything
-    // else is a fault and stays a throw, so a genuine failure is never reported
-    // as "your inputs are the wrong shape".
-    if (error instanceof RuntimeCaptureError) {
-      throw new WorkflowInputBoundsError("inputs must be a plain object of data values");
-    }
-    throw error;
-  }
-}
-
-/**
- * Bound the caller `inputs` on the SDK/direct `startWorkflow` surface BEFORE the
- * record is built. The DEPTH guard runs FIRST — `assertInputsWithinCap` does
- * `JSON.stringify(inputs)`, which a deeply-nested SDK start input would drive into
- * stack-overflow recursion BEFORE any byte cap — so a deep payload is rejected with
- * a typed {@link WorkflowInputBoundsError} rather than a stringify crash; the byte
- * cap then bounds an oversized-but-shallow payload. This matches the bounds the
- * action / MCP / `--input-json` surfaces already enforce (R7).
- */
-function assertStartInputsWithinBounds(inputs: Record<string, unknown>): void {
-  assertInputDepthWithinBounds(inputs); // BEFORE the stringify — a deep SDK input cannot overflow
-  assertInputsWithinCap(inputs);
-}
-
-/**
- * Fail closed (BEFORE building the record) when the caller `inputs` serialize past
- * {@link MAX_WORKFLOW_INPUTS_BYTES}, so an oversized payload can neither build an
- * unreadable record nor reach the filesystem.
- */
-function assertInputsWithinCap(inputs: Record<string, unknown>): void {
-  const bytes = Buffer.byteLength(JSON.stringify(inputs), "utf8");
-  if (bytes > MAX_WORKFLOW_INPUTS_BYTES) throw new WorkflowInputsTooLargeError(bytes);
 }
 
 /**
@@ -288,7 +222,7 @@ function buildPendingRun(args: {
  * The run id is minted NO-CLOBBER: under the held lock it is re-minted until it
  * names an absent run, so a (vanishingly rare) id collision can never overwrite
  * prior run history. Caller `inputs` are depth- AND size-bounded BEFORE the record
- * is built ({@link assertStartInputsWithinBounds}), so a deeply-nested SDK start
+ * is built ({@link snapshotWorkflowInputs}), so a deeply-nested SDK start
  * input is rejected before the stringify rather than overflowing the stack.
  *
  * @param root - Absolute project root.
@@ -313,20 +247,10 @@ export async function startWorkflow(
   lockOptions: BlockingLockOptions = {},
   processOptions: { workspaceId?: string; required?: boolean } = {},
 ): Promise<WorkflowRun> {
-  // CAPTURED IN THE SYNCHRONOUS PROLOGUE, BEFORE THE FIRST AWAIT (D-10-9) — and
-  // the first await here is the BLOCKING LOCK below, not the profile read, so
-  // the window a caller could rewrite its object in was as long as the project
-  // lock stayed contended. Measured before the fix: a run started with
-  // `{count: 1}` recorded `count: 2`, an array element rewritten after the call
-  // reached disk, and an own accessor was invoked SIX times with its value
-  // durably recorded.
-  //
-  // BEFORE THE BOUNDS CHECK TOO, so the caps are enforced against the snapshot
-  // rather than against an object that can still move underneath them.
-  const captured = captureStartInputs(inputs);
+  // Preserve JSON serialization semantics while isolating later caller mutation.
+  const captured = snapshotWorkflowInputs(inputs);
   const requestedWorkspaceId = processOptions.workspaceId;
   const requiresProductProcess = processOptions.required === true;
-  assertStartInputsWithinBounds(captured);
   await acquireMutationLockBlocking(root, "ordinary", lockOptions);
   try {
     // Await inside the try so a rejection is owned before the finally awaits
@@ -350,8 +274,7 @@ export async function startWorkflowLocked(
   mintId: (workflowId: string) => string = mintRunId,
   processOptions: { workspaceId?: string; required?: boolean } = {},
 ): Promise<WorkflowRun> {
-  const captured = captureStartInputs(inputs);
-  assertStartInputsWithinBounds(captured);
+  const captured = snapshotWorkflowInputs(inputs);
   const loaded = await loadProfile(root);
   const def = lookupWorkflowDef(loaded.profile.workflows, workflowId);
   if (def === undefined) throw new UnknownWorkflowError(workflowId);

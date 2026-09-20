@@ -8,10 +8,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import { deepCaptureData, RuntimeCaptureError } from "../../src/utils/runtime-capture.js";
 import { authoritySnapshotDigest, computeSealedAuthority, sealAttemptContext } from "../../src/preparations/attempts/start.js";
 
-const D = `sha256:${"a".repeat(64)}` as const;
+const D = parseSha256Digest(`sha256:${"a".repeat(64)}`);
 
 /** Recursively assert a value is frozen with no accessor properties anywhere. */
 function assertDeeplyFrozen(value: unknown, path = "$"): void {
@@ -101,7 +102,7 @@ describe("sealAttemptContext RC-A invariant", () => {
     const executor = executorLiteral();
     const sealed = seal(executor);
     const before = sealed.authoritySnapshotDigest;
-    executor.providerPinDigest = `sha256:${"9".repeat(64)}`;
+    executor.providerPinDigest = parseSha256Digest(`sha256:${"9".repeat(64)}`);
     expect((sealed.executor as { providerPinDigest: string }).providerPinDigest).toBe(D);
     const recomputed = authoritySnapshotDigest(computeSealedAuthority(manifest(), sealed.executor, { inputExposureSetDigest: D }));
     expect(recomputed).toBe(before);

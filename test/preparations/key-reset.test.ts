@@ -12,6 +12,7 @@
  */
 
 import { gateDecision } from "./lifecycle-fixture.js";
+import type { PreparationRunId } from "../../src/preparations/ids.js";
 import { randomBytes } from "node:crypto";
 import { chmod, lstat, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -171,7 +172,7 @@ describe("reset ignores an attacker-influenceable reset unit", () => {
   const root = useTempRoot();
 
   /** Assert a bare reset refuses with `key-healthy` and destroys no live authority. */
-  const expectRefusedIntact = async (runId: string): Promise<void> => {
+  const expectRefusedIntact = async (runId: PreparationRunId): Promise<void> => {
     await expect(reset(root.dir, MISSING_KEY_CONFIRMATION)).rejects.toMatchObject({ code: "key-healthy" });
     const inventory = await scanPreparationInventory(root.dir);
     expect(inventory.runIds.has(runId)).toBe(true);
@@ -179,7 +180,7 @@ describe("reset ignores an attacker-influenceable reset unit", () => {
   };
 
   /** Crash a missing-key reset at one durable seam, then assert the rerun completes. */
-  const resumesAfterCrash = async (runId: string, faults: ResetFaultsForTest): Promise<void> => {
+  const resumesAfterCrash = async (runId: PreparationRunId, faults: ResetFaultsForTest): Promise<void> => {
     await removePreparationKey(root.dir);
     const continuation = intentContinuation(await reset(root.dir, MISSING_KEY_CONFIRMATION));
     const crash = resetPreparationKeyEpochLocked(root.dir, { actor: LIFECYCLE_ACTOR, at: AT, confirmation: MISSING_KEY_CONFIRMATION, continuation, faults });

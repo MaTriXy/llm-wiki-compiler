@@ -50,7 +50,7 @@ describe("query pageId provenance/debug/CLI/log — PR4 F1+F2", () => {
   it("onPageSelection + activity log carry qualified ids; selectedPages stays bare slugs", async () => {
     const root = await buildProject();
     let seen: string[] = [];
-    const result = await generateAnswer(root, "scaling?", { save: true, onPageSelection: (pages) => { seen = pages; } });
+    const result = await generateAnswer(root, "scaling?", { onPageSelection: (pages) => { seen = pages; } });
     expect(new Set(seen)).toEqual(new Set(["papers/foo", "concepts/foo"]));
     const log = await readFile(path.join(root, "log.md"), "utf-8");
     expect(log).toContain("[[papers/foo]]");

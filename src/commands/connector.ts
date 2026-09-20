@@ -72,7 +72,7 @@ export async function connectorRunCommand(
   const rawResult = await (deps.runner ?? runConnector)(root, id, parseInputs(options.input));
   let result;
   try {
-    result = captureConnectorResult(rawResult);
+    result = captureConnectorResult(rawResult, "public");
   } catch {
     output.status("!", output.error("connector returned invalid candidate identities"));
     process.exitCode = 1;
@@ -84,9 +84,9 @@ export async function connectorRunCommand(
     return;
   }
   if (result.kind === "recovery-required") {
-    output.status("!", output.error(`recovery-required: ${renderCandidateIds(result.candidateIds)}`));
+    output.status("!", output.error(`recovery-required: ${renderCandidateIds(result.candidateIds, "public")}`));
     process.exitCode = 1;
     return;
   }
-  output.status("+", output.success(`${result.kind}: ${renderCandidateIds(result.candidateIds)}`));
+  output.status("+", output.success(`${result.kind}: ${renderCandidateIds(result.candidateIds, "public")}`));
 }

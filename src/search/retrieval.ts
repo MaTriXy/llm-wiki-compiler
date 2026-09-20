@@ -22,7 +22,6 @@ import {
   type EmbeddingWarning,
 } from "../utils/embeddings-load.js";
 import type { EmbeddingStoreV3 } from "../utils/embeddings-store.js";
-import * as output from "../utils/output.js";
 import {
   loadSelectedPagesByPageId,
   loadPageRecordPairsByPageId,
@@ -63,6 +62,11 @@ export interface SearchSelection {
   warnings: SearchWarning[];
 }
 
+/** Opt-in recovery from embedder failures; omitted preserves public error semantics. */
+export interface RetrievalOptions {
+  embeddingFailure?: "throw" | "fallback";
+}
+
 /** Deduplicate refs by pageId, preserving first-seen ordering. */
 function dedupeRefs(refs: SelectedPageRef[]): SelectedPageRef[] {
   const seen = new Set<PageId>();
@@ -84,7 +88,7 @@ function dedupeRefs(refs: SelectedPageRef[]): SelectedPageRef[] {
  * @param question - The query used to rank pages.
  * @returns Ordered refs (pageId-keyed) plus structured warnings.
  */
-export async function pickSearchRefs(root: string, question: string): Promise<SearchSelection> {
+export async function pickSearchRefs(root: string, question: string, options: RetrievalOptions = {}): Promise<SearchSelection> {
   const profile = await loadProfile(root);
   const outcome = await loadEmbeddingsForSearch(root);
   // A pending/unavailable compile journal applies to the whole result regardless
@@ -94,7 +98,7 @@ export async function pickSearchRefs(root: string, question: string): Promise<Se
   const base: SearchWarning[] = journalWarning ? [journalWarning, ...outcome.warnings] : outcome.warnings;
   let warnings = base;
   if (outcome.store) {
-    const semantic = await selectViaEmbeddings(root, outcome.store, question, profile);
+    const semantic = await selectViaEmbeddings(root, outcome.store, question, profile, options);
     // Stale entries are a read-path signal regardless of hit count, so enrich the
     // warnings BEFORE branching — the all-stale/zero-hits fallback must keep it;
     // an embedding-degrade warning rides the same channel.
@@ -132,20 +136,16 @@ export function withStaleWarning(base: SearchWarning[], stalePageIds: PageId[]):
 }
 
 /**
- * Run the chunk-then-page v3 pipeline against a loaded v3 store. NEVER throws
- * — the same degrade-and-continue contract the query pipeline has: an
- * embedding failure (e.g. a keyless embedder while a v3 store is present)
- * degrades to zero refs with an `embedding-degraded` warning, so the caller
- * falls through to the LLM/index fallback — which needs no embedder — instead
- * of aborting the whole search. One catch spans both legs because both share
- * the same embedder: after the chunk leg's embed threw, the page leg's cannot
- * succeed.
+ * Run chunk-then-page retrieval, preserving public failure semantics by default.
+ * Explicit fallback returns a structured warning, never a stdout diagnostic:
+ * this library also serves the MCP stdio transport.
  */
 async function selectViaEmbeddings(
   root: string,
   store: EmbeddingStoreV3,
   question: string,
   profile: LoadedProfile,
+  options: RetrievalOptions,
 ): Promise<SemanticSelection> {
   try {
     const { hits: chunkHits, stalePageIds: chunkStale } =
@@ -159,8 +159,8 @@ async function selectViaEmbeddings(
     const refs = pageHits.map((p) => ({ pageId: p.pageId, slug: p.slug, title: p.title, kind: "page" as const }));
     return { refs, stalePageIds: pageStale };
   } catch (err) {
+    if (options.embeddingFailure !== "fallback") throw err;
     const message = err instanceof Error ? err.message : String(err);
-    output.status("!", output.dim(`Semantic retrieval unavailable (${message}); falling back.`));
     return {
       refs: [],
       stalePageIds: [],

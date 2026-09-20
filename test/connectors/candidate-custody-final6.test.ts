@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import { archivePath, candidatePath } from "../../src/compiler/candidate-paths.js";
 import {
   MAX_CANDIDATE_RECORD_BYTES,
+  CandidateCustodyUnavailableError,
   moveCandidateWithCustody,
   type CandidateCustodyMoveRequest,
   type CandidateCustodyReceipt,
@@ -56,7 +57,7 @@ async function archiveFixture() {
 }
 
 /** Narrow a successful archive result to its internal receipts. */
-function archivedReceipts(result: Awaited<ReturnType<typeof archiveFixture>>): CandidateCustodyReceipt[] {
+function archivedReceipts(result: Awaited<ReturnType<typeof archiveFixture>>): readonly CandidateCustodyReceipt[] {
   if (result.kind !== "archived") throw new Error(`expected archived, got ${result.kind}`);
   return result.receipts;
 }
@@ -141,9 +142,7 @@ describe("Final6 connector candidate custody", () => {
     const padding = " ".repeat(MAX_CANDIDATE_RECORD_BYTES + 1 - Buffer.byteLength(record));
     await writeFile(path.join(dir, `${FILE_ID}.json`), record + padding);
 
-    await expect(selectFixture()).rejects.toMatchObject({
-      name: "CandidateCustodyUnavailableError",
-    });
+    await expect(selectFixture()).rejects.toBeInstanceOf(CandidateCustodyUnavailableError);
   });
 
   it("keeps a post-archive path failure inside recovery precedence", async () => {

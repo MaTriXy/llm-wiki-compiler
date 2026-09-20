@@ -16,6 +16,7 @@ import {
   type ProjectionTarget,
 } from "../../src/operation-bundles/projection-store.js";
 import { canonicalBytes } from "../../src/profile/templates/signing/canonical.js";
+import { AtomicWritePostCommitError } from "../../src/utils/atomic-write.js";
 import { useTempRoot } from "../fixtures/temp-root.js";
 
 const root = useTempRoot();
@@ -84,9 +85,12 @@ describe("projection store", () => {
       if (outputSyncAttempts === 1) throw failure;
     };
 
-    await expect(writeProjectionLocked(root.dir, location, bytes, {
+    const rejected = await writeProjectionLocked(root.dir, location, bytes, {
       beforeOutputDirectorySyncForTest: observeOutputSync,
-    })).rejects.toBe(failure);
+    }).catch(error => error);
+    expect(rejected).toBeInstanceOf(AtomicWritePostCommitError);
+    expect(rejected.cause).toBe(failure);
+    expect(await readFile(projectionOutputPath(root.dir, location))).toEqual(bytes);
     await expect(writeProjectionLocked(root.dir, location, bytes, {
       beforeOutputDirectorySyncForTest: observeOutputSync,
     })).resolves.toBe("same");

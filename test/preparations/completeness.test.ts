@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 import {
   COMPLETENESS_CATEGORIES, COMPLETION_CLASS_IDENTITY_KEYS, CompletenessAuthorityError,
   PROVIDER_COUNT_MISMATCH_CODE, assertCompletenessPermitsSuccess, assertIdentitySetEquations,
@@ -18,8 +19,8 @@ import type { EvidenceRefV1 } from "../../src/preparations/types.js";
 
 const identitySetRef: EvidenceRefV1 = {
   kind: "completeness-identity-set", mediaType: "application/json", provenanceLabel: "host-derived",
-  digest: `sha256:${"a".repeat(64)}`, byteCount: 128, sensitivity: "ordinary", retention: "audit",
-  producer: { kind: "host", contractDigest: `sha256:${"b".repeat(64)}` }, untrusted: true,
+  digest: parseSha256Digest(`sha256:${"a".repeat(64)}`), byteCount: 128, sensitivity: "ordinary", retention: "audit",
+  producer: { kind: "host", contractDigest: parseSha256Digest(`sha256:${"b".repeat(64)}`) }, untrusted: true,
 };
 
 type SetOverrides = Partial<Record<string, unknown>>;

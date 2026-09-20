@@ -31,7 +31,7 @@ import type { PreparationPrincipal } from "../../src/preparations/principals.js"
 import { useTempRoot } from "../fixtures/temp-root.js";
 import { externalEffectPlan, stageRequest } from "./store-fixture.js";
 
-const DIGEST = `sha256:${"a".repeat(64)}` as const;
+const DIGEST = parseSha256Digest(`sha256:${"a".repeat(64)}`);
 const AT = "2026-07-20T00:00:00.000Z";
 const cli: PreparationPrincipal = { id: "operator", surface: "cli", grants: [] };
 const GATE_ID = "send";

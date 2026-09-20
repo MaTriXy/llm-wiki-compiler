@@ -73,12 +73,11 @@ async function readMarkdownFiles(
  *   family, which knows each entity kind's required fields — the generic rules
  *   firing there too would double-report every finding.
  * - `"wiki-wide"` — every markdown page under `wiki/`, whatever directories the
- *   active profile declares. The WIKILINK family and the §4.6 fix plan take
- *   this one: a link is a link in any entity kind, and the old generic-only
- *   walk meant a profile project's broken links were never checked at all —
- *   the fix preview reported a clean wiki over pages it had never read.
+ *   active profile declares. The explicit tiered CLI and §4.6 fix plan take
+ *   this scope for wikilinks. Existing flat lint and direct rule calls retain
+ *   generic coverage, including on old profile projects.
  *
- * The fix plan and the broken-wikilink rule must take the SAME scope: their
+ * A fix plan and the broken-wikilink check it accompanies take the SAME scope: their
  * agreement ("no fix where the linter saw no problem") is a tested invariant,
  * and two scopes would break it silently on exactly the pages one saw and the
  * other did not.

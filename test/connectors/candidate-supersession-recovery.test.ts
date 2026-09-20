@@ -89,7 +89,7 @@ async function moveDestination(request: CandidateCustodyMoveRequest): Promise<st
 }
 
 /** Extract internal receipts from one successful archive result. */
-function receiptsFrom(result: Awaited<ReturnType<typeof archiveCandidatesWithUndo>>): CandidateCustodyReceipt[] {
+function receiptsFrom(result: Awaited<ReturnType<typeof archiveCandidatesWithUndo>>): readonly CandidateCustodyReceipt[] {
   if (result.kind !== "archived") throw new Error(`expected archived, got ${result.kind}`);
   return result.receipts;
 }

@@ -19,7 +19,7 @@ import {
 import type { NormalizedPreparationPlanV1, PhaseGateContractV1 } from "../../src/preparations/plan-types.js";
 import type { GateProofSummaryV1 } from "../../src/preparations/run-types.js";
 
-const DIGEST = `sha256:${"a".repeat(64)}` as const;
+const DIGEST = parseSha256Digest(`sha256:${"a".repeat(64)}`);
 const RUN_ID = `prr_${"1".repeat(32)}` as const;
 const EFFECT_GATE: PhaseGateContractV1 = { gateId: "send", gateKind: "confirm-external-effect" };
 const RESIDUAL_GATE: PhaseGateContractV1 = { gateId: "risk", gateKind: "confirm-residual-risk" };
