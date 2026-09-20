@@ -9,7 +9,7 @@ import type {
   LiveStageProjectionProvider, LiveStageProjectionResult, RunProjectionAnchor,
   LiveProjectionOutcome, StageProjection, StageVerificationFailureV1, VerifiedStageFactsV1,
 } from "./workflow-run-projection.js";
-import type { WorkflowRun } from "../workflows/types.js";
+import type { WorkflowRun } from "../workflow-history/types.js";
 import { normalizeVerifiedFacts, type NormalizedFacts } from "./workflow-run-provider-facts.js";
 
 const MAX_STAGE_STRING_LEN = 4_000;

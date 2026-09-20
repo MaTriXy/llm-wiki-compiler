@@ -10,8 +10,8 @@
  * `sha256:`-prefixed reference digest is stripped before comparison.
  */
 
-import { readRun } from "../workflows/store.js";
-import type { WorkflowRunStatus } from "../workflows/types.js";
+import { readRun } from "../workflow-history/store.js";
+import type { WorkflowRunStatus } from "../workflow-history/types.js";
 import type { WorkflowParentRefV1 } from "./types.js";
 
 const SHA256_PREFIX = "sha256:";

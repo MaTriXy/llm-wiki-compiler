@@ -14,7 +14,7 @@
  * Declared submit-type hints also travel with parked-stage status.
  */
 
-import type { RunStatus } from "../workflows/status.js";
+import type { RunStatus } from "../workflow-history/status.js";
 
 /** A single stable JSON row in the `/api/workflow-runs` envelope. */
 export interface WorkflowRunRow {

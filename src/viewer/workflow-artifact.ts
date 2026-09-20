@@ -15,7 +15,7 @@
  */
 
 import type { ServerResponse } from "http";
-import { readRun } from "../workflows/store.js";
+import { readRun } from "../workflow-history/store.js";
 import { loadProfile } from "../profile/load.js";
 import { readVerifiedArtifactBody } from "../artifacts/read-verified.js";
 import { parseArtifactRef, formatArtifactRef, type ArtifactRef } from "../artifacts/ref.js";

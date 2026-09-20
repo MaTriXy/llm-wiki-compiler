@@ -26,15 +26,15 @@
  */
 
 import type { ServerResponse } from "http";
-import { readRun } from "../workflows/store.js";
-import { classifyRun, type RunClassification } from "../workflows/status.js";
-import { lookupWorkflowDef } from "../workflows/start.js";
+import { readRun } from "../workflow-history/store.js";
+import { classifyRun, type RunClassification } from "../workflow-history/status.js";
+import { lookupWorkflowDef } from "../workflow-history/definition.js";
 import { workflowDefDigest } from "../profile/workflow-digest.js";
-import { parseGate } from "../workflows/gates.js";
-import type { GateKind } from "../workflows/gates.js";
+import { parseGate } from "../workflow-history/gates.js";
+import type { GateKind } from "../workflow-history/gates.js";
 import { loadProfile } from "../profile/load.js";
 import { applyLiveStageProvider } from "./workflow-run-facts.js";
-import type { WorkflowRun, WorkflowActorKind, WorkflowEvent } from "../workflows/types.js";
+import type { WorkflowRun, WorkflowActorKind, WorkflowEvent } from "../workflow-history/types.js";
 import type { WorkflowDef } from "../profile/types.js";
 import type { VerifiedExperimentStateV1 } from "./compat/experiment-state.js";
 export type { VerifiedExperimentStateV1 } from "./compat/experiment-state.js";

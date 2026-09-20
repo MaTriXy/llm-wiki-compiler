@@ -14,7 +14,7 @@
  * member leaves, and any obsolete leaf.
  */
 import { loadNonDefaultProfile } from "../profile/block.js";
-import { isTrustedWriteGranted } from "../workflows/trusted-write.js";
+import { isTrustedWriteGranted } from "../trust/trusted-write.js";
 import { openBatch, recordPreState, commitBatch } from "../trust/journal.js";
 import { preflightEventAppend } from "../events/store.js";
 import type { OperationBinding } from "../utils/operation-binding.js";

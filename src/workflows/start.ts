@@ -21,6 +21,8 @@ import { acquireMutationLockBlocking } from "../operation-bundles/lock-gate.js";
 import { workflowDefDigest } from "../profile/workflow-digest.js";
 import { mintRunId, writeRun, runExists, readRun, listRuns, WorkflowRunIdCollisionError } from "./store.js";
 import { isTerminalStatus } from "./with-lock.js";
+import { lookupWorkflowDef } from "../workflow-history/definition.js";
+export { lookupWorkflowDef } from "../workflow-history/definition.js";
 import { currentActorIdentity } from "./actor-identity.js";
 import { snapshotWorkflowInputs } from "./input-snapshot.js";
 export { WorkflowInputsTooLargeError } from "./input-snapshot.js";
@@ -143,26 +145,6 @@ async function mintFreshRunId(
     if (!(await runExists(root, candidate))) return candidate;
   }
   throw new WorkflowRunIdCollisionError(MAX_MINT_ATTEMPTS);
-}
-
-/**
- * Look up a workflow def by id using an OWN-property check, never the prototype
- * chain. A plain `workflows?.[id]` resolves inherited `Object.prototype` members
- * (`constructor`, `valueOf`, …), so an attacker-chosen id like `"constructor"`
- * would yield the `Function` constructor instead of `undefined` and crash a
- * downstream `.map`/digest with a raw `TypeError`. {@link Object.hasOwn} confines
- * the lookup to declared workflow ids, so an undeclared id is cleanly `undefined`.
- *
- * @param workflows - The profile's optional `workflows` block.
- * @param workflowId - The candidate workflow id (possibly attacker-controlled).
- * @returns The declared def, or `undefined` when not an OWN key.
- */
-export function lookupWorkflowDef(
-  workflows: Record<string, WorkflowDef> | undefined,
-  workflowId: string,
-): WorkflowDef | undefined {
-  const declared = workflows ?? {};
-  return Object.hasOwn(declared, workflowId) ? declared[workflowId] : undefined;
 }
 
 /**

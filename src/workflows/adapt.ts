@@ -34,6 +34,8 @@ import { lookupWorkflowDef, UnknownWorkflowError } from "./start.js";
 import { readRun, listRuns, resolveRunId, writeRun } from "./store.js";
 import { appendRunEvent } from "./events.js";
 import { withRunLock, isTerminalStatus } from "./with-lock.js";
+import { mapStageId } from "../workflow-history/definition.js";
+export { mapStageId } from "../workflow-history/definition.js";
 import { maybeAutoProject } from "./projection.js";
 import { AdaptationRequiresConfirmError, AlreadyCurrentError, RunNotActiveError } from "./errors.js";
 import type { PendingStageOutput, WorkflowRun, WorkflowEvent } from "./types.js";
@@ -53,21 +55,6 @@ export class AdaptationKeyCollisionError extends Error {
     super(`adaptation maps two distinct outputs keys to the same stage id ${JSON.stringify(newId)}`);
     this.name = "AdaptationKeyCollisionError";
   }
-}
-
-/**
- * Map an old stage id to its current id: identity when the id is still a stage,
- * else the id of the stage that declares it under `previousIds`, else `null`
- * (unmappable — the stage was removed, not renamed). Pure and total.
- *
- * @param oldId - The stage id referenced by an in-flight run.
- * @param def - The CURRENT workflow definition to map against.
- * @returns The current stage id `oldId` maps to, or `null` when unmappable.
- */
-export function mapStageId(oldId: string, def: WorkflowDef): string | null {
-  if (def.stages.some((stage) => stage.id === oldId)) return oldId;
-  const renamed = def.stages.find((stage) => stage.previousIds?.includes(oldId));
-  return renamed?.id ?? null;
 }
 
 /** A read-only adaptation preview for ONE run against the current workflow def. */

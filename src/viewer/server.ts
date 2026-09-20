@@ -28,7 +28,7 @@ import { handleApiSource } from "./api-sources.js";
 import { loadShellTemplate } from "./shell.js";
 import { ASSETS_DIR, handleAsset } from "./static-assets.js";
 import { searchPages } from "./search.js";
-import { workflowStatus } from "../workflows/status.js";
+import { workflowStatus } from "../workflow-history/status.js";
 import { buildWorkflowRunsEnvelope } from "./workflow-runs.js";
 import { listCandidatePage } from "../compiler/candidates.js";
 import { buildReviewsEnvelope, REVIEW_LIST_LIMIT } from "./reviews.js";

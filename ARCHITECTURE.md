@@ -52,6 +52,21 @@ separation does not silently remove them, route them through llmflow, or declare
 all workflow-related compiler code obsolete. New llmflow product coordination
 belongs in llmflow; reusable record and authority mechanisms belong here.
 
+### Passive history versus local execution
+
+`src/workflow-history` owns the persisted local-run schema, validation, HMAC
+verification, definition lookup, and read-only status projection. It does not
+depend on `src/workflows`. Template audits, export checks, parent-reference
+verification, linting, and viewer history read this passive layer directly.
+The shared trusted-write predicate lives in `src/trust/trusted-write.ts`.
+
+Run mutations and secret-key creation remain in `src/workflows`. Existing
+module paths forward to the shared implementations, preserving function and
+error-class identity, stored bytes, public SDK names, and CLI behavior. This is
+the first extraction step, not yet an independently installable package: the
+host-service interface and package manifests still need to be separated before
+the local engine becomes optional for a core-only consumer.
+
 ## Viewer extension boundary
 
 The generic viewer consumes a bounded, verified projection. New providers use

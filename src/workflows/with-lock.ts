@@ -139,10 +139,4 @@ export async function commitTerminalEvent(
   return writeTerminalRun(root, committed);
 }
 
-/** The run statuses that are terminal (no further lifecycle action). */
-const TERMINAL_STATUSES = ["completed", "cancelled", "failed", "refused"] as const;
-
-/** True when `status` is a terminal run status. */
-export function isTerminalStatus(status: WorkflowRun["status"]): boolean {
-  return (TERMINAL_STATUSES as readonly string[]).includes(status);
-}
+export { isTerminalStatus } from "../workflow-history/definition.js";
