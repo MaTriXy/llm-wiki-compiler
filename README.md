@@ -10,10 +10,12 @@ See [Compiler, integrations, and products](ARCHITECTURE.md) for the ownership
 boundaries between base llmwiki, configurable domain capabilities, external
 orchestration, and product implementations.
 
-For application integration, see [SDK package selection](docs/guides/sdk-packages.mdx)
-and [SDK upgrade notes](docs/guides/sdk-upgrade.mdx). The standard package keeps
+For application integration, see [SDK package selection](https://llmwiki.atomicstrata.ai/guides/sdk-packages)
+and [SDK upgrade notes](https://llmwiki.atomicstrata.ai/guides/sdk-upgrade). The standard package keeps
 `createWiki` and its local workflows; `llmwiki-core` offers an engine-free option.
 Experimental SDK type and workflow changes can require consumer updates.
+Before these candidate guides are deployed, read their sources under
+`docs/guides/sdk-packages.mdx` and `docs/guides/sdk-upgrade.mdx` in this checkout.
 
 ### Development runtime authority
 

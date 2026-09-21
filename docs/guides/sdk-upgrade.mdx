@@ -41,6 +41,11 @@ remain available:
   sparse arrays/function fields follow JSON normalization. JSON hooks remain
   supported. Typed action inputs still validate their declared schema; this is
   not permission to coerce invalid action fields.
+- The `Wiki` interface has additional required members. Hand-written full
+  implementations or test doubles may need to implement them. For a consumer
+  that needs only a few methods, type its dependency and its test double as
+  `Pick<Wiki, "status" | "getPage">` (using the methods it actually consumes),
+  rather than casting an incomplete object to the full interface.
 
 Do not describe this candidate as fully source-compatible with every experimental
 consumer. Stable public contract changes require a separate compatibility decision.
@@ -58,7 +63,8 @@ reconcile uncertain outcomes before retrying. Retained artifacts are verified
 against current bytes, not merely their recorded digests.
 
 Composition with a duplicate core module instance is rejected before I/O, including
-through the standard compatibility facade. If startup fails after changing
+at standard package import or CLI load, not only when starting a workflow.
+If startup fails after changing
 dependencies, check that the standard package and local engine resolve the same
 exact core installation; do not suppress the identity check.
 
