@@ -10,6 +10,11 @@ See [Compiler, integrations, and products](ARCHITECTURE.md) for the ownership
 boundaries between base llmwiki, configurable domain capabilities, external
 orchestration, and product implementations.
 
+For application integration, see [SDK package selection](docs/guides/sdk-packages.mdx)
+and [SDK upgrade notes](docs/guides/sdk-upgrade.mdx). The standard package keeps
+`createWiki` and its local workflows; `llmwiki-core` offers an engine-free option.
+Experimental SDK type and workflow changes can require consumer updates.
+
 ### Development runtime authority
 
 SDK clients can prepare, observe and retire record effects with explicit grants.

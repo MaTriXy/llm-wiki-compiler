@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Split-package development distribution: `llmwiki-core` is engine-free;
+  `llmwiki-local-workflows` takes an explicit core host; the standard
+  `llm-wiki-compiler` package composes both at matching versions and retains
+  existing CLI/SDK entry points. Duplicate-core composition now fails before
+  I/O, including standard facade initialization. See the
+  [SDK upgrade notes](docs/guides/sdk-upgrade.mdx) for experimental source changes.
+  Registry publication requires dependency-first release of all three packages.
+
 - Local `1.4.0-dev.20260919` integration candidate: generic domain SDK record
   preparation/observation/retirement, operation-bundle authority and recovery,
   preparation lifecycle, configurable operation packs and capability providers.

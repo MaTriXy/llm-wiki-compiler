@@ -38,6 +38,9 @@ jobs:
       - run: npm run release:check-docs
       - run: npm run build
       - run: npm test
+      # Default tests exclude this fresh-install check. Exercise the shipped
+      # facade, its exact workspace dependencies, and consumer declarations.
+      - run: npm run test:pack
 
   codebase-health:
     runs-on: ubuntu-latest
