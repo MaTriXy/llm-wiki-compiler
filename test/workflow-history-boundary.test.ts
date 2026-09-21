@@ -4,10 +4,10 @@
  * execution engine, with stable compatibility exports and non-creating reads.
  */
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import ts from "typescript";
+import { literalModuleImports } from "./fixtures/module-imports.js";
 import { SRC_DIR, srcTsFiles } from "./fixtures/src-tree.js";
 import { useConfinementRoots } from "./fixtures/confinement-roots.js";
 import * as history from "../src/workflow-history/store.js";
@@ -31,6 +31,17 @@ import { installWorkflowProfile } from "./fixtures/workflow-profile.js";
 
 const ctx = useConfinementRoots("workflow-history");
 
+const PACKAGE_ENTRIES: Record<string, string> = {
+  "llmwiki-core/compiler-cli": "compiler-cli.ts",
+  "llmwiki-core": "core-index.ts",
+  "llmwiki-core/compiler-sdk": "sdk/compiler-composition.ts",
+  "llmwiki-core/compiler-legacy-workflows": "local-workflow-host/legacy-composition.ts",
+  "llmwiki-core/local-workflow-host": "local-workflow-host/index.ts",
+  "llmwiki-core/local-workflow-contracts": "local-workflow-host/shared-contracts.ts",
+  "llmwiki-local-workflows": "local-workflows/index.ts",
+  "llm-wiki-compiler": "index.ts",
+};
+
 /** The core consumers whose passive imports must not reintroduce execution. */
 const PASSIVE_CONSUMERS = [
   "artifacts/apply.ts", "preparations/workflow-parent.ts", "profile/templates/corpus.ts",
@@ -50,20 +61,11 @@ async function snapshot(root: string): Promise<Array<[string, string | null]>> {
 
 /** Collect static and literal dynamic module edges using the TypeScript parser. */
 function dependencies(file: string): string[] {
-  const parsed = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
-  const found: string[] = [];
-  const visit = (node: ts.Node): void => {
-    let specifier: ts.Node | undefined;
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) specifier = node.moduleSpecifier;
-    if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword
-      || node.expression.getText(parsed) === "require")) specifier = node.arguments[0];
-    if (specifier && ts.isStringLiteralLike(specifier) && specifier.text.startsWith(".")) {
-      found.push(path.resolve(path.dirname(file), specifier.text.replace(/\.js$/, ".ts")));
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(parsed);
-  return found;
+  return literalModuleImports(file).flatMap(specifier => {
+    if (specifier.startsWith(".")) return [path.resolve(path.dirname(file), specifier.replace(/\.js$/, ".ts"))];
+    const entry = PACKAGE_ENTRIES[specifier];
+    return entry ? [path.join(SRC_DIR, entry)] : [];
+  });
 }
 
 /** Follow local imports transitively, including type-only edges. */
@@ -76,7 +78,8 @@ function engineEdges(entries: string[]): string[] {
     if (seen.has(file) || !existsSync(file)) continue;
     seen.add(file);
     for (const dependency of dependencies(file)) {
-      if (dependency.startsWith(path.join(SRC_DIR, "workflows") + path.sep)) {
+      if (["workflows", "local-workflows"].some(dir => dependency.startsWith(path.join(SRC_DIR, dir) + path.sep))
+        || ["index.ts", "sdk/wiki.ts", "sdk/workflow-facade.ts"].some(file => dependency === path.join(SRC_DIR, file))) {
         offending.push(`${path.relative(SRC_DIR, file)} -> ${path.relative(SRC_DIR, dependency)}`);
       } else pending.push(dependency);
     }
@@ -89,6 +92,13 @@ describe("core-owned passive workflow history", () => {
     const entries = srcTsFiles().filter(file => file.startsWith("workflow-history/"))
       .map(file => path.join(SRC_DIR, file));
     entries.push(path.join(SRC_DIR, "trust/trusted-write.ts"));
+    entries.push(path.join(SRC_DIR, "sdk/core.ts"));
+    entries.push(path.join(SRC_DIR, "core-index.ts"));
+    entries.push(path.join(SRC_DIR, "compiler-cli.ts"));
+    entries.push(path.join(SRC_DIR, "sdk/compiler-composition.ts"));
+    entries.push(path.join(SRC_DIR, "local-workflow-host/legacy-composition.ts"));
+    entries.push(path.join(SRC_DIR, "local-workflow-host/index.ts"));
+    entries.push(path.join(SRC_DIR, "local-workflow-host/shared-contracts.ts"));
     entries.push(...PASSIVE_CONSUMERS.map(file => path.join(SRC_DIR, file)));
     expect(engineEdges(entries)).toEqual([]);
   });

@@ -11,15 +11,16 @@ base product, not a hidden installation of AutoSci, Newsroom, or llmflow.
 | --- | --- | --- |
 | Base compiler | Ingest sources, compile and query knowledge, link pages, search, lint, export, and view | Commands and their shared services under `src/` |
 | Configurable domain capabilities | Profiles and typed records, relations, retained artifacts, provenance, reviewed mutations, receipts and authority checks | `src/profile`, `artifacts`, `relations`, `trust`, `operation-bundles`, and supporting services |
-| Compiler-local execution | Execute declared actions and durable preparations; preserve existing experimental workflow commands and SDK methods | `src/products`, `preparations`, `workflows`, and their SDK facades |
+| Generic effect services | Execute declared product actions and durable preparations under compiler authority | `src/products`, `preparations`, and their SDK facades |
+| Optional local workflow engine | Preserve existing experimental workflow commands and SDK methods | `src/local-workflows`, composed by `src/workflows` and the standard SDK |
 | External orchestration | Coordinate a product's overall process, human decisions, revisions, repeated occurrences, and operator workbench | llmflow, outside this repository |
 | Product implementation | Domain policy, providers, editorial/scientific decisions, product-specific UI and export assembly | Product packages or modules outside compiler core |
 
 The word `product` in a compiler service denotes a generic declarative package
 and action contract. It does not mean that the service implements Newsroom or
-AutoSci. Likewise, accepting a workflow parent reference associates a compiler
-effect with an external run; it does not delegate compiler mutation authority
-to the workflow engine.
+AutoSci. The existing workflow-parent reference verifies a compiler-local run;
+it is not an llmflow or Temporal run reference and does not delegate mutation
+authority to an external engine.
 
 ## Integration direction and authority
 
@@ -60,12 +61,47 @@ depend on `src/workflows`. Template audits, export checks, parent-reference
 verification, linting, and viewer history read this passive layer directly.
 The shared trusted-write predicate lives in `src/trust/trusted-write.ts`.
 
-Run mutations and secret-key creation remain in `src/workflows`. Existing
-module paths forward to the shared implementations, preserving function and
-error-class identity, stored bytes, public SDK names, and CLI behavior. This is
-the first extraction step, not yet an independently installable package: the
-host-service interface and package manifests still need to be separated before
-the local engine becomes optional for a core-only consumer.
+`src/local-workflows` owns local execution and requests effects through an
+explicit core host. `src/local-workflow-host` owns confined persistence, signing,
+locking and compiler mutation authority. Existing `src/workflows` paths compose
+the host or forward to these implementations; they do not duplicate the engine.
+
+### Package composition
+
+- `llmwiki-core` provides `createWikiCore`, knowledge/domain services, passive
+  history, and explicit host contracts. It has no local-engine dependency or
+  workflow-execution SDK methods.
+- `llmwiki-local-workflows` provides the engine and requires a matching core peer.
+  It requires a host at construction; it cannot manufacture default authority.
+- `llm-wiki-compiler` remains the standard CLI and `createWiki` SDK. Both packages
+  are required exact-version dependencies, preserving existing workflow features.
+  Core-only installation is an explicit alternative, not a changed default.
+
+Core entry points share built chunks, including lock/error identities and a
+module-instance token. Composition rejects a host from a duplicate core instance.
+The standard package's `compiler-sdk` and `compiler-cli` support entries preserve
+its composition without bundling another private copy of core. The separately
+named `compiler-legacy-workflows` entry preserves the caller-held-lock start
+contract; it does not independently verify that the caller holds the lock.
+
+The build orders core, engine, and standard facade. `npm run dev` explicitly
+watches shared sources and rebuilds the dependencies before CLI success. Installed
+CLI/SDK and core-only smoke checks are separate from source-boundary checks;
+full product parity and public-release approval remain integration requirements.
+
+### Package analysis conventions
+
+Core's source still lives under the root `src/` tree. Fallow attributes those
+imports to the root workspace, so its core-manifest dependency findings are not
+meaningful. Only `packages/llmwiki-core/package.json` is excluded from Fallow;
+`test/local-workflow-package-boundary.test.ts` instead compares its dependency
+declarations exactly against imports in built JavaScript and declarations.
+Root dependency analysis and all core source analysis remain enabled.
+
+Package entries and retained `src/workflows` compatibility paths are explicit
+analysis entry points. Named duplicate-export exceptions identify forwarding
+aliases, not duplicate implementations. Do not remove compatibility exports to
+make the dead-code report green.
 
 ## Viewer extension boundary
 

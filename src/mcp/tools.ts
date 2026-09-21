@@ -10,23 +10,20 @@
 
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ingestSource } from "../commands/ingest.js";
-import { compileAndReport } from "../compiler/index.js";
-import { generateAnswer } from "../commands/query.js";
-import { lint } from "../linter/index.js";
-import { collectStatus } from "../status/collect.js";
-import { buildContextPack } from "../context/build.js";
-import {
-  ensureCompileProviderAvailable,
-  ensureProviderAvailable,
-} from "../utils/provider-guard.js";
-import { runEval, DEFAULT_SAMPLE_SIZE } from "../eval/index.js";
-import { readPageRecord } from "../pages/read.js";
-import { pickSearchRefs, loadSelectedRefs } from "../search/retrieval.js";
-import { loadNonDefaultProfile } from "../profile/block.js";
-import { isSlugSafe } from "../profile/identity.js";
-import { resolveArtifactRef, declaresArtifactTypes } from "../artifacts/resolve.js";
-import type { ArtifactRef } from "../artifacts/ref.js";
+import { ingestSource } from "llmwiki-core/compiler-cli";
+import { compileAndReport } from "llmwiki-core/compiler-cli";
+import { generateAnswer } from "llmwiki-core/compiler-cli";
+import { lint } from "llmwiki-core/compiler-cli";
+import { collectStatus } from "llmwiki-core/compiler-cli";
+import { buildContextPack } from "llmwiki-core/compiler-cli";
+import { ensureCompileProviderAvailable, ensureProviderAvailable } from "llmwiki-core/compiler-cli";
+import { runEval, DEFAULT_SAMPLE_SIZE } from "llmwiki-core/compiler-cli";
+import { readPageRecord } from "llmwiki-core/compiler-cli";
+import { pickSearchRefs, loadSelectedRefs } from "llmwiki-core/compiler-cli";
+import { loadNonDefaultProfile } from "llmwiki-core/compiler-cli";
+import { isSlugSafe } from "llmwiki-core/compiler-cli";
+import { resolveArtifactRef, declaresArtifactTypes } from "llmwiki-core/compiler-cli";
+import type { ArtifactRef } from "llmwiki-core/compiler-cli";
 import { jsonResult, errorResult } from "./result.js";
 
 /** Register all 10 wiki tools on the given MCP server instance. */

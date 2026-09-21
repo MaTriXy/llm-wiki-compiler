@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { canonicalDigest } from "../src/profile/templates/signing/canonical.js";
 import { previewLifecycleLocked } from "../src/trust/lifecycle-apply.js";
 import { prepareLifecycleIntent } from "../src/workflows/lifecycle-output-recovery.js";
+import { createLocalWorkflowHost } from "../src/local-workflow-host/index.js";
 import { submitStageOutput, type LifecycleStageOutput } from "../src/workflows/stage-output.js";
 import { writeRun } from "../src/workflows/store.js";
 import { kindsProfile, startKindsRun, pageLifecycle } from "./fixtures/seam-fixtures.js";
@@ -27,7 +28,9 @@ function output(junk: unknown): LifecycleStageOutput {
 /** Represent a crash after page publication but before the output receipt. */
 async function landedIntent(root: string, runId: string, legacy = false): Promise<void> {
   const request = output("first");
-  const intent = await prepareLifecycleIntent(root, request);
+  const host = createLocalWorkflowHost();
+  const intent = await host.withMutation(root, transaction =>
+    prepareLifecycleIntent(root, request, { host, transaction }));
   const preview = await previewLifecycleLocked(root, request);
   const run = await readOkRun(root, runId);
   await writeRun(root, { ...run, pendingOutput: {

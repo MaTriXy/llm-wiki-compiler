@@ -5,8 +5,8 @@
     "declaration": true,
     "rootDir": "../..",
     "paths": {
-      "llm-wiki-compiler": [
-        "../../src/index.ts"
+      "llmwiki-core": [
+        "../../src/core-index.ts"
       ],
       "llmwiki-dev-backend": [
         "../llmwiki-dev-backend/src/index.ts"

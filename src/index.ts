@@ -19,64 +19,65 @@ export type {
   ListPagesOptions,
   ListPagesResult,
   ListPagesProfileBlock,
-} from "./pages/list.js";
+} from "llmwiki-core";
 
 export type {
   JsonExportDocument,
   ExportJsonOptions,
   JsonExportProfileBlock,
   RelationView,
-} from "./export/json-export.js";
+} from "llmwiki-core";
 
 export {
   ProviderUnavailableError,
   UnknownProviderError,
-} from "./utils/provider-guard.js";
+} from "llmwiki-core";
 
 export { createWiki } from "./sdk/wiki.js";
-export { startViewer, type StartViewerOptions } from "./viewer/server.js";
+export { startViewer, type StartViewerOptions } from "llmwiki-core";
 export type {
   ViewerDeps, LiveStageProjectionProvider, LiveStageProjectionResult,
   VerifiedStageFactsV1, VerifiedExperimentStateV1, RunProjectionAnchor,
   WorkflowRunProjectionEnvelope, WorkflowRunProblem, StageProjection,
   StageGateProjection, StageGateState, StageOutputRef,
   StageVerificationFailureV1, VerifiedFactPanelV1,
-} from "./viewer/workflow-run-projection.js";
-export type { RecordIntentV1 } from "./operation-bundles/record-intent.js";
-export type { PreparedEffectRefV1 } from "./operation-bundles/prepare-record.js";
-export type { SdkOperationOptions, WikiOperationSurface, RecordPreparationResultV1 } from "./sdk/operations-facade.js";
-export type { Wiki, CreateWikiOptions, SdkCompileOptions, ContextPackOptions } from "./sdk/types.js";
+} from "llmwiki-core";
+export type { RecordIntentV1 } from "llmwiki-core";
+export type { PreparedEffectRefV1 } from "llmwiki-core";
+export type { SdkOperationOptions, WikiOperationSurface, RecordPreparationResultV1 } from "llmwiki-core";
+export type { Wiki } from "./sdk/types.js";
+export type { CreateWikiOptions, SdkCompileOptions, ContextPackOptions } from "llmwiki-core";
 
 // Result/input types for the Wiki facade methods, re-exported so typed
 // consumers don't have to deep-import from internal module paths.
-export type { IngestResult, CompileResult, QueryResult } from "./utils/types.js";
-export type { IngestTextInput } from "./commands/ingest.js";
-export type { LintSummary } from "./linter/types.js";
-export type { ContextPack } from "./context/types.js";
-export type { EvalReport } from "./eval/types.js";
-export type { WikiStatus } from "./status/collect.js";
-export type { PageRecord } from "./pages/read.js";
-export type { SourceRecord, ListSourcesOptions, ListSourcesResult } from "./sources/store.js";
+export type { IngestResult, CompileResult, QueryResult } from "llmwiki-core";
+export type { IngestTextInput } from "llmwiki-core";
+export type { LintSummary } from "llmwiki-core";
+export type { ContextPack } from "llmwiki-core";
+export type { EvalReport } from "llmwiki-core";
+export type { WikiStatus } from "llmwiki-core";
+export type { PageRecord } from "llmwiki-core";
+export type { SourceRecord, ListSourcesOptions, ListSourcesResult } from "llmwiki-core";
 // WriteStatus is part of IngestResult — re-exported so callers needn't deep-import utils/types.
-export type { WriteStatus } from "./utils/types.js";
+export type { WriteStatus } from "llmwiki-core";
 
 // OKF export/import — report types and typed errors for SDK consumers.
-export type { OkfExportReport } from "./export/okf/run.js";
-export type { OkfImportReport, OkfImportSkip, OkfImportedPage } from "./import/run.js";
-export { LockUnavailableError, QueueFullError } from "./import/run-errors.js";
+export type { OkfExportReport } from "llmwiki-core";
+export type { OkfImportReport, OkfImportSkip, OkfImportedPage } from "llmwiki-core";
+export { LockUnavailableError, QueueFullError } from "llmwiki-core";
 
 // @experimental — artifact write/verify. `createWiki()` exposes `writeArtifact`/
 // `verifyArtifact`; `SdkWriteArtifactInput` is the input `writeArtifact` takes,
 // `ArtifactRef`/`ArtifactHealth` are the ref/health types both methods return,
 // and `ArtifactVerifyUnavailableError` is the typed, catchable refusal
 // `verifyArtifact` throws when no active profile declares artifact types.
-export type { SdkWriteArtifactInput } from "./sdk/types.js";
-export type { ArtifactRef } from "./artifacts/ref.js";
-export type { ArtifactHealth } from "./artifacts/resolve.js";
-export { ArtifactVerifyUnavailableError } from "./artifacts/resolve.js";
-export type { VerifiedArtifactBodyV1 } from "./artifacts/read-verified.js";
-export type { ArtifactSelectorV1, ArtifactDiscoveryV1 } from "./artifacts/discover.js";
-export type { ArtifactMemberFileInput } from "./artifacts/members.js";
+export type { SdkWriteArtifactInput } from "llmwiki-core";
+export type { ArtifactRef } from "llmwiki-core";
+export type { ArtifactHealth } from "llmwiki-core";
+export { ArtifactVerifyUnavailableError } from "llmwiki-core";
+export type { VerifiedArtifactBodyV1 } from "llmwiki-core";
+export type { ArtifactSelectorV1, ArtifactDiscoveryV1 } from "llmwiki-core";
+export type { ArtifactMemberFileInput } from "llmwiki-core";
 
 // @experimental — programmatic non-default entity-page staging loop. The
 // `createWiki()` facade exposes `stageEntityPage`/`promoteStagedPage`; these are
@@ -86,8 +87,8 @@ export type { ArtifactMemberFileInput } from "./artifacts/members.js";
 // Read-integration status: typed entity pages are surfaced in `status`, the JSON
 // export, the wiki INDEX, the viewer graph, agent context packs (lexical ranking
 // + relation-edge expansion), and semantic search (under their qualified EntityId).
-export type { SdkStageEntityPageInput } from "./trust/staging.js";
-export { StagingRequiresProfileError } from "./trust/staging.js";
+export type { SdkStageEntityPageInput } from "llmwiki-core";
+export { StagingRequiresProfileError } from "llmwiki-core";
 // The staged-change RELATION/ARTIFACT targets are Phase-4 STUB shapes named
 // `Staged…` so the canonical relation `RelationRef` (from `relations/types.ts`,
 // below) owns the unprefixed name.
@@ -98,19 +99,19 @@ export type {
   WorkflowRunRef,
   StagedRelationRef,
   StagedArtifactRef,
-} from "./trust/staged-change.js";
+} from "llmwiki-core";
 
 // @experimental — trust-gated relation writes + lifecycle transitions
 // (planner-routed, shared SDK/CLI). `createWiki().createRelation` /
 // `.transitionLifecycle` expose these; these are the input/return + typed-error
 // types consumers need.
-export type { AppendRelationInput } from "./relations/store.js";
-export type { RelationRef, RelationId, CitationRef } from "./relations/types.js";
-export { RelationEndpointError } from "./relations/types.js";
-export { RelationWriteDeniedError, RelationsRequireProfileError } from "./trust/relation-write.js";
-export type { SdkTransitionLifecycleInput } from "./sdk/types.js";
-export { LifecycleTransitionUnavailableError } from "./trust/lifecycle-transition.js";
-export { LifecycleTransitionError } from "./profile/lifecycle.js";
+export type { AppendRelationInput } from "llmwiki-core";
+export type { RelationRef, RelationId, CitationRef } from "llmwiki-core";
+export { RelationEndpointError } from "llmwiki-core";
+export { RelationWriteDeniedError, RelationsRequireProfileError } from "llmwiki-core";
+export type { SdkTransitionLifecycleInput } from "llmwiki-core";
+export { LifecycleTransitionUnavailableError } from "llmwiki-core";
+export { LifecycleTransitionError } from "llmwiki-core";
 // Planner sub-types named by `StagedChange.target` / `.planned` so the staged
 // surface is fully nameable by consumers (the typed `EntityRef` target especially).
 export type {
@@ -121,14 +122,14 @@ export type {
   MutationKind,
   PlannedMutation,
   MutationProvenance,
-} from "./trust/planner.js";
-export type { TrustDecision } from "./trust/decision.js";
+} from "llmwiki-core";
+export type { TrustDecision } from "llmwiki-core";
 
 // Experimental read-only domain contract. The unrestricted loader stays internal;
 // the non-default projection preserves the existing compiler profile validation.
-export { activeProfileDigest, readConfinedCappedBuffer } from "./sdk/domain-read.js";
-export type { ConfinedCappedRead } from "./sdk/domain-read.js";
-export { loadNonDefaultProfile } from "./profile/block.js";
+export { activeProfileDigest, readConfinedCappedBuffer } from "llmwiki-core";
+export type { ConfinedCappedRead } from "llmwiki-core";
+export { loadNonDefaultProfile } from "llmwiki-core";
 // Profile pack types for callers interpreting the read-only projection.
 export type {
   ProfilePack,
@@ -138,64 +139,64 @@ export type {
   EntityProblemView,
   LoadedProfile,
   SlugSafe,
-} from "./profile/types.js";
+} from "llmwiki-core";
 
 // Experimental integration contracts retained from the internal implementation.
-export { parseFrontmatter, slugify } from "./utils/markdown.js";
-export { collectViewerPages, resolveBareSlug } from "./viewer/collect.js";
-export type { ArtifactMemberEntry } from "./artifacts/members.js";
-export { isTrustedWriteGranted } from "./workflows/trusted-write.js";
+export { parseFrontmatter, slugify } from "llmwiki-core";
+export { collectViewerPages, resolveBareSlug } from "llmwiki-core";
+export type { ArtifactMemberEntry } from "llmwiki-core";
+export { isTrustedWriteGranted } from "llmwiki-core";
 export { startProductWorkflow } from "./workflows/start.js";
-export { captureVerifiedMemberArtifact } from "./artifacts/capture-member.js";
-export { assertRunWorkspace, WorkflowProcessAuthorityError } from "./workflows/process-authority.js";
+export { captureVerifiedMemberArtifact } from "llmwiki-core";
+export { assertRunWorkspace, WorkflowProcessAuthorityError } from "llmwiki-core";
 export { refuseWorkflow, WorkflowRefusalError } from "./workflows/refuse.js";
 export { HumanInputValidationError } from "./workflows/human-input-schema.js";
 export type { HumanInputStageOutput, HumanInputRefV1 } from "./workflows/human-input.js";
-export type { WorkflowProcessAuthorityV1, WorkflowRefusalV1, WorkflowRun } from "./workflows/types.js";
-export { atomicWrite, AtomicWriteCollisionError, AtomicWriteCommittedCleanupError, type AtomicWriteOptions, type AtomicWriteNoReplaceDurableOptions } from "./utils/atomic-write.js";
-export type { SdkPreparationOptions, SdkStagePreparationInput } from "./sdk/types.js";
-export type { CancelResultV1 as PreparationCancelResult, FailResultV1 as PreparationFailResult, ListResultV1 as PreparationListResult, PreparationGrant, PreparationLifecyclePendingState as PreparationLifecycleState, PreparationRunRowV1 as PreparationRunRow, PreparationRunState, PreviewResultV1 as PreparationPreviewResult, RecoveryResultV1 as PreparationRecoveryResult, StageResultV1 as PreparationStageResult } from "./preparations/service.js";
-export { PrincipalAuthorityError } from "./preparations/service.js";
-export type { SdkProductActionInput, SdkProductResumeInput, WikiProductSurface } from "./sdk/types.js";
-export type { CompiledActionSummaryV1 as ProductActionSummary, ProductInvokeResultV1 as ProductInvokeResult, ProductPreviewResultV1 as ProductPreviewResult } from "./products/service.js";
-export { locatePreparationManifest, readPreparationInitialInput, resolvePreparationRun, readPreparationRunForManifest } from "./preparations/service-run-lookup.js";
-export { classifyExecutionOwnerLiveness } from "./preparations/attempts/lease.js";
-export { scanPreparationInventory } from "./preparations/capacity.js";
-export type { PreparationInitialInputLookupV1, PreparationManifestLookupV1, PreparationRunLookupV1 } from "./preparations/service-run-lookup.js";
-export { readPreparationEvidenceBytes } from "./preparations/evidence-store.js";
-export type { PreparationManifestV1 } from "./preparations/manifest-parse.js";
-export { preparationManifestDigest } from "./preparations/manifest-parse.js";
-export type { PhaseSummaryV1 as PreparationPhaseSummary } from "./preparations/run-types.js";
-export { observeOperationBundle } from "./operation-bundles/observe.js";
-export type { OperationBundleObservationV1, OperationBundleMutationV1, OperationPageObservationV1 } from "./operation-bundles/observe.js";
-export type { EvidenceRefV1 as PreparationEvidenceRef } from "./preparations/types.js";
-export { runPreparation } from "./preparations/runner.js";
-export type { RunPreparationInputV1 as RunPreparationInput, RunPreparationResultV1 as RunPreparationResult, PreparationMaterializerV1 as PreparationMaterializer } from "./preparations/runner.js";
-export { formatArtifactRef, parseArtifactRef } from "./artifacts/ref.js";
-export { readVerifiedArtifactBody } from "./artifacts/read-verified.js";
-export { resolveArtifactRef } from "./artifacts/resolve.js";
-export { artifactPaths, memberLeafPath, readArtifactMemberBytes } from "./artifacts/store.js";
-export { loadProfile } from "./profile/load.js";
-export { isSlugSafe } from "./profile/identity.js";
-export type { ProfileTemplatePackage } from "./profile/templates/types.js";
-export { confineUnderRoot } from "./utils/path-confine.js";
-export { resolveConfinedPrivateDir } from "./utils/private-dir.js";
-export { releaseLock } from "./utils/lock.js";
-export { acquireMutationLockBlocking } from "./operation-bundles/lock-gate.js";
-export { recomputeCompositionLock } from "./operations-packs/composition-lock.js";
-export { parseOperationsPack } from "./operations-packs/parse.js";
-export type { PackRecipeV2 } from "./operations-packs/recipe-types.js";
-export type { WorkspaceOperationsPackV2 } from "./operations-packs/types.js";
-export { HOST_DECLARED_CONTRACT_SET, defaultHostCompatibility } from "./products/compatibility.js";
-export { assertProductDigest } from "./products/ids.js";
-export type { Sha256Digest } from "./products/ids.js";
-export { recomputePackageDigest, recomputeRuntimeAuthorityDigest } from "./products/packages/verify.js";
-export type { PackageMemberKind, PackageMemberRefV1, ProductPackageManifestV1 } from "./products/types.js";
-export { transitionLifecycle } from "./trust/lifecycle-transition.js";
-export { readRun } from "./workflows/store.js";
+export type { WorkflowProcessAuthorityV1, WorkflowRefusalV1, WorkflowRun } from "llmwiki-core";
+export { atomicWrite, AtomicWriteCollisionError, AtomicWriteCommittedCleanupError, type AtomicWriteOptions, type AtomicWriteNoReplaceDurableOptions } from "llmwiki-core";
+export type { SdkPreparationOptions, SdkStagePreparationInput } from "llmwiki-core";
+export type { PreparationCancelResult, PreparationFailResult, PreparationListResult, PreparationGrant, PreparationLifecycleState, PreparationRunRow, PreparationRunState, PreparationPreviewResult, PreparationRecoveryResult, PreparationStageResult } from "llmwiki-core";
+export { PrincipalAuthorityError } from "llmwiki-core";
+export type { SdkProductActionInput, SdkProductResumeInput, WikiProductSurface } from "llmwiki-core";
+export type { ProductActionSummary, ProductInvokeResult, ProductPreviewResult } from "llmwiki-core";
+export { locatePreparationManifest, readPreparationInitialInput, resolvePreparationRun, readPreparationRunForManifest } from "llmwiki-core";
+export { classifyExecutionOwnerLiveness } from "llmwiki-core";
+export { scanPreparationInventory } from "llmwiki-core";
+export type { PreparationInitialInputLookupV1, PreparationManifestLookupV1, PreparationRunLookupV1 } from "llmwiki-core";
+export { readPreparationEvidenceBytes } from "llmwiki-core";
+export type { PreparationManifestV1 } from "llmwiki-core";
+export { preparationManifestDigest } from "llmwiki-core";
+export type { PreparationPhaseSummary } from "llmwiki-core";
+export { observeOperationBundle } from "llmwiki-core";
+export type { OperationBundleObservationV1, OperationBundleMutationV1, OperationPageObservationV1 } from "llmwiki-core";
+export type { PreparationEvidenceRef } from "llmwiki-core";
+export { runPreparation } from "llmwiki-core";
+export type { RunPreparationInput, RunPreparationResult, PreparationMaterializer } from "llmwiki-core";
+export { formatArtifactRef, parseArtifactRef } from "llmwiki-core";
+export { readVerifiedArtifactBody } from "llmwiki-core";
+export { resolveArtifactRef } from "llmwiki-core";
+export { artifactPaths, memberLeafPath, readArtifactMemberBytes } from "llmwiki-core";
+export { loadProfile } from "llmwiki-core";
+export { isSlugSafe } from "llmwiki-core";
+export type { ProfileTemplatePackage } from "llmwiki-core";
+export { confineUnderRoot } from "llmwiki-core";
+export { resolveConfinedPrivateDir } from "llmwiki-core";
+export { releaseLock } from "llmwiki-core";
+export { acquireMutationLockBlocking } from "llmwiki-core";
+export { recomputeCompositionLock } from "llmwiki-core";
+export { parseOperationsPack } from "llmwiki-core";
+export type { PackRecipeV2 } from "llmwiki-core";
+export type { WorkspaceOperationsPackV2 } from "llmwiki-core";
+export { HOST_DECLARED_CONTRACT_SET, defaultHostCompatibility } from "llmwiki-core";
+export { assertProductDigest } from "llmwiki-core";
+export type { Sha256Digest } from "llmwiki-core";
+export { recomputePackageDigest, recomputeRuntimeAuthorityDigest } from "llmwiki-core";
+export type { PackageMemberKind, PackageMemberRefV1, ProductPackageManifestV1 } from "llmwiki-core";
+export { transitionLifecycle } from "llmwiki-core";
+export { readRun } from "llmwiki-core";
 export { startWorkflowLocked } from "./workflows/start.js";
 export { assertRunOwnership } from "./workflows/with-lock.js";
-export { assertCurrentWorkflowProcessAuthority } from "./workflows/process-authority.js";
+export { assertCurrentWorkflowProcessAuthority } from "llmwiki-core";
 export { predecessorChainRoot, readLiveTargetDigest, mintVerifierReceipt } from "./workflows/verifier-receipt.js";
 export { createVerifierRegistry, verifierImplementationDigest, type HostVerifierImplementationV1 } from "./workflows/verifier-registry.js";
 export { resolveGateChallenge } from "./workflows/gate.js";
@@ -203,13 +204,13 @@ export { approveHumanGateInteractively } from "./workflows/approve-human-interac
 export { currentActorIdentity } from "./workflows/actor-identity.js";
 export { resolveCurrentStage } from "./workflows/advance.js";
 export { assertProductOperationOutputCurrent, assertProductStageOutputCurrent } from "./workflows/product-operation-output.js";
-export { DEV_PROVIDER_BOUNDS, derivePinForPayload, devEffectiveGrantRequest, devGrantScope, devModelInvokeAuthority, devProviderInvocation, devSourceReadAuthority, installDevProvider, issueDevProviderGrant } from "./capability-providers/host/index.js";
-export type { DevGrantRequestContextV1, DevInvocationHostV1, InstallDevProviderRequestV1, InstalledDevProviderV1, IssueDevGrantRequestV1, IssuedDevGrantV1, ProviderBackendChannelV1, ProviderHostBackendV1, ProviderLaunchDescriptorV1 } from "./capability-providers/host/index.js";
-export { resolveAuthorizedProviderPaths } from "./capability-providers/packages/paths.js";
-export { canonicalBytes, canonicalDigest } from "./profile/templates/signing/canonical.js";
-export { resolveProviderEntrypoint, providerLaunchEnv } from "./capability-providers/host/entrypoint.js";
-export { hostModelQuoteDigest } from "./capability-providers/brokers/model.js";
-export type { HostModelBrokerV1, HostModelQuoteObservationV1, HostModelQuoteRequestV1 } from "./capability-providers/brokers/model.js";
-export { confinedFetch, confinedFetchRequest } from "./connectors/confined-fetch.js";
-export type { FetchLimits, ConfinedFetchSeams, ConfinedFetchResult, ConfinedFetchRequest, ConfinedFetchMethod } from "./connectors/confined-fetch.js";
-export { scaffoldConfinedDirectories, ensureConfinedDirectory, type ScaffoldDirectoriesResultV1 } from "./utils/confined-scaffold.js";
+export { DEV_PROVIDER_BOUNDS, derivePinForPayload, devEffectiveGrantRequest, devGrantScope, devModelInvokeAuthority, devProviderInvocation, devSourceReadAuthority, installDevProvider, issueDevProviderGrant } from "llmwiki-core";
+export type { DevGrantRequestContextV1, DevInvocationHostV1, InstallDevProviderRequestV1, InstalledDevProviderV1, IssueDevGrantRequestV1, IssuedDevGrantV1, ProviderBackendChannelV1, ProviderHostBackendV1, ProviderLaunchDescriptorV1 } from "llmwiki-core";
+export { resolveAuthorizedProviderPaths } from "llmwiki-core";
+export { canonicalBytes, canonicalDigest } from "llmwiki-core";
+export { resolveProviderEntrypoint, providerLaunchEnv } from "llmwiki-core";
+export { hostModelQuoteDigest } from "llmwiki-core";
+export type { HostModelBrokerV1, HostModelQuoteObservationV1, HostModelQuoteRequestV1 } from "llmwiki-core";
+export { confinedFetch, confinedFetchRequest } from "llmwiki-core";
+export type { FetchLimits, ConfinedFetchSeams, ConfinedFetchResult, ConfinedFetchRequest, ConfinedFetchMethod } from "llmwiki-core";
+export { scaffoldConfinedDirectories, ensureConfinedDirectory, type ScaffoldDirectoriesResultV1 } from "llmwiki-core";

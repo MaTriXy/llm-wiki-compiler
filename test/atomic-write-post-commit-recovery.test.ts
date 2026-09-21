@@ -17,6 +17,8 @@ import { installWorkflowProfile, WORKFLOW_PROFILE } from "./fixtures/workflow-pr
 import { startWorkflow } from "../src/workflows/start.js";
 import { readRun } from "../src/workflows/store.js";
 import { preflightApplyRecord } from "../src/workflows/stage-output-internals.js";
+import { createLocalWorkflowHost } from "../src/local-workflow-host/index.js";
+import { createLocalWorkflowRuntime } from "../src/workflows/runtime.js";
 
 const fault = vi.hoisted(() => ({ target: "" }));
 vi.mock("fs/promises", async (original) => {
@@ -36,6 +38,27 @@ afterEach(() => { fault.target = ""; });
 const BODY = "---\ntitle: New\n---\n\nNew body.\n";
 
 describe("post-commit filesystem drift", () => {
+  it("retains the pending marker when the host reports a post-commit failure after a real page write", async () => {
+    const root = await realpath(ctx.dir);
+    await installWorkflowProfile(root);
+    await mkdir(path.join(root, "wiki/ideas"), { recursive: true });
+    const host = createLocalWorkflowHost();
+    const runtime = createLocalWorkflowRuntime({ ...host, pages: { ...host.pages,
+      apply: async (tx, projectRoot, planned) => {
+        await host.pages.apply(tx, projectRoot, planned);
+        throw new AtomicWritePostCommitError(new Error("injected post-commit host failure"));
+      },
+    } });
+    const run = await runtime.start({ root, workflowId: "build", inputs: {} });
+    await expect(runtime.submit(root, run.runId, { kind: "page", entityType: "ideas", slug: "page", body: BODY }))
+      .rejects.toBeInstanceOf(AtomicWritePostCommitError);
+    const stored = await readRun(root, run.runId);
+    expect(stored).toMatchObject({ status: "ok", run: {
+      status: "pending", outputs: {}, pendingOutput: { stageId: "draft" },
+    } });
+    expect(await readFile(path.join(root, "wiki/ideas/page.md"), "utf8")).toBe(BODY);
+  });
+
   it("does not label a refused rename as a committed write", async () => {
     const target = path.join(ctx.dir, "wiki/concepts/directory.md");
     await mkdir(target);
@@ -94,7 +117,11 @@ describe("post-commit filesystem drift", () => {
       await atomicWrite(target, BODY, { confineRoot: root });
       return { decision: "allow" as const, outputRef: {} };
     };
-    await expect(preflightApplyRecord(root, run, stage, {}, apply)).rejects.toBeInstanceOf(AtomicWritePostCommitError);
+    const host = createLocalWorkflowHost();
+    await expect(host.withMutation(root, transaction =>
+      preflightApplyRecord(root, run, stage, {}, apply, undefined,
+        (projectRoot, record) => host.records.write(transaction, projectRoot, record))))
+      .rejects.toBeInstanceOf(AtomicWritePostCommitError);
     const stored = await readRun(root, run.runId);
     expect(stored.status).toBe("ok");
     if (stored.status !== "ok") throw new Error("run unreadable");

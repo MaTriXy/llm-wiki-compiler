@@ -20,6 +20,6 @@
     "prepack": "npm run build:lib"
   },
   "peerDependencies": {
-    "llm-wiki-compiler": "1.4.0-dev.20260919"
+    "llmwiki-core": "1.4.0-dev.20260919"
   }
 }

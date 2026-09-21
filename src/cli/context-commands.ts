@@ -3,10 +3,10 @@
  * options and presentation together without expanding the main entrypoint.
  */
 import type { Command } from "commander";
-import nextCommand from "../commands/next.js";
-import contextCommand, { type ContextCommandOptions } from "../commands/context.js";
-import { setVerbose } from "../utils/output.js";
-import { runExitCodeCommand } from "./shared.js";
+import { nextCommand } from "llmwiki-core/compiler-cli";
+import { contextCommand, type ContextCommandOptions } from "llmwiki-core/compiler-cli";
+import { setVerbose } from "llmwiki-core/compiler-cli";
+import { runExitCodeCommand } from "llmwiki-core/compiler-cli";
 
 /** Register advisory commands with the main CLI verbose-option policy. */
 export function registerContextCommands(program: Command, verboseEnabled: (flag?: boolean) => boolean): void {

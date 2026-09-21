@@ -24,17 +24,17 @@
  * one cannot exhaust memory.
  */
 
-import { providerLaunchEnv, resolveProviderEntrypoint } from "llm-wiki-compiler";
+import { providerLaunchEnv, resolveProviderEntrypoint } from "llmwiki-core";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { launchProviderChannel } from "./channel.js";
 import type {
   ProviderHostBackendV1, ProviderLaunchDescriptorV1 as DevLaunchDescriptorV1,
-} from "llm-wiki-compiler";
+} from "llmwiki-core";
 import type {
   ProviderBackendChannelV1 as DevBackendChannelV1,
-} from "llm-wiki-compiler";
+} from "llmwiki-core";
 
 /** The runtime's backend shape, structurally: one launch returning a channel. */
 

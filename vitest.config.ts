@@ -9,6 +9,13 @@ export default defineConfig({
   // installed compiler peer by name; this resolver is not shipped at runtime.
   resolve: {
     alias: [
+      { find: /^llmwiki-core\/compiler-cli$/, replacement: fileURLToPath(new URL("./src/compiler-cli.ts", import.meta.url)) },
+      { find: /^llmwiki-core\/compiler-legacy-workflows$/, replacement: fileURLToPath(new URL("./src/local-workflow-host/legacy-composition.ts", import.meta.url)) },
+      { find: /^llmwiki-core\/compiler-sdk$/, replacement: fileURLToPath(new URL("./src/sdk/compiler-composition.ts", import.meta.url)) },
+      { find: /^llmwiki-local-workflows$/, replacement: fileURLToPath(new URL("./src/local-workflows/index.ts", import.meta.url)) },
+      { find: /^llmwiki-core\/local-workflow-host$/, replacement: fileURLToPath(new URL("./src/local-workflow-host/index.ts", import.meta.url)) },
+      { find: /^llmwiki-core$/, replacement: fileURLToPath(new URL("./src/core-index.ts", import.meta.url)) },
+      { find: /^llmwiki-core\/local-workflow-contracts$/, replacement: fileURLToPath(new URL("./src/local-workflow-host/shared-contracts.ts", import.meta.url)) },
       { find: /^llm-wiki-compiler$/, replacement: fileURLToPath(new URL("./src/index.ts", import.meta.url)) },
       ...["llmwiki-dev-backend", "llmwiki-limited-isolation-backend"].map(name => ({
         find: new RegExp("^" + name + "$"),

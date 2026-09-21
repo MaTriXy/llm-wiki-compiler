@@ -20,9 +20,9 @@
  * and exits 1 itself only on a malformed `--input` pair.
  */
 
-import * as output from "../utils/output.js";
-import { MAX_WORKFLOW_SUBMIT_FILE_BYTES } from "../utils/constants.js";
-import { readCappedNoFollow } from "../utils/confined-read.js";
+import { output } from "llmwiki-core/compiler-cli";
+import { MAX_WORKFLOW_SUBMIT_FILE_BYTES } from "llmwiki-core/compiler-cli";
+import { readCappedNoFollow } from "llmwiki-core/compiler-cli";
 import { assertInputDepthWithinBounds, WorkflowInputBoundsError } from "../workflows/input-bounds.js";
 import { listWorkflows } from "../workflows/list.js";
 import { showWorkflow, type WorkflowStageDetail } from "../workflows/show.js";
@@ -43,7 +43,7 @@ import {
   type WorkflowStartOptions,
 } from "./workflow-shared.js";
 import type { WorkflowRun } from "../workflows/types.js";
-import type { AppendRelationInput } from "../relations/store.js";
+import type { AppendRelationInput } from "llmwiki-core/compiler-cli";
 
 export { parseJsonObject } from "./workflow-shared.js";
 export type { WorkflowStartOptions };

@@ -35,7 +35,7 @@
  * SCOPE OF THE FILESYSTEM RULE, stated because overstating a control is the
  * defect class this corpus keeps finding: it covers `src/commands/preparation`
  * and `src/sdk` MINUS a named exemption list — an allowlist that fails closed,
- * so a new SDK module is covered the moment it exists. Only `src/sdk/wiki.ts` is
+ * so a new SDK module is covered the moment it exists. Only `src/sdk/core.ts` is
  * exempt, because its `node:fs` use is a root-is-a-directory check in the
  * general SDK composition root, predating preparations and unrelated to them.
  * The substrate-reach rule DOES cover all of `src/sdk` including the exemptions,
@@ -47,6 +47,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -57,6 +58,9 @@ import { listFilesUnder } from "./preparations/lifecycle-model/walk.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const SERVICE = "src/preparations/service.ts";
+const SOURCE_ALIASES: Record<string, string[]> = JSON.parse(
+  readFileSync(path.join(REPO_ROOT, "tsconfig.json"), "utf8"),
+).compilerOptions.paths;
 /** The CLI registrar lives among unrelated CLI files, so it is named. */
 const CLI_REGISTRAR = "src/cli/preparation-commands.ts";
 
@@ -78,8 +82,10 @@ async function sourceOf(module: string): Promise<string> {
   return readFile(path.join(REPO_ROOT, module), "utf8");
 }
 
-/** Resolve one relative specifier against its importer, repo-relative. */
+/** Resolve relative imports and the repository's real package aliases. */
 function resolveSpecifier(module: string, specifier: string): string {
+  const alias = SOURCE_ALIASES[specifier]?.[0];
+  if (alias) return path.posix.normalize(alias);
   return path.posix.normalize(
     path.posix.join(path.posix.dirname(module), specifier.replace(/\.js$/u, ".ts")));
 }
@@ -89,7 +95,7 @@ async function substrateReaches(): Promise<string[]> {
   const offenders: string[] = [];
   for (const module of await adapterModules()) {
     for (const specifier of importedSpecifiers(module, await sourceOf(module))) {
-      if (!specifier.startsWith(".")) continue;
+      if (!specifier.startsWith(".") && !SOURCE_ALIASES[specifier]) continue;
       const resolved = resolveSpecifier(module, specifier);
       if (!resolved.startsWith("src/preparations/") || resolved === SERVICE) continue;
       offenders.push(`${module} -> ${resolved}`);
@@ -126,7 +132,7 @@ function valueImportsOf(module: string, source: string): string[] {
   const reached: string[] = [];
   for (const statement of parsed.statements) {
     const specifier = valueSpecifierOf(statement);
-    if (specifier !== undefined && specifier.startsWith(".")) {
+    if (specifier !== undefined && (specifier.startsWith(".") || SOURCE_ALIASES[specifier])) {
       reached.push(resolveSpecifier(module, specifier));
     }
   }
@@ -136,7 +142,7 @@ function valueImportsOf(module: string, source: string): string[] {
     // type` specifiers too, so every type-only reach became a value edge and
     // `documents.ts` — which imports exactly one type from the service — was
     // classified as able to call an operation.
-    if (specifier.startsWith(".")) reached.push(resolveSpecifier(module, specifier));
+    if (specifier.startsWith(".") || SOURCE_ALIASES[specifier]) reached.push(resolveSpecifier(module, specifier));
   }
   return reached;
 }
@@ -162,12 +168,12 @@ function valueSpecifierOf(statement: ts.Statement): string | undefined {
  * green. Stating the exemption instead means a new module is covered by
  * default and removing its coverage is an edit somebody has to make on purpose.
  *
- * `wiki.ts` is exempt because its `node:fs` use is the root-is-a-directory check
+ * `core.ts` is exempt because its `node:fs` use is the root-is-a-directory check
  * in the general SDK composition root — it predates preparations and is
  * unrelated to them. That is the header's scope note, in the one place the
  * scope is actually decided.
  */
-const FS_RULE_EXEMPT: readonly string[] = ["src/sdk/wiki.ts"];
+const FS_RULE_EXEMPT: readonly string[] = ["src/sdk/core.ts"];
 
 /** The modules that ARE the preparation surface — see the file header's scope note. */
 async function surfaceModules(): Promise<string[]> {
@@ -240,7 +246,7 @@ async function behaviourBearingModules(): Promise<Set<string>> {
  * conduit. Without this, the named exempt module could `export { … } from` the
  * service — handing the constructor to every consumer while holding `node:fs`
  * itself, and nothing checks it because it is exempt. Composing a facade is
- * allowed and is what `wiki.ts` legitimately does; reaching the service itself
+ * allowed and is what `core.ts` legitimately does; reaching the service itself
  * is not, in any value form.
  */
 async function exemptServiceConduits(): Promise<string[]> {
@@ -379,7 +385,7 @@ describe("preparation surfaces are adapters over one service", () => {
   it("names every filesystem-rule exemption, and keeps each one under the substrate rule", async () => {
     // The exemption is an ALLOWLIST, so it has to be visible and exact — an
     // unpinned one is a way to leave a control's scope rather than satisfy it.
-    expect(FS_RULE_EXEMPT).toEqual(["src/sdk/wiki.ts"]);
+    expect(FS_RULE_EXEMPT).toEqual(["src/sdk/core.ts"]);
     // And exempt from the FILESYSTEM rule is not exempt from everything: each
     // one is still an adapter, so it may still reach no preparation module but
     // the service.
@@ -395,11 +401,12 @@ describe("preparation surfaces are adapters over one service", () => {
     // is in neither the adapter set nor the surface set, so exporting
     // `createPreparationService` from it left this whole file green.
     expect(await leakedPublicExports()).toEqual([]);
-    // ANTI-VACUITY: the entry point really does re-export FROM the service, so
-    // a resolution bug cannot make this pass by finding no statements at all.
+    // ANTI-VACUITY: follow the standard facade into core, then the service.
     const source = await sourceOf(PUBLIC_ENTRY);
     expect(importedSpecifiers(PUBLIC_ENTRY, source)
-      .some((specifier) => resolveSpecifier(PUBLIC_ENTRY, specifier) === SERVICE)).toBe(true);
+      .some((specifier) => resolveSpecifier(PUBLIC_ENTRY, specifier) === "src/core-index.ts")).toBe(true);
+    expect(importedSpecifiers("src/core-index.ts", await sourceOf("src/core-index.ts"))
+      .some((specifier) => resolveSpecifier("src/core-index.ts", specifier) === SERVICE)).toBe(true);
   });
 
   it("lets no filesystem-rule exemption become a conduit to the service", async () => {
@@ -445,8 +452,11 @@ describe("preparation surfaces are adapters over one service", () => {
       // the substrate-reach rule's `src/commands/preparation` + `src/sdk` scope;
       // the facade IS in that scope and reaches no preparation module directly.
       "src/products/service.ts",
+      "src/sdk/compiler-composition.ts",
+      "src/sdk/core.ts",
       "src/sdk/preparation-facade.ts",
       "src/sdk/product-facade.ts",
+      "src/sdk/wiki.ts",
     ]);
   });
 

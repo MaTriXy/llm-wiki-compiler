@@ -13,7 +13,7 @@ export type { UnsandboxedLocalBackendOptionsV1 } from "./backend.js";
 // The CONTRACT lives in llmwiki; this package implements it.
 export type {
   ProviderBackendChannelV1, ProviderHostBackendV1, ProviderLaunchDescriptorV1,
-} from "llm-wiki-compiler";
+} from "llmwiki-core";
 
 // The HOST constructors now live in llmwiki itself, so an operator writing a
 // provider module imports them from the distributed package rather than from
@@ -21,11 +21,11 @@ export type {
 export {
   DEV_PROVIDER_BOUNDS, derivePinForPayload, devEffectiveGrantRequest, devGrantScope,
   devProviderInvocation, installDevProvider, issueDevProviderGrant,
-} from "llm-wiki-compiler";
+} from "llmwiki-core";
 export type {
   DevInvocationHostV1, InstallDevProviderRequestV1, InstalledDevProviderV1,
   IssueDevGrantRequestV1, IssuedDevGrantV1,
-} from "llm-wiki-compiler";
+} from "llmwiki-core";
 
 // The provider-channel launcher the isolation backend (and any operator backend
 // that wraps a child process) builds on; exported so it is imported by package

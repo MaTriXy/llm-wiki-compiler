@@ -8,35 +8,32 @@
 
 import { createRequire } from "module";
 import { Command } from "commander";
-import ingestCommand from "./commands/ingest.js";
-import ingestSessionCommand from "./commands/ingest-session.js";
-import viewCommand from "./commands/view.js";
-import visualizeCommand, { type VisualizeOptions } from "./commands/visualize.js";
-import compileCommand from "./commands/compile.js";
-import { rmCommand } from "./commands/rm.js";
-import queryCommand from "./commands/query.js";
-import watchCommand from "./commands/watch.js";
-import lintCommand from "./commands/lint.js";
-import statusCommand from "./commands/status.js";
-import exportCommand from "./commands/export.js";
-import importCommand from "./commands/import.js";
-import { recoverCommand } from "./commands/recover.js";
-import { registerRulesCommand } from "./commands/rules-register.js";
+import { ingestCommand } from "llmwiki-core/compiler-cli";
+import { ingestSessionCommand } from "llmwiki-core/compiler-cli";
+import { viewCommand } from "llmwiki-core/compiler-cli";
+import { visualizeCommand, type VisualizeOptions } from "llmwiki-core/compiler-cli";
+import { compileCommand } from "llmwiki-core/compiler-cli";
+import { rmCommand } from "llmwiki-core/compiler-cli";
+import { queryCommand } from "llmwiki-core/compiler-cli";
+import { watchCommand } from "llmwiki-core/compiler-cli";
+import { lintCommand } from "llmwiki-core/compiler-cli";
+import { statusCommand } from "llmwiki-core/compiler-cli";
+import { exportCommand } from "llmwiki-core/compiler-cli";
+import { importCommand } from "llmwiki-core/compiler-cli";
+import { recoverCommand } from "llmwiki-core/compiler-cli";
+import { registerRulesCommand } from "llmwiki-core/compiler-cli";
 import { registerContextCommands } from "./cli/context-commands.js";
-import refreshCommand from "./commands/refresh.js";
-import quickstartCommand from "./commands/quickstart.js";
+import { refreshCommand } from "llmwiki-core/compiler-cli";
+import { quickstartCommand } from "llmwiki-core/compiler-cli";
 import { startMCPServer } from "./mcp/server.js";
-import { applyLanguageOption } from "./utils/output-language.js";
-import { applySourcesSectionOption } from "./utils/sources-section.js";
+import { applyLanguageOption } from "llmwiki-core/compiler-cli";
+import { applySourcesSectionOption } from "llmwiki-core/compiler-cli";
 import { readInstructions } from "./cli/instructions.js";
-import {
-  ensureCompileProviderAvailable,
-  ensureProviderAvailable,
-} from "./utils/provider-guard.js";
-import { setVerbose } from "./utils/output.js";
-import { parseConcurrencyFlag } from "./compiler/concurrency.js";
-import { ENV_VERBOSE } from "./utils/constants.js";
-import { runExitCodeCommand } from "./cli/shared.js";
+import { ensureCompileProviderAvailable, ensureProviderAvailable } from "llmwiki-core/compiler-cli";
+import { setVerbose } from "llmwiki-core/compiler-cli";
+import { parseConcurrencyFlag } from "llmwiki-core/compiler-cli";
+import { ENV_VERBOSE } from "llmwiki-core/compiler-cli";
+import { runExitCodeCommand } from "llmwiki-core/compiler-cli";
 import { registerStateCommands } from "./cli/state-commands.js";
 import { registerSchemaCommands } from "./cli/schema-commands.js";
 import { registerProfileCommands } from "./cli/profile-commands.js";
@@ -49,11 +46,7 @@ import { registerConnectorCommands } from "./cli/connector-commands.js";
 import { registerOperationCommands } from "./cli/operation-commands.js";
 import { registerProductCommands } from "./cli/product-commands.js";
 import { registerPreparationCommands } from "./cli/preparation-commands.js";
-import {
-  addProviderOption,
-  applyProviderOption,
-  type ProviderOption,
-} from "./cli/provider-option.js";
+import { addProviderOption, applyProviderOption, type ProviderOption } from "llmwiki-core/compiler-cli";
 import { loadCliEnvironment } from "./cli/environment.js";
 
 loadCliEnvironment();

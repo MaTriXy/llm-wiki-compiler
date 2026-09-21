@@ -5,7 +5,7 @@
  * the existing actor validation and direct approval path.
  */
 
-import * as output from "../utils/output.js";
+import { output } from "llmwiki-core/compiler-cli";
 import { approveGate, resolveGateChallenge } from "../workflows/gate.js";
 import { confirmHumanGateInteractively } from "../workflows/human-gate-confirm.js";
 import { processHumanGateIo } from "./workflow-shared.js";

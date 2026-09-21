@@ -5,7 +5,9 @@
  * by an ordinary artifact output even when its JSON looks fully accepted.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createLocalWorkflowHost } from "../src/local-workflow-host/index.js";
+import { createLocalWorkflowRuntime } from "../src/workflows/runtime.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
 import {
   createVerifierRegistry,
@@ -37,6 +39,24 @@ function verifier(): HostVerifierImplementationV1 {
 }
 
 describe("core-minted verifier receipts", () => {
+  it("uses supplied host evidence observations and persistence when constructed", async () => {
+    const run = await snapshotRun();
+    const ref = run.outputs.check as { artifactType: string; slug: string; sha256: string };
+    const base = createLocalWorkflowHost();
+    const artifactBody = vi.fn(base.observations.artifactBody);
+    const processSource = vi.fn(base.observations.processSource);
+    const write = vi.fn(base.records.write);
+    const runtime = createLocalWorkflowRuntime({ ...base, records: { ...base.records, write },
+      observations: { ...base.observations, artifactBody, processSource } });
+    const receipt = await runtime.mintVerifierReceipt(root.dir, run.runId, "check",
+      `${ref.artifactType}/${ref.slug}@sha256:${ref.sha256}`, SUBJECT_VERIFIER_ID, createVerifierRegistry([verifier()]));
+    expect(artifactBody).toHaveBeenCalledOnce();
+    expect(processSource).toHaveBeenCalledOnce();
+    expect(write).toHaveBeenCalledOnce();
+    expect(await base.history.read(root.dir, run.runId))
+      .toMatchObject({ status: "ok", run: { verifierReceipts: { check: receipt } } });
+  });
+
   it("runs the process-pinned implementation and binds the current authority", async () => {
     const run = await snapshotRun();
     const ref = run.outputs.check as { artifactType: string; slug: string; sha256: string };

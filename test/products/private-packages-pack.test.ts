@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const REPO = path.resolve(import.meta.dirname, "..", "..");
 const PACKAGES = ["llmwiki-dev-backend", "llmwiki-limited-isolation-backend"] as const;
-const ALLOWED_IMPORTS = new Set(["llm-wiki-compiler", "llmwiki-dev-backend", "llmwiki-limited-isolation-backend"]);
+const ALLOWED_IMPORTS = new Set(["llmwiki-core", "llmwiki-dev-backend", "llmwiki-limited-isolation-backend"]);
 const dirs: string[] = [];
 afterEach(async () => { for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true }); });
 
@@ -36,7 +36,8 @@ describe("the packed private packages install into an EMPTY consumer and import 
       const printed = execFileSync("npm", ["pack", "--silent", "--pack-destination", out], { cwd: dir }).toString();
       return path.join(out, printed.trim().split("\n").pop() as string);
     };
-    const tarballs = [packInto(REPO), ...PACKAGES.map((name) => packInto(path.join(REPO, "packages", name)))];
+    const dependencies = ["llmwiki-core", "llmwiki-local-workflows", ...PACKAGES];
+    const tarballs = [packInto(REPO), ...dependencies.map((name) => packInto(path.join(REPO, "packages", name)))];
     await writeFile(path.join(consumer, "package.json"), JSON.stringify({ name: "consumer", type: "module", private: true }));
     // A peer or file: dependency regression fails HERE (ERESOLVE), not in a later slice's journey.
     execFileSync("npm", ["install", ...tarballs], { cwd: consumer, stdio: ["ignore", "ignore", "pipe"] });

@@ -6,7 +6,9 @@
  * stale lifecycle state, and malformed payload shapes fail closed.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createLocalWorkflowHost } from "../src/local-workflow-host/index.js";
+import { createLocalWorkflowRuntime } from "../src/workflows/runtime.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { makeTempRoot } from "./fixtures/temp-root.js";
@@ -69,6 +71,20 @@ function validInput(source: string): Record<string, unknown> {
 }
 
 describe("workflow human input", () => {
+  it("resolves references and records settlement through the supplied host", async () => {
+    const { root, run, source } = await fixture();
+    const base = createLocalWorkflowHost();
+    const artifact = vi.fn(base.observations.artifact);
+    const entityFrontmatter = vi.fn(base.observations.entityFrontmatter);
+    const write = vi.fn(base.records.write);
+    const runtime = createLocalWorkflowRuntime({ ...base, records: { ...base.records, write },
+      observations: { ...base.observations, artifact, entityFrontmatter } });
+    await runtime.submit(root, run.runId, { kind: "human-input", input: validInput(source) });
+    expect(artifact).toHaveBeenCalledOnce();
+    expect(entityFrontmatter).toHaveBeenCalledTimes(2);
+    expect(write).toHaveBeenCalledOnce();
+  });
+
   it("admits all six closed field forms and stamps an immutable host envelope", async () => {
     process.env.LLMWIKI_ACTOR = "editor-one";
     try {

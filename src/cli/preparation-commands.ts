@@ -58,19 +58,19 @@
  */
 
 import type { Command } from "commander";
-import { runExitCodeCommand } from "./shared.js";
-import { preparationCancelCommand } from "../commands/preparation/cancel.js";
-import { preparationListCommand } from "../commands/preparation/list.js";
-import { preparationShowCommand } from "../commands/preparation/show.js";
-import { preparationPauseCommand } from "../commands/preparation/pause.js";
-import { preparationResumeCommand } from "../commands/preparation/resume.js";
-import { preparationFailCommand } from "../commands/preparation/fail.js";
-import { preparationGateCommand } from "../commands/preparation/gate.js";
-import { preparationPruneCommand } from "../commands/preparation/prune.js";
-import { preparationRecoverCommand } from "../commands/preparation/recovery.js";
-import { RESET_CONFIRM_DESCRIPTION, RESET_TOKEN_DESCRIPTION, preparationResetCommand } from "../commands/preparation/reset.js";
-import { preparationPreviewCommand, preparationStageCommand } from "../commands/preparation/stage.js";
-import { preparationSweepCommand } from "../commands/preparation/sweep.js";
+import { runExitCodeCommand } from "llmwiki-core/compiler-cli";
+import { preparationCancelCommand } from "llmwiki-core/compiler-cli";
+import { preparationListCommand } from "llmwiki-core/compiler-cli";
+import { preparationShowCommand } from "llmwiki-core/compiler-cli";
+import { preparationPauseCommand } from "llmwiki-core/compiler-cli";
+import { preparationResumeCommand } from "llmwiki-core/compiler-cli";
+import { preparationFailCommand } from "llmwiki-core/compiler-cli";
+import { preparationGateCommand } from "llmwiki-core/compiler-cli";
+import { preparationPruneCommand } from "llmwiki-core/compiler-cli";
+import { preparationRecoverCommand } from "llmwiki-core/compiler-cli";
+import { RESET_CONFIRM_DESCRIPTION, RESET_TOKEN_DESCRIPTION, preparationResetCommand } from "llmwiki-core/compiler-cli";
+import { preparationPreviewCommand, preparationStageCommand } from "llmwiki-core/compiler-cli";
+import { preparationSweepCommand } from "llmwiki-core/compiler-cli";
 
 /** Register the `preparation` command group on the root program. */
 export function registerPreparationCommands(program: Command): void {

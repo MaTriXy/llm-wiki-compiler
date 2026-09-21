@@ -24,6 +24,17 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+/** Pack already-built exact workspace dependencies alongside the standard facade. */
+function packDistribution(repo: string, destination: string): string[] {
+  return ["packages/llmwiki-core", "packages/llmwiki-local-workflows", "."].map(directory => {
+    const output = execFileSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", destination],
+      { cwd: path.join(repo, directory), encoding: "utf8" });
+    const [packed] = JSON.parse(output) as Array<{ filename: string }>;
+    expect(packed!.filename).toMatch(/\.tgz$/);
+    return path.join(destination, packed!.filename);
+  });
+}
+
 describe("packaging (slow; run via `npm run test:pack`)", () => {
   it("library entry imports from a packed tarball, no shebang, types emitted", async () => {
     const repo = process.cwd();
@@ -34,17 +45,9 @@ describe("packaging (slow; run via `npm run test:pack`)", () => {
     const out = await mkdtemp(path.join(tmpdir(), "wiki-pack-"));    // pack INTO temp
     const fixture = await mkdtemp(path.join(tmpdir(), "wiki-fix-"));
     try {
-      const packOutput = execFileSync("npm", ["pack", "--silent", "--pack-destination", out], { cwd: repo }).toString();
-      // Take the last non-empty line that ends with .tgz to guard against any
-      // npm noise that --silent doesn't suppress in all npm versions.
-      const name = packOutput
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l.endsWith(".tgz"))
-        .at(-1)!;
-      expect(name).toMatch(/\.tgz$/);
+      const tarballs = packDistribution(repo, out);
       await writeFile(path.join(fixture, "package.json"), JSON.stringify({ name: "f", type: "module" }));
-      execFileSync("npm", ["install", path.join(out, name)], { cwd: fixture, stdio: "ignore" });
+      execFileSync("npm", ["install", "--ignore-scripts", ...tarballs], { cwd: fixture, stdio: "ignore" });
       await writeFile(path.join(fixture, "probe.mjs"), `import { createWiki } from "llm-wiki-compiler"; if (typeof createWiki !== "function") process.exit(2);`);
       execFileSync("node", ["probe.mjs"], { cwd: fixture, stdio: "ignore" });
     } finally {

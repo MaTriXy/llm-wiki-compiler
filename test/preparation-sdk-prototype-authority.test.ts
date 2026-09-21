@@ -125,6 +125,7 @@ async function sourceOf(module: string): Promise<string> {
 async function ownGatedKeys(): Promise<string[]> {
   return [...new Set([
     ...keyArgumentsOf(await sourceOf("src/sdk/preparation-facade.ts"), "own", 1),
+    ...keyArgumentsOf(await sourceOf("src/sdk/core.ts"), "Object.hasOwn", 1),
     ...keyArgumentsOf(await sourceOf("src/sdk/wiki.ts"), "Object.hasOwn", 1),
   ])].sort();
 }

@@ -30,21 +30,13 @@
  */
 
 import type { Command } from "commander";
-import { runExitCodeCommand } from "./shared.js";
-import {
-  productInvokeCommand, productResumeCommand, productPreviewCommand,
-} from "../commands/product/action.js";
-import {
-  productApplyCommand, type ProductApplyOptions,
-} from "../commands/product/apply.js";
-import {
-  productStatusCommand, type ProductStatusOptions,
-} from "../commands/product/status.js";
-import type { ProductActionOptions } from "../commands/product/inputs.js";
-import {
-  productActivateCommand, productInstallCommand, type ProductPackageOptions,
-} from "../commands/product/package.js";
-import { productInitCommand } from "../commands/product/init.js";
+import { runExitCodeCommand } from "llmwiki-core/compiler-cli";
+import { productInvokeCommand, productResumeCommand, productPreviewCommand } from "llmwiki-core/compiler-cli";
+import { productApplyCommand, type ProductApplyOptions } from "llmwiki-core/compiler-cli";
+import { productStatusCommand, type ProductStatusOptions } from "llmwiki-core/compiler-cli";
+import type { ProductActionOptions } from "llmwiki-core/compiler-cli";
+import { productActivateCommand, productInstallCommand, type ProductPackageOptions } from "llmwiki-core/compiler-cli";
+import { productInitCommand } from "llmwiki-core/compiler-cli";
 
 /** Every verb here answers `--json` with the same envelope contract. */
 const JSON_DESCRIPTION = "Emit the machine-readable envelope instead of the human lines";

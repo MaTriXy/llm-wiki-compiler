@@ -5,7 +5,9 @@
  * bytes and every ordinary lifecycle surface treats the result as terminal.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createLocalWorkflowHost } from "../src/local-workflow-host/index.js";
+import { createLocalWorkflowRuntime } from "../src/workflows/runtime.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
 import { seedArtifact } from "./fixtures/artifact-seed.js";
 import { activateProductLocked } from "../src/products/binding/activate.js";
@@ -53,6 +55,23 @@ function reportRef(): Promise<string> {
 }
 
 describe("terminal workflow refusal", () => {
+  it("uses constructed host observations and terminal persistence for refusal", async () => {
+    const run = await startedRun();
+    const base = createLocalWorkflowHost();
+    const processSource = vi.fn(base.observations.processSource);
+    const artifact = vi.fn(base.observations.artifact);
+    const writeCandidates = vi.fn(base.records.writeCandidates);
+    const runtime = createLocalWorkflowRuntime({ ...base,
+      observations: { ...base.observations, processSource, artifact },
+      records: { ...base.records, writeCandidates } });
+    expect((await runtime.refuse(root.dir, run.runId, {
+      verifierResult: "not-approvable", evidenceRef: await reportRef(),
+    })).status).toBe("refused");
+    expect(processSource).toHaveBeenCalledOnce();
+    expect(artifact).toHaveBeenCalledOnce();
+    expect(writeCandidates).toHaveBeenCalledOnce();
+  });
+
   it("derives and records the process-declared reason over verified evidence", async () => {
     const started = await startedRun();
     const refused = await refuseWorkflow(root.dir, started.runId, {

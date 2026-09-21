@@ -29,7 +29,7 @@
  * rather than reaching the compiler as an unsound cast.
  */
 
-import { parseInputJsonObject, parseInputPairs } from "../workflow-shared.js";
+import { parseInputJsonObject, parseInputPairs } from "../../cli/input-parsers.js";
 import type {
   PackActionInputScalarV2, PackActionInputValueV2,
 } from "../../operations-packs/types.js";

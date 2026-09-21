@@ -7,7 +7,7 @@
  */
 
 import type { Command } from "commander";
-import { stateResetCommand } from "../commands/state-reset.js";
+import { stateResetCommand } from "llmwiki-core/compiler-cli";
 
 /** Register the `state` command group (currently just `state reset`) on `program`. */
 export function registerStateCommands(program: Command): void {

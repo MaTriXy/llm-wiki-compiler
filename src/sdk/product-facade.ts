@@ -1,6 +1,6 @@
 /**
  * @file src/sdk/product-facade.ts
- * @description The EXPERIMENTAL product slice of the `Wiki` facade — the SDK
+ * @description The EXPERIMENTAL product slice of the `WikiCore` facade — the SDK
  * surface for invoking an activated product's actions.
  *
  * AN ADAPTER, and nothing else. It imports the product service and the service's
@@ -38,18 +38,18 @@
 import { createOperationRuntime } from "../operation-bundles/runtime-factory.js";
 import { createProductService } from "../products/service.js";
 import { sdkPreparationPrincipal } from "./preparation-facade.js";
-import type { SdkPreparationOptions, SdkProductActionInput, Wiki } from "./types.js";
+import type { SdkPreparationOptions, SdkProductActionInput, WikiCore } from "./core-types.js";
 
-/** The experimental product method the `Wiki` facade composes in. */
-export type ProductFacadeSlice = Pick<Wiki, "product">;
+/** The experimental product method the `WikiCore` facade composes in. */
+export type ProductFacadeSlice = Pick<WikiCore, "product">;
 
 /**
- * Build the experimental product slice of the `Wiki` facade bound to `root`.
+ * Build the experimental product slice of the `WikiCore` facade bound to `root`.
  *
  * @param root - Normalized absolute project root.
  * @param runQuiet - The facade's quiet-scoping wrapper (output suppressed).
  * @param options - The embedder's preparation identity and grants, if any.
- * @returns The experimental product Wiki surface.
+ * @returns The experimental product WikiCore surface.
  */
 export function buildProductFacade(
   root: string,

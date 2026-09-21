@@ -1,6 +1,6 @@
 /**
  * @file src/sdk/preparation-facade.ts
- * @description The EXPERIMENTAL preparation slice of the `Wiki` facade — the
+ * @description The EXPERIMENTAL preparation slice of the `WikiCore` facade — the
  * preparation service's SECOND real caller, and the reason extracting it was
  * justified at all.
  *
@@ -37,12 +37,12 @@ import type {
   PreparationPrincipal, PreparationPrincipalResolverV1,
 } from "../preparations/service.js";
 import type {
-  SdkGatePreparationInput, SdkPreparationOptions, SdkStagePreparationInput, Wiki,
-} from "./types.js";
+  SdkGatePreparationInput, SdkPreparationOptions, SdkStagePreparationInput, WikiCore,
+} from "./core-types.js";
 
-/** The experimental preparation methods the `Wiki` facade composes in. */
+/** The experimental preparation methods the `WikiCore` facade composes in. */
 export type PreparationFacadeSlice = Pick<
-  Wiki,
+  WikiCore,
   "stagePreparation" | "previewPreparation" | "listPreparations" | "showPreparation"
   | "failPreparation"
   | "cancelPreparation" | "pausePreparation" | "resumePreparation"
@@ -137,12 +137,12 @@ function inMemoryDocument(text: unknown, label: "plan" | "seed"): Promise<Prepar
 }
 
 /**
- * Build the experimental preparation slice of the `Wiki` facade bound to `root`.
+ * Build the experimental preparation slice of the `WikiCore` facade bound to `root`.
  *
  * @param root - Normalized absolute project root.
  * @param runQuiet - The facade's quiet-scoping wrapper (output suppressed).
  * @param options - The embedder's preparation identity and grants, if any.
- * @returns The experimental preparation Wiki methods.
+ * @returns The experimental preparation WikiCore methods.
  */
 export function buildPreparationFacade(
   root: string,
