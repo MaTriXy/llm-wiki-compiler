@@ -5,12 +5,12 @@
 export { advanceWorkflowWithHost } from "llmwiki-local-workflows";
 export type { AdvanceOutcome, AdvanceResult, ResolvedStage } from "llmwiki-local-workflows";
 import { advanceWorkflowWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { AdvanceResult, ResolvedStage } from "llmwiki-local-workflows";
 import { resolveCurrentStage as resolveStageWithReader } from "llmwiki-local-workflows";
 import { loadProfile } from "llmwiki-core";
-import type { WorkflowRun } from "./types.js";
-import type { BlockingLockOptions } from "../utils/lock.js";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
 
 /** Preserve the standard compiler reader for callers of the legacy helper. */
 export async function resolveCurrentStage(root: string, run: WorkflowRun,

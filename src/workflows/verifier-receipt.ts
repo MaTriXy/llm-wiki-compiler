@@ -5,9 +5,9 @@
 export { predecessorChainRoot, mintVerifierReceiptWithHost } from "llmwiki-local-workflows";
 export { readLiveTargetDigest } from "llmwiki-core";
 import { mintVerifierReceiptWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { HostVerifierRegistryV1 } from "./verifier-registry.js";
-import type { VerifierReceiptV1 } from "./types.js";
+import type { VerifierReceiptV1 } from "llmwiki-core/local-workflow-contracts";
 
 
 /** Mint and persist one receipt under the producing stage id. */

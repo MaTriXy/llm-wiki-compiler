@@ -5,7 +5,7 @@
 export { lookupAction, listActionsWithHost, showActionWithHost } from "llmwiki-local-workflows";
 export type { ActionSummary, ActionDetail } from "llmwiki-local-workflows";
 import { listActionsWithHost, showActionWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { ActionSummary, ActionDetail } from "llmwiki-local-workflows";
 
 

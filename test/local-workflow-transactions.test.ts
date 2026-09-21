@@ -94,4 +94,26 @@ describe("local workflow host transactions", () => {
     })).rejects.toBe(failure);
     await expectLockReleased();
   });
+
+  it("does not rethrow an awaited effect error handled by the callback", async () => {
+    const scope = createLocalWorkflowTransactionScope();
+    const failure = new Error("handled host error");
+    const result = await scope.transactions.withMutation(ctx.root, async tx => {
+      try {
+        await scope.runEffect(tx, ctx.root, async () => { throw failure; });
+      } catch (error) { expect(error).toBe(failure); }
+      return scope.runEffect(tx, ctx.root, async () => "recovered");
+    });
+    expect(result).toBe("recovered");
+    await expectLockReleased();
+  });
+
+  it("lets an explicit catch own recovery from an effect failure", async () => {
+    const scope = createLocalWorkflowTransactionScope();
+    await expect(scope.transactions.withMutation(ctx.root, tx =>
+      scope.runEffect(tx, ctx.root, async () => { throw new Error("handled"); })
+        .catch(() => "recovered"),
+    )).resolves.toBe("recovered");
+    await expectLockReleased();
+  });
 });

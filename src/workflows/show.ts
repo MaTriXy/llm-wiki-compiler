@@ -5,7 +5,7 @@
 export { showWorkflowWithHost } from "llmwiki-local-workflows";
 export type { WorkflowStageDetail, WorkflowDetail } from "llmwiki-local-workflows";
 import { showWorkflowWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { WorkflowDetail } from "llmwiki-local-workflows";
 
 

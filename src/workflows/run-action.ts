@@ -5,9 +5,9 @@
 export { runActionWithHost } from "llmwiki-local-workflows";
 export type { ActionRunResult } from "llmwiki-local-workflows";
 import { runActionWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { ActionRunResult } from "llmwiki-local-workflows";
-import type { ActionSurface } from "../profile/types.js";
+import type { ActionSurface } from "llmwiki-core/local-workflow-contracts";
 import { nonInteractiveHumanGateIo, type HumanGateIo } from "./human-gate-confirm.js";
 
 

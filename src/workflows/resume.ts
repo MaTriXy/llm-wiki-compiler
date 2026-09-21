@@ -4,8 +4,8 @@
  */
 export { resumeWorkflowWithHost } from "llmwiki-local-workflows";
 import { resumeWorkflowWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
-import type { WorkflowRun } from "./types.js";
+import { createLocalWorkflowHost } from "./host.js";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
 
 
 /**

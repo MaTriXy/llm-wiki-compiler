@@ -6,7 +6,7 @@ export { submitStageOutputWithHost } from "llmwiki-local-workflows";
 export type { PageStageOutput, RelationStageOutput, LifecycleStageOutput, StageOutput, SubmitResult } from "llmwiki-local-workflows";
 import { submitStageOutputWithHost, type StageOutput, type SubmitResult } from "llmwiki-local-workflows";
 import type { SubmitStageOutputOptions } from "./artifact-output.js";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 
 const legacyHost = createLocalWorkflowHost();
 

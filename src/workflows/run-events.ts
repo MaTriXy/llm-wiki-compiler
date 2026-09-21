@@ -4,8 +4,8 @@
  */
 export { listRunEventsWithHost } from "llmwiki-local-workflows";
 import { listRunEventsWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
-import type { WorkflowEvent } from "./types.js";
+import { createLocalWorkflowHost } from "./host.js";
+import type { WorkflowEvent } from "llmwiki-core/local-workflow-contracts";
 
 
 /**

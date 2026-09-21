@@ -5,9 +5,9 @@
 export { computeAdaptationPlan, adaptDryRunWithHost, adaptApplyWithHost, mapStageId, AdaptationKeyCollisionError, AdaptDryRunError } from "llmwiki-local-workflows";
 export type { AdaptationPlan } from "llmwiki-local-workflows";
 import { adaptDryRunWithHost, adaptApplyWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { AdaptationPlan } from "llmwiki-local-workflows";
-import type { WorkflowRun } from "./types.js";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
 
 
 /**

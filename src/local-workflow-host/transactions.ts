@@ -8,6 +8,7 @@
 import path from "node:path";
 import { acquireMutationLockBlocking } from "../operation-bundles/lock-gate.js";
 import { releaseLock, type BlockingLockOptions } from "../utils/lock.js";
+import { trackHostEffect } from "./tracked-effect.js";
 import {
   LOCAL_WORKFLOW_CORE_INSTANCE, LocalWorkflowTransactionError,
   type LocalWorkflowTransaction, type LocalWorkflowTransactions,
@@ -16,8 +17,7 @@ import {
 interface Lease {
   root: string;
   active: boolean;
-  pending: Promise<void>[];
-  errors: unknown[];
+  effects: ReturnType<typeof trackHostEffect>[];
 }
 
 /** Reject before an operation starts; a structurally similar object is not a lease. */
@@ -32,7 +32,7 @@ function assertLease(leases: WeakMap<LocalWorkflowTransaction, Lease>,
 /** Acquire once, await the entire callback, revoke the handle, then release once. */
 async function withMutation<T>(leases: WeakMap<LocalWorkflowTransaction, Lease>, root: string,
   body: (transaction: LocalWorkflowTransaction) => Promise<T>, options: BlockingLockOptions): Promise<T> {
-  const lease: Lease = { root: path.resolve(root), active: true, pending: [], errors: [] };
+  const lease: Lease = { root: path.resolve(root), active: true, effects: [] };
   await acquireMutationLockBlocking(root, "ordinary", options);
   const transaction = Object.freeze({}) as LocalWorkflowTransaction;
   leases.set(transaction, lease);
@@ -45,8 +45,9 @@ async function withMutation<T>(leases: WeakMap<LocalWorkflowTransaction, Lease>,
   } finally {
     lease.active = false;
     try {
-      await Promise.all(lease.pending);
-      if (!callbackFailed && lease.errors.length > 0) throw lease.errors[0];
+      await Promise.all(lease.effects.map(effect => effect.settled));
+      const unobserved = lease.effects.find(effect => effect.unobservedFailure());
+      if (!callbackFailed && unobserved) throw unobserved.failure();
     } finally {
       await releaseLock(root);
     }
@@ -58,9 +59,9 @@ function runEffect<T>(leases: WeakMap<LocalWorkflowTransaction, Lease>, transact
   root: string, effect: () => Promise<T>): Promise<T> {
   assertLease(leases, transaction, root);
   const lease = leases.get(transaction)!;
-  const result = Promise.resolve().then(effect);
-  lease.pending.push(result.then(() => undefined, error => { lease.errors.push(error); }));
-  return result;
+  const tracked = trackHostEffect(effect);
+  lease.effects.push(tracked);
+  return tracked.result;
 }
 
 /** Internal host assembly helper; the effect callback is not part of the engine contract. */

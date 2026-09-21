@@ -5,7 +5,7 @@
 export { listWorkflowsWithHost } from "llmwiki-local-workflows";
 export type { WorkflowSummary } from "llmwiki-local-workflows";
 import { listWorkflowsWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { WorkflowSummary } from "llmwiki-local-workflows";
 
 

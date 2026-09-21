@@ -4,11 +4,12 @@
  */
 export { approveHumanGateWithHost } from "llmwiki-local-workflows";
 import { approveHumanGateWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
 
 
 
 /** Approve only the exact subject confirmed through this process's terminal. */
-export async function approveHumanGateInteractively(root: string, runId: string, gateId: string) {
+export async function approveHumanGateInteractively(root: string, runId: string, gateId: string): Promise<WorkflowRun> {
   return approveHumanGateWithHost(createLocalWorkflowHost(), root, runId, gateId);
 }

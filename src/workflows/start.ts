@@ -4,12 +4,12 @@
  * preconditions remain unchanged; the algorithm uses the same constructed host
  * as the new runtime. The locked entry point deliberately does not reacquire.
  */
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import { startWorkflowWithHost, startWorkflowWithServices } from "llmwiki-local-workflows";
 import { mintRunId } from "llmwiki-local-workflows";
 import { writeRunWithCallerHeldLock } from "llmwiki-core/compiler-legacy-workflows";
-import type { BlockingLockOptions } from "../utils/lock.js";
-import type { WorkflowRun } from "./types.js";
+import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
 export { UnknownWorkflowError, TooManyActiveRunsError, WorkflowRunStoreUnavailableError } from "llmwiki-local-workflows";
 export { WorkflowInputsTooLargeError } from "./input-snapshot.js";
 export { lookupWorkflowDef } from "llmwiki-core/local-workflow-contracts";

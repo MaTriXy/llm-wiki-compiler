@@ -2,16 +2,10 @@
  * Workflow-only SDK contract, composed by the standard distribution.
  * Core consumers do not depend on these execution methods.
  */
-import type { ActionSummary, ActionDetail } from "../workflows/actions.js";
-import type { WorkflowSummary } from "../workflows/list.js";
-import type { WorkflowDetail } from "../workflows/show.js";
-import type { WorkflowRun, WorkflowActorKind, WorkflowEvent } from "../workflows/types.js";
+import type { ActionSummary, ActionDetail, WorkflowSummary, WorkflowDetail,
+  AdaptationPlan, AdvanceResult, StageOutput, SubmitResult, ActionRunResult } from "llmwiki-local-workflows";
+import type { WorkflowRun, WorkflowActorKind, WorkflowEvent, ProjectionResult } from "llmwiki-core/local-workflow-contracts";
 import type { RunStatus } from "../workflows/status.js";
-import type { AdaptationPlan } from "../workflows/adapt.js";
-import type { AdvanceResult } from "../workflows/advance.js";
-import type { StageOutput, SubmitResult } from "../workflows/stage-output.js";
-import type { ActionRunResult } from "../workflows/run-action.js";
-import type { ProjectionResult } from "../workflows/projection.js";
 
 export interface WikiWorkflow {
   /**

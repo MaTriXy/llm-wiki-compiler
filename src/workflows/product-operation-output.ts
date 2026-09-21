@@ -4,10 +4,10 @@
  */
 export { productPreparationRef, recordProductOperationOutputLocked, replayProductOperationOutputLocked } from "llmwiki-local-workflows";
 export type { ProductOperationStageOutput, ProductPreparationRefV1 } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
-import type { LocalWorkflowHost } from "../local-workflow-host/host-contract.js";
-import type { WorkflowRun } from "./types.js";
-import type { WorkflowStageDef } from "../profile/types.js";
+import { createLocalWorkflowHost } from "./host.js";
+import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
 import { assertProductOperationOutputCurrent as verifyOperation, assertProductStageOutputCurrent as verifyStage } from "llmwiki-local-workflows";
 
 type ProductObservations = Pick<LocalWorkflowHost["observations"], "locatePreparation" | "readPreparation" | "operationBundle">;

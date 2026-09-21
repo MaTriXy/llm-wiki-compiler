@@ -6,8 +6,8 @@ export { projectRun, writeProjectionWithHost, maybeAutoProject } from "llmwiki-l
 export type { ProjectionResult } from "llmwiki-local-workflows";
 export { confineProjectionPath } from "llmwiki-core/compiler-cli";
 import { writeProjectionWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
-import type { ProjectionResult } from "../local-workflow-host/projection.js";
+import { createLocalWorkflowHost } from "./host.js";
+import type { ProjectionResult } from "llmwiki-core/local-workflow-contracts";
 
 
 /**

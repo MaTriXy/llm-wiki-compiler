@@ -32,7 +32,7 @@ import { createLocalWorkflowRuntime } from "../workflows/runtime.js";
 import type { ApproveGateOptions } from "../workflows/gate.js";
 import { SdkHumanGateError } from "../workflows/errors.js";
 import type { WikiWorkflow } from "./workflow-types.js";
-import type { WorkflowRun } from "../workflow-history/types.js";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
 
 /** The standard facade's optional local workflow methods. */
 export type WorkflowFacadeSlice = WikiWorkflow;

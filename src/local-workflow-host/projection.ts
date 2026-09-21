@@ -82,6 +82,11 @@ export async function writeLocalWorkflowProjection(root: string, workflowId: str
   const loaded = await loadProfile(root);
   const def = lookupWorkflowDef(loaded.profile.workflows, workflowId);
   if (def?.projectionFile === undefined) return { status: "no-target" };
+  // Rendered frontmatter includes inputs and can exceed the existing overwrite
+  // probe window. Do not impose a new size limit on valid first-time projections.
+  if (!body.includes(DERIVED_MARKER)) {
+    return { status: "unavailable", detail: "projection body is not a derived projection page" };
+  }
   let writePath: string;
   try {
     writePath = await confineProjectionPath(root, def.projectionFile);
@@ -95,5 +100,3 @@ export async function writeLocalWorkflowProjection(root: string, workflowId: str
   await atomicWrite(writePath, body, { confineRoot: realRoot });
   return { status: "written", path: def.projectionFile };
 }
-
-

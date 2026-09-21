@@ -50,6 +50,14 @@ const PASSIVE_CONSUMERS = [
   "viewer/workflow-run-facts.ts", "viewer/workflow-runs.ts",
 ];
 
+/** Generic CLI helpers intentionally implemented and exported by core. */
+const CORE_CLI_HELPERS = new Set(["cli/input-parsers.ts", "cli/provider-option.ts", "cli/shared.ts"]);
+
+/** Reject standard composition while allowing only the named generic helpers. */
+function isStandardComposition(file: string): boolean {
+  return /^(?:cli\/|commands\/workflow|mcp\/workflow)/.test(file) && !CORE_CLI_HELPERS.has(file);
+}
+
 /** Snapshot every fixture path and file byte, distinguishing empty directories. */
 async function snapshot(root: string): Promise<Array<[string, string | null]>> {
   const entries = (await readdir(root, { recursive: true })).sort();
@@ -79,7 +87,8 @@ function engineEdges(entries: string[]): string[] {
     seen.add(file);
     for (const dependency of dependencies(file)) {
       if (["workflows", "local-workflows"].some(dir => dependency.startsWith(path.join(SRC_DIR, dir) + path.sep))
-        || ["index.ts", "sdk/wiki.ts", "sdk/workflow-facade.ts"].some(file => dependency === path.join(SRC_DIR, file))) {
+        || ["index.ts", "cli.ts", "sdk/wiki.ts", "sdk/workflow-facade.ts"].some(file => dependency === path.join(SRC_DIR, file))
+        || isStandardComposition(path.relative(SRC_DIR, dependency))) {
         offending.push(`${path.relative(SRC_DIR, file)} -> ${path.relative(SRC_DIR, dependency)}`);
       } else pending.push(dependency);
     }

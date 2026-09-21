@@ -5,10 +5,10 @@
 export { resolveGateChallengeWithHost, approveGateWithHost } from "llmwiki-local-workflows";
 export type { ApproveGateOptions, GateChallengeV1 } from "llmwiki-local-workflows";
 import { resolveGateChallengeWithHost, approveGateWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { ApproveGateOptions, GateChallengeV1 } from "llmwiki-local-workflows";
-import type { WorkflowRun } from "./types.js";
-import type { BlockingLockOptions } from "../utils/lock.js";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
 
 
 /** Resolve and verify the exact gate challenge shown to an operator. */

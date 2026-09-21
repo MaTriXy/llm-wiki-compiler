@@ -5,9 +5,9 @@
 export { refuseWorkflowWithHost, WorkflowRefusalError } from "llmwiki-local-workflows";
 export type { RefuseWorkflowOptionsV1 } from "llmwiki-local-workflows";
 import { refuseWorkflowWithHost } from "llmwiki-local-workflows";
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
+import { createLocalWorkflowHost } from "./host.js";
 import type { RefuseWorkflowOptionsV1 } from "llmwiki-local-workflows";
-import type { WorkflowRun } from "./types.js";
+import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
 
 
 /** Irreversibly refuse a run using its process-declared terminal disposition. */
