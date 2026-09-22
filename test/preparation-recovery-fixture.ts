@@ -253,18 +253,9 @@ export async function driveRunning(
     },
     stateVersionAtSeal: 1,
   });
-  await acquireLock(root, { quiet: true });
-  try {
-    const read = await readPreparationRun(root, binding);
-    if (read.status !== "ok") throw new Error("run unavailable");
-    await appendProjectedTransitionLocked(root, binding, preparationRunPredecessor(read.run), {
-      type: "phase-started", stateAfter: "running", actor: { id: "operator", surface: "cli" },
-      at: "2026-08-07T00:00:01.000Z",
-      payload: { kind: "phase", phaseInstanceId, phaseState: "running" },
-    }, attemptIntentProjector(sealed, 1));
-  } finally {
-    await releaseLock(root);
-  }
+  await appendPhaseUnderLock(fixture, {
+    type: "phase-started", phaseState: "running", at: "2026-08-07T00:00:01.000Z",
+  }, attemptIntentProjector(sealed, 1));
 }
 
 /** A staged project whose single run is `running` under a stranded owner. */

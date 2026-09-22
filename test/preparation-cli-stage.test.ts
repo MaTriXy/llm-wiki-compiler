@@ -12,9 +12,18 @@ import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { runCLI, expectCLIExit } from "./fixtures/run-cli.js";
 import {
-  emptyWorkspace, expectRefusal, initializedWorkspace, listedStates, onlyManifest,
-  planAndSeed, stageable,
+  emptyWorkspace, expectRefusal, initializedWorkspace, listedStates,
+  planAndSeed, planWithoutSeed, stageable, stageManifest,
 } from "./preparation-cli-fixture.js";
+
+/** Corrupt the active configuration and require the precise readiness refusal. */
+async function expectUnreadableProfile(cwd: string, planFile: string, seedFile: string): Promise<void> {
+  const { writeFile } = await import("node:fs/promises");
+  const { PROFILE_FILE } = await import("../src/utils/constants.js");
+  await writeFile(path.join(cwd, PROFILE_FILE), "{ not json");
+  const reason = await expectRefusal(["preparation", "stage", planFile, "--seed", seedFile], cwd);
+  expect(reason).toMatch(/profile is present but unreadable/u);
+}
 
 describe("GENESIS TO TERMINAL, entirely through the binary", () => {
   it("stage -> list -> fail -> list, with no in-process substrate call", async () => {
@@ -68,15 +77,8 @@ describe("GENESIS TO TERMINAL, entirely through the binary", () => {
     // operator mistake, not an edge case — and the refusal has to name the flag
     // they need rather than fail deeper on evidence coverage.
     const cwd = await initializedWorkspace("declaredinputs");
-    const { validPlan } = await import("./preparations/plan-fixture.js");
-    const { writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const planFile = path.join(cwd, "plan.json");
-    await writeFile(planFile, JSON.stringify(validPlan()));
-    const result = await runCLI(["preparation", "stage", planFile, "--json"], cwd);
-    expect(result.code).not.toBe(0);
-    expect((JSON.parse(result.stdout) as { reason: string }).reason)
-      .toMatch(/pass --seed/u);
+    const planFile = await planWithoutSeed(cwd);
+    expect(await expectRefusal(["preparation", "stage", planFile], cwd)).toMatch(/pass --seed/u);
   });
 
   it("REFUSES an allowance that is not a positive whole number", async () => {
@@ -84,16 +86,11 @@ describe("GENESIS TO TERMINAL, entirely through the binary", () => {
     // `Number("1e999")` is Infinity, so neither a bare truthiness check nor
     // `parseInt` would catch these.
     const cwd = await initializedWorkspace("allowance");
-    const { validPlan } = await import("./preparations/plan-fixture.js");
-    const { writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const planFile = path.join(cwd, "plan.json");
-    await writeFile(planFile, JSON.stringify(validPlan()));
+    const planFile = await planWithoutSeed(cwd);
 
     for (const bad of ["0", "-1", "1e999", "abc", "1.5"]) {
-      const result = await runCLI(["preparation", "stage", planFile, "--allowance", bad, "--json"], cwd);
-      expect(result.code).not.toBe(0);
-      expect((JSON.parse(result.stdout) as { reason: string }).reason).toMatch(/positive whole number/u);
+      const reason = await expectRefusal(["preparation", "stage", planFile, "--allowance", bad], cwd);
+      expect(reason).toMatch(/positive whole number/u);
     }
   });
 });
@@ -106,36 +103,19 @@ describe("stage respects the plan and the project lock", () => {
     // it, because the coverage check compares the DIGEST only and the digest is
     // over the value alone. Metadata never enters it, so only reading the
     // durable manifest can witness this.
-    const cwd = await initializedWorkspace("classification");
-    const { fixturePlan } = await import("./preparations/store-fixture.js");
-    const { readFile, writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const plan = fixturePlan((object) => {
+    const { cwd, planFile, seedFile } = await stageable("classification", (object) => {
       const set = object.initialInputSet as Record<string, unknown>;
       set.sensitivity = "restricted";
       set.retention = "audit";
     });
-    const planFile = path.join(cwd, "plan.json");
-    const seedFile = path.join(cwd, "seed.json");
-    await writeFile(planFile, JSON.stringify(plan));
-    await writeFile(seedFile, JSON.stringify({ seed: "initial-input", version: 1 }));
 
-    const staged = await runCLI(
-      ["preparation", "stage", planFile, "--seed", seedFile, "--json"], cwd);
-    expectCLIExit(staged, 0);
-    const created = JSON.parse(staged.stdout) as { workspaceId: string };
-
-    const { MANIFEST_FILENAME, PREPARATIONS_SEGMENT } = await import("../src/preparations/paths.js");
-    const dir = path.join(cwd, ".llmwiki", "workspaces", created.workspaceId, PREPARATIONS_SEGMENT);
-    const { readdir } = await import("node:fs/promises");
-    const [prepId] = await readdir(dir);
     // THE RECORDED INPUT, not the manifest as a whole. The manifest embeds the
     // PLAN too, so a substring search finds the operator's declaration whether
     // or not the input inherited it — the assertion passed with the hardcoded
     // values still in place. `initialEvidence` is what the input actually got.
-    const manifest = JSON.parse(
-      await readFile(path.join(dir, prepId!, MANIFEST_FILENAME), "utf8"),
-    ) as { initialEvidence: { sensitivity: string; retention: string }[] };
+    const manifest = await stageManifest(cwd, planFile, seedFile) as {
+      initialEvidence: { sensitivity: string; retention: string }[];
+    };
     expect(manifest.initialEvidence).toHaveLength(1);
     expect(manifest.initialEvidence[0]!.sensitivity).toBe("restricted");
     expect(manifest.initialEvidence[0]!.retention).toBe("audit");
@@ -150,10 +130,8 @@ describe("stage respects the plan and the project lock", () => {
     const { access } = await import("node:fs/promises");
     const { planFile, seedFile } = await planAndSeed(cwd);
 
-    const result = await runCLI(
-      ["preparation", "stage", planFile, "--seed", seedFile, "--json"], cwd);
-    expect(result.code).not.toBe(0);
-    expect((JSON.parse(result.stdout) as { reason: string }).reason).toMatch(/no \.llmwiki store/u);
+    const reason = await expectRefusal(["preparation", "stage", planFile, "--seed", seedFile], cwd);
+    expect(reason).toMatch(/no \.llmwiki store/u);
     // NOTHING was created — the refusal must not leave a partial store behind.
     await expect(access(path.join(cwd, ".llmwiki"))).rejects.toThrow();
   });
@@ -162,22 +140,14 @@ describe("stage respects the plan and the project lock", () => {
     // The everyday operator mistake. It escaped as an internal validator string
     // naming neither the flag nor the file, with EMPTY stdout under `--json`.
     const cwd = await initializedWorkspace("wrongseed");
-    const { fixturePlan } = await import("./preparations/store-fixture.js");
     const { writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const planFile = path.join(cwd, "plan.json");
-    const seedFile = path.join(cwd, "seed.json");
-    await writeFile(planFile, JSON.stringify(fixturePlan()));
+    const { planFile, seedFile } = await planAndSeed(cwd);
     await writeFile(seedFile, JSON.stringify({ not: "the declared bytes" }));
 
-    const result = await runCLI(
-      ["preparation", "stage", planFile, "--seed", seedFile, "--json"], cwd);
-    expect(result.code).not.toBe(0);
     // Parseable, and on stdout — the envelope contract holds on the refusal
     // path too, which is where it was broken.
-    const envelope = JSON.parse(result.stdout) as { status: string; reason: string };
-    expect(envelope.status).toBe("refused");
-    expect(envelope.reason).toMatch(/staging refused/u);
+    const reason = await expectRefusal(["preparation", "stage", planFile, "--seed", seedFile], cwd);
+    expect(reason).toMatch(/staging refused/u);
   });
 
   it("REFUSES to stage while the project lock is held", async () => {
@@ -191,10 +161,8 @@ describe("stage respects the plan and the project lock", () => {
     const { releaseLock } = await import("../src/utils/lock.js");
     expect(await acquireMutationLock(cwd, "ordinary")).toBe(true);
     try {
-      const result = await runCLI(
-        ["preparation", "stage", planFile, "--seed", seedFile, "--json"], cwd);
-      expect(result.code).not.toBe(0);
-      expect((JSON.parse(result.stdout) as { reason: string }).reason).toMatch(/lock is busy/u);
+      const reason = await expectRefusal(["preparation", "stage", planFile, "--seed", seedFile], cwd);
+      expect(reason).toMatch(/lock is busy/u);
     } finally {
       await releaseLock(cwd);
     }
@@ -210,12 +178,7 @@ describe("the host readiness precheck", () => {
     // and the earlier version claimed otherwise.
     const cwd = await initializedWorkspace("readiness");
     const { planFile, seedFile } = await planAndSeed(cwd);
-    const { writeFile } = await import("node:fs/promises");
-    const { PROFILE_FILE } = await import("../src/utils/constants.js");
-    await writeFile(path.join(cwd, PROFILE_FILE), "{ not json");
-
-    const reason = await expectRefusal(["preparation", "stage", planFile, "--seed", seedFile], cwd);
-    expect(reason).toMatch(/profile is present but unreadable/u);
+    await expectUnreadableProfile(cwd, planFile, seedFile);
   });
 
   it("does NOT claim to authorize a plan's declared authorities", async () => {
@@ -267,11 +230,7 @@ describe("what the staged run actually records", () => {
     // Forging the actor to a made-up id passed the entire suite: nothing
     // observed whose identity lands on the durable record.
     const { cwd, planFile, seedFile } = await stageable("actor");
-    const staged = await runCLI(
-      ["preparation", "stage", planFile, "--seed", seedFile, "--json"], cwd);
-    expectCLIExit(staged, 0);
-    const created = JSON.parse(staged.stdout) as { workspaceId: string };
-    const manifest = await onlyManifest(cwd, created.workspaceId);
+    const manifest = await stageManifest(cwd, planFile, seedFile);
     expect(manifest.createdBy).toMatchObject({ id: "cli-operator", surface: "cli" });
   });
 
@@ -309,16 +268,7 @@ describe("what the staged run actually records", () => {
     // `fail` has this control; `stage` — the genesis command — had none, and
     // deleting its authority gate passed the whole suite.
     const { cwd, planFile, seedFile } = await stageable("stageauthority");
-    const { writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const { PROFILE_FILE } = await import("../src/utils/constants.js");
-    await writeFile(path.join(cwd, PROFILE_FILE), "{ not json");
-
-    const result = await runCLI(
-      ["preparation", "stage", planFile, "--seed", seedFile, "--json"], cwd);
-    expect(result.code).not.toBe(0);
-    expect((JSON.parse(result.stdout) as { reason: string }).reason)
-      .toMatch(/profile is present but unreadable/u);
+    await expectUnreadableProfile(cwd, planFile, seedFile);
   });
 });
 

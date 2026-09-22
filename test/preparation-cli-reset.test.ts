@@ -22,7 +22,7 @@
 import { readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { runCLI } from "./fixtures/run-cli.js";
+import { runCLI, expectCLIJson } from "./fixtures/run-cli.js";
 import { emptyWorkspace } from "./preparation-cli-fixture.js";
 import { preparationKeyFile } from "../src/preparations/paths.js";
 import { FORCED_KEY_CONFIRMATION, MISSING_KEY_CONFIRMATION } from "../src/preparations/reset.js";
@@ -131,8 +131,7 @@ describe("the verb can be figured out from the verb", () => {
     const cwd = await strandedProject("reset-wrong-phrase-boundary");
     const result = await runCLI(
       ["preparation", "reset", "--confirm", FORCED_KEY_CONFIRMATION, "--json"], cwd);
-    expect(result.code).toBe(1);
-    expect(envelope(result.stdout)).toMatchObject({
+    expectCLIJson(result, 1, {
       status: "refused", reason: expect.stringContaining("confirmation-mismatch"),
     });
   });
@@ -151,8 +150,7 @@ describe("the secret has a route that `ps` cannot see", () => {
       "preparation", "reset", "--confirm", MISSING_KEY_CONFIRMATION,
       "--continue", unitId, "--json",
     ], cwd, { [RESET_TOKEN_ENV]: token });
-    expect(result.code, result.stderr).toBe(0);
-    expect(envelope(result.stdout)).toMatchObject({ status: "completed", unitId });
+    expectCLIJson(result, 0, { status: "completed", unitId });
   });
 
   it("prefers an explicit --token over a stale variable in the environment", async () => {
@@ -165,8 +163,7 @@ describe("the secret has a route that `ps` cannot see", () => {
       "preparation", "reset", "--confirm", MISSING_KEY_CONFIRMATION,
       "--continue", unitId, "--token", token, "--json",
     ], cwd, { [RESET_TOKEN_ENV]: Buffer.alloc(32, 9).toString("base64") });
-    expect(result.code, result.stderr).toBe(0);
-    expect(envelope(result.stdout)).toMatchObject({ status: "completed", unitId });
+    expectCLIJson(result, 0, { status: "completed", unitId });
   });
 
   it("treats an EMPTY variable as absent, and says how to supply the secret", async () => {
@@ -262,8 +259,7 @@ describe("the verb refuses honestly", () => {
     const cwd = await strandedProject("reset-wrong-confirm");
     const result = await runCLI(
       ["preparation", "reset", "--confirm", "not-the-phrase", "--json"], cwd);
-    expect(result.code).toBe(1);
-    expect(envelope(result.stdout)).toMatchObject({
+    expectCLIJson(result, 1, {
       status: "refused", reason: expect.stringContaining("confirmation-mismatch"),
     });
   });

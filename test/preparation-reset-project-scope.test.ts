@@ -142,16 +142,22 @@ describe("other operations' pending units do not block a project reset", () => {
   });
 });
 
+/** Plant two valid pending intents so project scope differs observably from unit scope. */
+async function twoPendingIntents() {
+  await stagePreparation(root);
+  await removePreparationKey(root);
+  const first = await passOne();
+  const second = await plantSecondIntent(first.unitId);
+  expect(await resetUnits()).toHaveLength(2);
+  return { first, second };
+}
+
 describe("the continuation authorizes the unit it executes", () => {
   it("completes the named unit when a SECOND pending marker exists", async () => {
     // TWO VALID PENDING INTENTS, which is the only arrangement that can tell a
     // per-unit ticket from a project-scoped authorization: with one marker, a
     // ticket naming the wrong unit is indistinguishable from a right one.
-    await stagePreparation(root);
-    await removePreparationKey(root);
-    const first = await passOne();
-    const second = await plantSecondIntent(first.unitId);
-    expect(await resetUnits()).toHaveLength(2);
+    const { first, second } = await twoPendingIntents();
     const completed = await cliService().reset({
       confirmation: MISSING_KEY_CONFIRMATION,
       continuation: { unitId: second.unitId, token: second.token },
@@ -189,11 +195,7 @@ describe("supersession is authorized over every marker it clears", () => {
     // A SINGLE-UNIT TICKET CANNOT COVER THIS. Supersede deletes a SET, so an
     // authorization naming one unit while two are deleted is check-and-executor
     // disagreement by construction — which is what the C3 row produced.
-    await stagePreparation(root);
-    await removePreparationKey(root);
-    const first = await passOne();
-    const second = await plantSecondIntent(first.unitId);
-    expect(await resetUnits()).toHaveLength(2);
+    const { first, second } = await twoPendingIntents();
     const superseded = await cliService().reset({
       confirmation: MISSING_KEY_CONFIRMATION, supersede: true,
     });

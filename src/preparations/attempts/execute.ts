@@ -14,8 +14,8 @@
  * broker, handler, or custody work executes while the project lock is held.
  */
 
-import { acquireMutationLockBlocking } from "../../operation-bundles/lock-gate.js";
-import { LockBusyError, releaseLock } from "../../utils/lock.js";
+import { withOrdinaryMutationLock as underLock } from "../../operation-bundles/with-mutation-lock.js";
+import { LockBusyError } from "../../utils/lock.js";
 import { parseSha256Digest } from "../../capability-providers/ids.js";
 import { externalEffectReceiptDigest } from "../../capability-providers/brokers/receipts.js";
 import { captureOwnDataRecord } from "../../utils/runtime-capture.js";
@@ -640,16 +640,6 @@ async function commitCancelAware(
     // fail this leg while its commit stands.
   }
   return committed;
-}
-
-/** Run one bounded action inside the project lock + recovery gate, then release. */
-async function underLock<T>(root: string, fn: () => Promise<T>): Promise<T> {
-  await acquireMutationLockBlocking(root, "ordinary");
-  try {
-    return await fn();
-  } finally {
-    await releaseLock(root);
-  }
 }
 
 /**

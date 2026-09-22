@@ -6,13 +6,8 @@
  * with an `embedding-degraded` warning, instead of aborting the whole query.
  */
 
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeTempRoot } from "./fixtures/temp-root.js";
-import { writePage } from "./fixtures/write-page.js";
-import { pageEntryOf, writePageStore } from "./fixtures/typed-grounding.js";
-import * as providerMod from "../src/utils/provider.js";
+import { describe, expect, it, vi } from "vitest";
+import { useAlphaPageFixture, mockEmbeddingFailure } from "./fixtures/alpha-page.js";
 import { generateAnswer } from "../src/commands/query.js";
 
 // Selection call (tools present) picks the seeded concept; answer call echoes
@@ -22,22 +17,7 @@ vi.mock("../src/utils/llm.js", () => ({
     opts.tools ? JSON.stringify({ pages: ["concepts/alpha"], reasoning: "r" }) : opts.messages[0].content),
 }));
 
-const roots: string[] = [];
-afterEach(async () => {
-  vi.restoreAllMocks();
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
-});
-
-/** Seed a project whose v3 PAGE store is live for one concept page. */
-async function seedRootWithPageStore(): Promise<string> {
-  const root = await makeTempRoot("embed-degrade");
-  roots.push(root);
-  await writeFile(path.join(root, "wiki", "index.md"), "# Index\n");
-  await writePage(path.join(root, "wiki/concepts"), "alpha", { title: "Alpha", summary: "a" }, "ALPHA_BODY fact.");
-  await mkdir(path.join(root, ".llmwiki"), { recursive: true });
-  await writePageStore(root, [pageEntryOf("concepts/alpha", "Alpha", "a", [1, 0])]);
-  return root;
-}
+const seedRootWithPageStore = useAlphaPageFixture("embed-degrade", true);
 
 describe("page-level embedding failure degrades to the fallback", () => {
   it.each([
@@ -46,12 +26,7 @@ describe("page-level embedding failure degrades to the fallback", () => {
     { review: true },
   ])("answers via fallback only when opted in: %j", async (options) => {
     const root = await seedRootWithPageStore();
-    const embed = vi.fn(async () => {
-      throw new Error("no embedding credentials");
-    });
-    vi.spyOn(providerMod, "getProvider").mockReturnValue(
-      { embed, embedBatch: embed } as unknown as ReturnType<typeof providerMod.getProvider>,
-    );
+    const embed = mockEmbeddingFailure();
 
     await expect(generateAnswer(root, "what is alpha?")).rejects.toThrow("no embedding credentials");
     await expect(generateAnswer(root, "what is alpha?", { ...options, embeddingFailure: "throw" }))

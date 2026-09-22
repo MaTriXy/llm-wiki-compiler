@@ -12,6 +12,16 @@
  * A slice that legitimately changes a corpus file must update this manifest, which is
  * exactly the explicit disposition the migration requires. The friction is the feature.
  *
+ * RE-BASELINED 2026-09-21 for reviewed CI deduplication: RST-009 delegates its
+ * completed-sweep assertion to lifecycle-fixture.ts. PRN-006/007/008 delegate the
+ * identical authenticated resume request to resumePrune; their refusal, retained
+ * bytes and completion assertions stay in place. PRN-009 delegates setup and the
+ * afterDeletes crash to stageAndCrashPrune, whose rejection assertion now checks
+ * the crash message as well. Only these five body hashes and the whole-file
+ * hashes for key-reset.test.ts, prune-sweep.test.ts and lifecycle-fixture.ts move.
+ * The shared fixture is itself frozen. IDs, titles, counts, classification and
+ * production-entry-point obligations remain unchanged; no attack is removed.
+ *
  * RE-BASELINED 2026-09-19 for test typing only: key-reset helper arguments now
  * use PreparationRunId; the shared actor id is mutable string-typed for capture
  * probes; QTN-009 omits the unused runId from its evidence-location argument.
@@ -174,7 +184,7 @@ export const FROZEN_REGRESSIONS = [
   },
   {
     path: "test/preparations/key-reset.test.ts",
-    fileSha256: "0b296ca62fe8da7baca4fd932c38e89d931bc44edc0bf897cb88024ca19da0e5",
+    fileSha256: "0f606ffc12b22ff092f94ea22f18afcf7713d9fdb8f73e4f1bab5d1b77cc2fc8",
     scenarios: [
       { id: "PLA-REG-RST-001", title: "records an intent and returns a continuation secret on the first pass", bodySha256: "051ac05936034d5cd2184dec5cf82bd70939be1d5a06cef2f8085e60e65f313d", operation: "reset", evidence: "ordinary", reachesProduction: "resetPreparationKeyEpochLocked" },
       { id: "PLA-REG-RST-002", title: "quarantines all authority and installs one fresh epoch on the token-bearing rerun", bodySha256: "b874356ad9606d29189939791d5e53a1855ad116f972d5ae41c4c2e307493ab7", operation: "reset", evidence: "durability", reachesProduction: "resetPreparationKeyEpochLocked" },
@@ -184,7 +194,7 @@ export const FROZEN_REGRESSIONS = [
       { id: "PLA-REG-RST-006", title: "refuses the ordinary reset when the key is unreadable, not missing", bodySha256: "d65b2d314300398ac14fb442063647d6e98953ef6e3b8505f605cd7668225c6a", operation: "reset", evidence: "adversarial", reachesProduction: "resetPreparationKeyEpochLocked" },
       { id: "PLA-REG-RST-007", title: "refuses to reset a healthy key epoch", bodySha256: "967bdc7f779dcc578bceaaab406d93eedf6fc328f57c4d86f5d76a49a948becc", operation: "reset", evidence: "adversarial", reachesProduction: "resetPreparationKeyEpochLocked" },
       { id: "PLA-REG-RST-008", title: "removes the plaintext staged key and the intent marker once the reset completes", bodySha256: "3e0e19b82f4622c8f712bdd74c9943f62a2f51515ce801161fa5e712af17b22b", operation: "reset", evidence: "ordinary", reachesProduction: "resetPreparationKeyEpochLocked" },
-      { id: "PLA-REG-RST-009", title: "takes custody of sweep bytes staged under the epoch it replaces", bodySha256: "ea028e0b9b1fe5a69afcbcd87925c651d439e0c5cce73a1177e09189dcbcf746", operation: "reset", evidence: "ordinary", reachesProduction: "resetPreparationKeyEpochLocked" },
+      { id: "PLA-REG-RST-009", title: "takes custody of sweep bytes staged under the epoch it replaces", bodySha256: "ba59d3768d69a66aef8d05093f34c509ebdc1e2a3dbd2afedf3b4b8d93bebfb8", operation: "reset", evidence: "ordinary", reachesProduction: "resetPreparationKeyEpochLocked" },
       { id: "PLA-REG-RST-010", title: "refuses the reset when a prune unit is an empty symlink rather than a real directory", bodySha256: "2bf2fac389b8214f826e187403d659e30070ea3da4dbdc8b9b3d9ba477d54111", operation: "reset", evidence: "adversarial", reachesProduction: "resetPreparationKeyEpochLocked" },
       { id: "PLA-REG-RST-011", title: "stages a fresh durable preparation after a completed reset", bodySha256: "e59c880bf96cf8fb47dbaaedd5199f96b37f4658804dce56c5a8b277c5e6023b", operation: "reset", evidence: "durability", reachesProduction: "resetPreparationKeyEpochLocked" },
       { id: "PLA-REG-RST-012", title: "records intent instead of completing when a full reset unit is planted and the key is absent", bodySha256: "ee1a82722da37dd2e88532d39481fffc289aefec671e055a8cdd491a7023eee0", operation: "reset", evidence: "adversarial", reachesProduction: "resetPreparationKeyEpochLocked" },
@@ -200,7 +210,7 @@ export const FROZEN_REGRESSIONS = [
   },
   {
     path: "test/preparations/lifecycle-fixture.ts",
-    fileSha256: "98a749a06ba324f3bb669d7d1c2368c18677ad0d294f34f243ddf1f48365e7cd",
+    fileSha256: "9fa999bb5447cdc520aea41c988a0dbda9334bc09b59bfb15c2109246705f39e",
     scenarios: [
 
     ],
@@ -217,17 +227,17 @@ export const FROZEN_REGRESSIONS = [
   },
   {
     path: "test/preparations/prune-sweep.test.ts",
-    fileSha256: "c843cc68498aefc8fc52629f121657e40ca240e5a459e3ca2acbc884724e3f92",
+    fileSha256: "9eba0b408d72c2dd408e695b4fc82509c99fa5e6d87ed3aa3452610a39ed347b",
     scenarios: [
       { id: "PLA-REG-PRN-001", title: "is eligible only for a terminal run past the injectable retention floor", bodySha256: "4d2bccbf78d416a069379014ab7a961fe7b806a420da22ddd59daac2e5ddb677", operation: "shared", evidence: "ordinary", reachesProduction: "pruneEligibility" },
       { id: "PLA-REG-PRN-002", title: "is never eligible for a recovery-required run", bodySha256: "cbc5b2c182bc88806cd2be3ed1b31c7e5778ee94de58febf9a4336e6644e2a95", operation: "shared", evidence: "adversarial", reachesProduction: "pruneEligibility" },
       { id: "PLA-REG-PRN-003", title: "deletes an eligible run's exact bytes and keeps a tombstone", bodySha256: "44754842ea003bd5a45eb5f67fa34a642389781c68a7a79358a9efea24684973", operation: "prune", evidence: "ordinary", reachesProduction: "prunePreparationRunLocked" },
       { id: "PLA-REG-PRN-004", title: "refuses to prune a run still within the retention floor", bodySha256: "9e7f5a8fb04f8c330c11205733f756449fcedcb83529c3a58dc9a2be0ab820eb", operation: "prune", evidence: "adversarial", reachesProduction: "prunePreparationRunLocked" },
       { id: "PLA-REG-PRN-005", title: "refuses a fresh prune whose target changed after the plan became durable", bodySha256: "264e0f3dd617fb643f3bf18ba7ed101a8b57c45a3d71fc7840b43538159162e5", operation: "prune", evidence: "durability", reachesProduction: "prunePreparationRunLocked" },
-      { id: "PLA-REG-PRN-006", title: "refuses to delete a target whose bytes changed since the plan", bodySha256: "6838acbc7b0b2e4f4d9318148017cb25ec5c2ff6e11e9be779cc69f9a2d3c223", operation: "prune", evidence: "adversarial", reachesProduction: "prunePreparationRunLocked" },
-      { id: "PLA-REG-PRN-007", title: "resumes a prune that crashed between staging and unlinking, leaving no staged bytes", bodySha256: "506397e17a96ee2e100c53b3fb31bf3da6526a29122083562d25677db8e0cf7b", operation: "prune", evidence: "durability", reachesProduction: "prunePreparationRunLocked" },
-      { id: "PLA-REG-PRN-008", title: "refuses to stage into a prune unit replaced by a symlink out of the project", bodySha256: "17f0565046d4e873106eb09175cf556a6135db01278c7a022c2aa9e156c0873b", operation: "prune", evidence: "adversarial", reachesProduction: "prunePreparationRunLocked" },
-      { id: "PLA-REG-PRN-009", title: "resumes a prune interrupted after the deletes", bodySha256: "d7ed7d835c063970f8f5a1ad62fa3503cda2125edec394470b6c3fd9df36d98e", operation: "prune", evidence: "durability", reachesProduction: "prunePreparationRunLocked" },
+      { id: "PLA-REG-PRN-006", title: "refuses to delete a target whose bytes changed since the plan", bodySha256: "140cdb3e3e645e243296dcbc34b1766740710942718ff9c776802ef905be6f97", operation: "prune", evidence: "adversarial", reachesProduction: "prunePreparationRunLocked" },
+      { id: "PLA-REG-PRN-007", title: "resumes a prune that crashed between staging and unlinking, leaving no staged bytes", bodySha256: "10a021a2ab77a206d9345f4335d28a5f194ca3801212a056e88ec9f096ec778f", operation: "prune", evidence: "durability", reachesProduction: "prunePreparationRunLocked" },
+      { id: "PLA-REG-PRN-008", title: "refuses to stage into a prune unit replaced by a symlink out of the project", bodySha256: "fa4f23cb48e45cb2c447e9d5b8cc39afe5f1d4faadac35e5c23f5a3e0406a6cf", operation: "prune", evidence: "adversarial", reachesProduction: "prunePreparationRunLocked" },
+      { id: "PLA-REG-PRN-009", title: "resumes a prune interrupted after the deletes", bodySha256: "5470a21f016d7fc038abb13dc0801bbd7c92e7a610de660af14cd527c7010289", operation: "prune", evidence: "durability", reachesProduction: "prunePreparationRunLocked" },
       { id: "PLA-REG-PRN-010", title: "refuses to sweep from a partial inventory instead of deleting what it can see", bodySha256: "1871439db54148f96e96701885916cb09fc6e037b7cb3c4d271491e10276a49d", operation: "sweep", evidence: "adversarial", reachesProduction: "sweepPreparationOrphansLocked" },
       { id: "PLA-REG-PRN-011", title: "reclaims a manifest whose run leaf is provably absent", bodySha256: "0ba25a6e10697034960146a42e905158b3a577ed36baec12a885dce3aa5791c3", operation: "sweep", evidence: "ordinary", reachesProduction: "sweepPreparationOrphansLocked" },
       { id: "PLA-REG-PRN-012", title: "resumes its own pending unit after a staging crash instead of deriving a new one", bodySha256: "befcb766a30228f5684b44a054d98e3e7d3387bdee26cc7abc5529f76e7f0ce4", operation: "sweep", evidence: "durability", reachesProduction: "sweepPreparationOrphansLocked" },

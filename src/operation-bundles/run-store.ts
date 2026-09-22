@@ -7,7 +7,8 @@
 
 import { createHash } from "node:crypto";
 import { canonicalBytes, canonicalDigest } from "../profile/templates/signing/canonical.js";
-import { AtomicWriteCollisionError, atomicWrite, atomicWriteNoReplaceDurable } from "../utils/atomic-write.js";
+import { atomicWrite } from "../utils/atomic-write.js";
+import { authenticatedRunRead, publishRunGenesis } from "../utils/run-store-io.js";
 import { readConfinedLeafBuffer } from "../utils/confined-read.js";
 import { MAX_MUTATIONS_PER_BUNDLE, MAX_RUN_BYTES, MAX_RUN_EVIDENCE_BLOB_BYTES } from "./constants.js";
 import { mutationId, type MutationId } from "./ids.js";
@@ -92,13 +93,8 @@ export async function readOperationRun(root: string, binding: OperationRunBindin
   const key = await readOperationKey(root);
   if (key.status === "absent") return { status: "unavailable", detail: "key-missing", code: "integrity-key-missing" };
   if (key.status === "unavailable") return { status: "unavailable", detail: "key-unreadable", code: "integrity-key-unreadable" };
-  try {
-    const run = parseOperationRun(leaf.body, binding);
-    if (!verifyOperationRunIntegrity(run, key.key, binding)) throw new Error("integrity");
-    return { status: "ok", run };
-  } catch {
-    return { status: "unavailable", detail: "run-invalid", code: "run-integrity-invalid" };
-  }
+  return authenticatedRunRead(() => parseOperationRun(leaf.body, binding),
+    (run) => verifyOperationRunIntegrity(run, key.key, binding));
 }
 
 /** Sign, serialize, parse, and authenticate a candidate before touching disk. */
@@ -133,17 +129,10 @@ export async function createOperationRunLocked(root: string, input: InitialOpera
   const content = createInitialOperationRun(input), binding = operationRunBinding(content);
   const prepared = prepareSignedRun(content, key.key, binding, "ordinary");
   const file = operationPaths(root, binding.workspaceId).runFile(binding.runId);
-  try {
-    await atomicWriteNoReplaceDurable(file, prepared.serialized, {
-      confineRoot: root, exactParent: true, mode: 0o600,
-    });
-  } catch (error) {
-    if (error instanceof AtomicWriteCollisionError) {
-      const collision = await readOperationRun(root, binding);
-      throw new Error(`operation run genesis already exists: ${collision.status}`);
-    }
-    throw error;
-  }
+  await publishRunGenesis({ root, file }, prepared.serialized, async () => {
+    const collision = await readOperationRun(root, binding);
+    return `operation run genesis already exists: ${collision.status}`;
+  });
   return prepared.parsed;
 }
 

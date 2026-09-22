@@ -26,10 +26,9 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { reviewProductReadiness } from "../../src/products/readiness.js";
-import { installDevProvider } from "../../src/capability-providers/host/install.js";
+import { readinessRequirement, installReadinessProvider, reviewReadinessDimension } from "./readiness-provider-fixture.js";
 import {
-  devInstallMaterial, installResolutionFixture, removeResolutionFixture, type ResolutionFixture,
+  installResolutionFixture, removeResolutionFixture, type ResolutionFixture,
 } from "../capability-providers/resolution-fixture.js";
 import type { ProviderRequirementV2 } from "../../src/operations-packs/types.js";
 import type { ProductReadinessDimensionV2 } from "../../src/operations-packs/types.js";
@@ -64,30 +63,18 @@ const dimension = {
 
 /** A requirement whose allowed pin is the digest the caller supplies. */
 function requirementFor(pinDigest: string): ProviderRequirementV2 {
-  return {
-    roleId: "extractor", disposition: "required", capabilityId: "discover",
-    capabilityContractDigest: `sha256:${"a".repeat(64)}`,
-    allowedProviderPins: [pinDigest], defaultProviderPin: pinDigest,
-    requiredReadinessDimensions: [DIMENSION], requestedGrantKinds: [],
-    fallbackPolicy: { kind: "refuse" },
-  } as unknown as ProviderRequirementV2;
+  return readinessRequirement(pinDigest, DIMENSION, "refuse");
 }
 
 /** Install a development provider and review readiness against a given pin. */
 async function reviewWith(pinDigestOf: (installed: { providerPinDigest: string; packageDigest: string }) => string) {
   fixture = await installResolutionFixture();
-  const { sourceRoot, payload } = await devInstallMaterial(fixture, "readiness-provider", "1.4.0");
-  const installed = await installDevProvider(fixture.paths, {
-    sourceRoot, payload, approveExecution: true,
-  });
+  const installed = await installReadinessProvider(fixture, "readiness-provider", "1.4.0");
   // Credential FIRST: without an available credential the review never reaches
   // the provider comparison these cases exist to measure.
   process.env.READINESS_FIXTURE_KEY = "present";
   await writeFile(path.join(fixture.paths.configRoot, CREDENTIALS_FILE), registryText(), "utf8");
-  const report = await reviewProductReadiness(
-    fixture.paths, [dimension], new Set(), [requirementFor(pinDigestOf(installed))],
-  );
-  return report.items.find((item) => item.dimensionId === DIMENSION);
+  return reviewReadinessDimension(fixture.paths, dimension, requirementFor(pinDigestOf(installed)));
 }
 
 describe("readiness over an installed provider", () => {

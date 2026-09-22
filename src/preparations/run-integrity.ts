@@ -7,7 +7,9 @@
  * and pure-projection primitives the run store composes with confined durable I/O.
  */
 
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+import { hmacHexEqual as preparationRunIntegrityMatches } from "../utils/hmac-equal.js";
+import { appendRunAnnotations, successorEnvelope } from "../utils/run-history-projection.js";
 import { canonicalBytes } from "../profile/templates/signing/canonical.js";
 import { parseSha256Digest } from "../capability-providers/ids.js";
 import type { Sha256Digest } from "./types.js";
@@ -19,7 +21,6 @@ import type {
 
 const PREPARATION_KEY_BYTES = 32;
 const KEY_EPOCH_DOMAIN = Buffer.from("llmwiki.preparation-run-key-epoch.v1\0", "utf8");
-const HMAC_HEX = /^[0-9a-f]{64}$/;
 
 /** Require exactly the V2 preparation-key entropy before cryptographic use. */
 function assertPreparationKey(key: Buffer): void {
@@ -47,12 +48,6 @@ function preparationRunIntegrity(key: Buffer, run: PreparationRunContentV1 | Pre
   assertPreparationKey(key);
   const { integrity: _integrity, ...content } = run as PreparationRunV1;
   return createHmac("sha256", key).update(canonicalBytes(content)).digest("hex");
-}
-
-/** Compare two canonical lowercase HMAC values in constant time. */
-function preparationRunIntegrityMatches(stored: string, expected: string): boolean {
-  if (!HMAC_HEX.test(stored) || !HMAC_HEX.test(expected)) return false;
-  return timingSafeEqual(Buffer.from(stored, "hex"), Buffer.from(expected, "hex"));
 }
 
 /** Return the exact binding projected from a parsed run. */
@@ -160,10 +155,8 @@ function appendProjection(
   input: AppendPreparationTransitionInput,
 ) {
   const payload = transition.payload;
-  const completionWarnings = payload.kind === "warning"
-    ? [...run.completionWarnings, { code: payload.code, attempted: payload.attempted, completed: payload.completed, skipped: payload.skipped, failed: payload.failed }]
-    : [...run.completionWarnings];
-  const notices = payload.kind === "notice" ? [...run.notices, { code: payload.code }] : [...run.notices];
+  const { completionWarnings, notices } = appendRunAnnotations(run,
+    payload.kind === "warning" ? payload : undefined, payload.kind === "notice" ? payload : undefined);
   const supersededByPreparationId = payload.kind === "supersede"
     ? payload.supersededByPreparationId : run.supersededByPreparationId;
   const handoff = boundHandoff(transition, input.handoff) ?? run.handoff;
@@ -183,11 +176,9 @@ export function appendPreparationTransition(
   const { integrity: _integrity, ...content } = run as PreparationRunV1;
   const prior = content.transitions.at(-1);
   if (prior === undefined) throw new Error("preparation run has no genesis transition");
-  const transitionContent = {
-    sequence: content.transitions.length, previousHash: prior.contentHash,
-    actor: cloneActor(input.actor), stateBefore: content.state, stateAfter: input.stateAfter,
-    type: input.type, at: input.at, payload: input.payload,
-  };
+  const transitionContent = successorEnvelope(content, prior.contentHash, {
+    actor: cloneActor(input.actor), stateAfter: input.stateAfter, type: input.type, at: input.at, payload: input.payload,
+  });
   const transition = { ...transitionContent, contentHash: preparationTransitionHash(transitionContent) };
   const { supersededByPreparationId: _prior, handoff: _priorHandoff, ...base } = content;
   const projection = appendProjection(content, transition, input);

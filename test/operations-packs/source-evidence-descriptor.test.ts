@@ -30,7 +30,7 @@ import { assembleRunnerInput } from "../../src/operations-packs/runtime/runner-i
 import type {
   PackProviderInvocationV1, PackSourceEvidenceContextV1,
 } from "../../src/operations-packs/runtime/runner-input.js";
-import type { ProviderInvokeFn } from "../../src/preparations/attempts/provider.js";
+import { completed } from "./completed-provider.js";
 import type { PackRecipeV2, SourceEvidenceDescriptorV2 } from "../../src/operations-packs/recipe-types.js";
 import { compilableRecipe, requestWithRecipe } from "./compile-fixture.js";
 import { bindingProviderRequest } from "./provider-invocation-fixture.js";
@@ -40,16 +40,6 @@ const runs = stagedRunTracker();
 afterEach(() => runs.cleanupAll());
 
 const SOURCE_TEXT = "The Transformer architecture uses Multi-Head Attention.\n";
-const USAGE = { brokerRequestCount: 0, tokenCount: "unobserved" as const, costMicros: "unobserved" as const };
-
-const completed: ProviderInvokeFn = async () => ({
-  kind: "completed",
-  admitted: {
-    outcome: "succeeded", acceptedArtifacts: [], receipts: [], usage: USAGE,
-    counts: { declared: 0, acceptedArtifacts: 0, requiredMissing: 0, receipts: 0 },
-    untrusted: { untrusted: true, providerReportedCounts: null, warnings: null, output: null },
-  },
-});
 
 /** The sealed descriptor every case shares. */
 const DESCRIPTOR: SourceEvidenceDescriptorV2 = {
@@ -130,13 +120,19 @@ function capturingInvocation(seen: PackSourceEvidenceContextV1[]): PackProviderI
   };
 }
 
+/** Seal the declared bytes, then place the chosen actual bytes in retained storage. */
+async function stageSource(actualBytes: string) {
+  const { digests, byteCounts } = hostColumns();
+  const action = await compilePackAction(requestWithColumns(digests, byteCounts));
+  const staged = runs.add(await stageCompiledAction(action));
+  await mkdir(path.join(staged.root, "sources"), { recursive: true });
+  await writeFile(path.join(staged.root, "sources", "paper.md"), actualBytes, "utf8");
+  return { action, staged };
+}
+
 describe("the sealed source-evidence descriptor", () => {
   it("delivers the retained source's bytes and path table to the provider leg", async () => {
-    const { digests, byteCounts } = hostColumns();
-    const action = await compilePackAction(requestWithColumns(digests, byteCounts));
-    const staged = runs.add(await stageCompiledAction(action));
-    await mkdir(path.join(staged.root, "sources"), { recursive: true });
-    await writeFile(path.join(staged.root, "sources", "paper.md"), SOURCE_TEXT, "utf8");
+    const { action, staged } = await stageSource(SOURCE_TEXT);
 
     const seen: PackSourceEvidenceContextV1[] = [];
     await runPreparation(assembleRunnerInput(action, {
@@ -175,12 +171,8 @@ describe("the sealed source-evidence descriptor", () => {
   });
 
   it("FAILS the leg when the source was edited after approval", async () => {
-    const { digests, byteCounts } = hostColumns();
-    const action = await compilePackAction(requestWithColumns(digests, byteCounts));
-    const staged = runs.add(await stageCompiledAction(action));
-    await mkdir(path.join(staged.root, "sources"), { recursive: true });
     // DIFFERENT bytes than the sealed digest describes.
-    await writeFile(path.join(staged.root, "sources", "paper.md"), "tampered\n", "utf8");
+    const { action, staged } = await stageSource("tampered\n");
 
     const seen: PackSourceEvidenceContextV1[] = [];
     const result = await runPreparation(assembleRunnerInput(action, {

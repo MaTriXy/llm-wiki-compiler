@@ -48,10 +48,7 @@ import {
 } from "../src/operation-bundles/lock-gate.js";
 import type { DestructiveGateIntent } from "../src/operation-bundles/lock-gate.js";
 import { releaseLock } from "../src/utils/lock.js";
-import { MISSING_KEY_CONFIRMATION, resetPreparationKeyEpochLocked } from "../src/preparations/reset.js";
-import {
-  LIFECYCLE_ACTOR, removePreparationKey, stagePreparation,
-} from "./preparations/lifecycle-fixture.js";
+import { resetAwaitingContinuation as seedResetContinuation } from "./preparations/crash-fixture.js";
 
 const AT = "2026-08-10T00:00:00.000Z";
 
@@ -61,14 +58,9 @@ afterEach(async () => { if (root) await rm(root, { recursive: true, force: true 
 
 /** Leave the project holding a `project-key-reset` unit awaiting its continuation. */
 async function resetAwaitingContinuation(): Promise<void> {
-  await stagePreparation(root);
-  await removePreparationKey(root);
-  const recorded = await resetPreparationKeyEpochLocked(root, {
-    actor: LIFECYCLE_ACTOR, at: AT, confirmation: MISSING_KEY_CONFIRMATION,
-  });
   // PIN THE PRECONDITION. If pass one did not record, every refusal below would
   // be a refusal of nothing and all three cases would pass for the wrong reason.
-  expect(recorded.status).toBe("intent-recorded");
+  await seedResetContinuation(root, AT);
 }
 
 /** Acquire destructively and release, returning what the gate said. */

@@ -17,6 +17,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { reviewProductReadiness } from "../../src/products/readiness.js";
+import { readinessRequirement, installReadinessProvider, reviewReadinessDimension } from "./readiness-provider-fixture.js";
 import { installDevProvider } from "../../src/capability-providers/host/install.js";
 import { devGrantScope, issueDevProviderGrant } from "../../src/capability-providers/host/grant.js";
 import { mkdtemp, realpath } from "node:fs/promises";
@@ -48,24 +49,14 @@ const dimension = {
 
 /** A requirement whose allowed pin is the digest the caller supplies. */
 function requirementFor(pinDigest: string): ProviderRequirementV2 {
-  return {
-    roleId: "extractor", disposition: "required", capabilityId: "discover",
-    capabilityContractDigest: `sha256:${"a".repeat(64)}`,
-    allowedProviderPins: [pinDigest], defaultProviderPin: pinDigest,
-    requiredReadinessDimensions: [DIMENSION], requestedGrantKinds: [],
-    fallbackPolicy: { kind: "none" },
-  } as unknown as ProviderRequirementV2;
+  return readinessRequirement(pinDigest, DIMENSION, "none");
 }
 
 /** Install a real provider, then review the credential-less dimension. */
 async function reviewWith(pinDigestOf: (installed: { providerPinDigest: string }) => string) {
   fixture = await installResolutionFixture();
-  const { sourceRoot, payload } = await devInstallMaterial(fixture, "credless-provider", "1.0.0");
-  const installed = await installDevProvider(fixture.paths, { sourceRoot, payload, approveExecution: true });
-  const report = await reviewProductReadiness(
-    fixture.paths, [dimension], new Set(), [requirementFor(pinDigestOf(installed))],
-  );
-  return report.items.find((item) => item.dimensionId === DIMENSION);
+  const installed = await installReadinessProvider(fixture, "credless-provider", "1.0.0");
+  return reviewReadinessDimension(fixture.paths, dimension, requirementFor(pinDigestOf(installed)));
 }
 
 /**
@@ -75,8 +66,7 @@ async function reviewWith(pinDigestOf: (installed: { providerPinDigest: string }
  */
 async function installedProviderInProject(name: string) {
   fixture = await installResolutionFixture();
-  const { sourceRoot, payload } = await devInstallMaterial(fixture, name, "1.0.0");
-  const installed = await installDevProvider(fixture.paths, { sourceRoot, payload, approveExecution: true });
+  const installed = await installReadinessProvider(fixture, name, "1.0.0");
   const projectRoot = await realpath(await mkdtemp(path.join(tmpdir(), `${name}-`)));
   return { installed, projectRoot, paths: fixture.paths };
 }
@@ -155,27 +145,30 @@ describe("a proposal-only requirement (no grant kinds) still needs a grant RECOR
   });
 });
 
+/** Two distinct installed pins, with the project grant issued exclusively to A. */
+async function pairWithGrantForA() {
+  fixture = await installResolutionFixture();
+  const installedA = await installReadinessProvider(fixture, "provider-a", "1.0.0");
+  const installedB = await installReadinessProvider(fixture, "provider-b", "2.0.0");
+  expect(installedB.providerPinDigest).not.toBe(installedA.providerPinDigest);
+  const projectRoot = await realpath(await mkdtemp(path.join(tmpdir(), "cross-grant-")));
+  await issueDevProviderGrant(fixture.paths, {
+    pin: installedA.pin, projectRoot, grantId: "a-only-grant", scope: devGrantScope([SOURCE_READ_ATOM as never]),
+  });
+  return { installedA, installedB, projectRoot, paths: fixture.paths };
+}
+
 describe("a grant binds ONE provider, and readiness must spend it on that one", () => {
   it("reports GRANT-MISSING for provider B when only provider A holds the grant", async () => {
     // The cross-provider probe: unioning grant kinds across the project spent
     // A's grant on B's requirement — a false `available` about a call the
     // runtime, which binds authority to the exact pin, would refuse.
-    fixture = await installResolutionFixture();
-    const a = await devInstallMaterial(fixture, "provider-a", "1.0.0");
-    const installedA = await installDevProvider(fixture.paths, { ...a, approveExecution: true });
-    const b = await devInstallMaterial(fixture, "provider-b", "2.0.0");
-    const installedB = await installDevProvider(fixture.paths, { ...b, approveExecution: true });
+    const { installedB, projectRoot, paths } = await pairWithGrantForA();
     // The probe is only a probe if the two providers ARE two: identical
     // payloads produce identical pins, and a requirement allowing "B" would
     // then legitimately accept A's grant.
-    expect(installedB.providerPinDigest).not.toBe(installedA.providerPinDigest);
-    const projectRoot = await realpath(await mkdtemp(path.join(tmpdir(), "cross-grant-")));
-    await issueDevProviderGrant(fixture.paths, {
-      pin: installedA.pin, projectRoot, grantId: "a-only-grant",
-      scope: devGrantScope([SOURCE_READ_ATOM as never]),
-    });
     const report = await reviewProductReadiness(
-      fixture.paths, [dimension], new Set(),
+      paths, [dimension], new Set(),
       [grantNeedingRequirement(installedB.providerPinDigest)], projectRoot,
     );
     expect(report.items[0]?.state).toBe("grant-missing");
@@ -184,17 +177,9 @@ describe("a grant binds ONE provider, and readiness must spend it on that one", 
   it("reports AVAILABLE for provider A, whose grant it is", async () => {
     // The complement, in the same two-provider world: the pin-bound evaluation
     // must not refuse the provider the grant actually names.
-    fixture = await installResolutionFixture();
-    const a = await devInstallMaterial(fixture, "provider-a", "1.0.0");
-    const installedA = await installDevProvider(fixture.paths, { ...a, approveExecution: true });
-    await installDevProvider(fixture.paths, { ...(await devInstallMaterial(fixture, "provider-b", "2.0.0")), approveExecution: true });
-    const projectRoot = await realpath(await mkdtemp(path.join(tmpdir(), "cross-grant-")));
-    await issueDevProviderGrant(fixture.paths, {
-      pin: installedA.pin, projectRoot, grantId: "a-only-grant",
-      scope: devGrantScope([SOURCE_READ_ATOM as never]),
-    });
+    const { installedA, projectRoot, paths } = await pairWithGrantForA();
     const report = await reviewProductReadiness(
-      fixture.paths, [dimension], new Set(),
+      paths, [dimension], new Set(),
       [grantNeedingRequirement(installedA.providerPinDigest)], projectRoot,
     );
     expect(report.items[0]?.state).toBe("available");

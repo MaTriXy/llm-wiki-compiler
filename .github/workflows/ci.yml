@@ -35,6 +35,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      - name: Install Linux isolation test dependency
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - run: npm run release:check-docs
       - run: npm run build
       - run: npm test

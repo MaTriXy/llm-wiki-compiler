@@ -27,6 +27,14 @@ afterEach(() => { delete process.env.LLMWIKI_TRUSTED_WRITE; });
 
 const exists = (p: string) => access(p).then(() => true, () => false);
 
+/** Invalid member names must refuse before creating the artifact directory. */
+async function expectNamesRefused(names: string[], reason: RegExp): Promise<void> {
+  const root = await makeMembersRoot("members-invalid-names");
+  const members = names.map(fileName => ({ fileName, bytes: Buffer.from("x", "utf8") }));
+  await expect(writeBundle(root, members)).rejects.toThrow(reason);
+  expect(await exists(bundlePaths(root).expectedDir)).toBe(false);
+}
+
 /** Drive one malformed SDK write and assert the refusal left the store untouched. */
 async function expectSdkWriteRefused(root: string, input: Record<string, unknown>): Promise<void> {
   const { createWiki } = await import("../../src/index.js");
@@ -81,20 +89,12 @@ describe("member-bearing artifact writes", () => {
 
   it.each([["a.tex", "A.tex"], ["µ.tex", "μ.tex"]])(
     "refuses duplicate aliases %s and %s before writing", async (left, right) => {
-      const root = await makeMembersRoot("members-alias-write");
-      await expect(writeBundle(root, [
-        { fileName: left, bytes: Buffer.from("x", "utf8") },
-        { fileName: right, bytes: Buffer.from("x", "utf8") },
-      ])).rejects.toThrow(/supplied more than once/);
-      expect(await exists(bundlePaths(root).expectedDir)).toBe(false);
+      await expectNamesRefused([left, right], /supplied more than once/);
     },
   );
 
   it("refuses a member name aliasing its own manifest", async () => {
-    const root = await makeMembersRoot("members-reserved-write");
-    await expect(writeBundle(root, [{ fileName: "BUNDLE.JSON", bytes: Buffer.from("x", "utf8") }]))
-      .rejects.toThrow(/reserved|extension/);
-    expect(await exists(bundlePaths(root).expectedDir)).toBe(false);
+    await expectNamesRefused(["BUNDLE.JSON"], /reserved|extension/);
   });
 
   it("SNAPSHOTS caller buffers synchronously: mutating the input after the call cannot fork hash from bytes", async () => {

@@ -20,11 +20,22 @@ import {
 } from "../../src/preparations/ephemeral-execute.js";
 import type { ProviderInvokeFn } from "../../src/preparations/attempts/provider.js";
 import type { ProviderInvocationHostV1 } from "../../src/capability-providers/runtime/invoke.js";
-import { fixedResolver, PIN, providerRequest } from "./attempt-fixture.js";
-import { ephemeralPlanObject } from "./inputs-fixture.js";
+import { fixedResolver, PIN, providerRequest, providerAuthority } from "./attempt-fixture.js";
+import { ephemeralPlanObject, ephemeralBrokerPlan } from "./inputs-fixture.js";
+import { parseSha256Digest } from "../../src/capability-providers/ids.js";
 
 /** The opaque provider host; the fake invoke seam never reads it. */
 export const HOST = {} as ProviderInvocationHostV1;
+
+/** Bind a broker-enabled read to the matching sealed plan and live authority. */
+export function ephemeralBrokerRequest(broker: "https" | "model") {
+  const brokerPlanDigest = parseSha256Digest(`sha256:${"c".repeat(64)}`);
+  return ephemeralRequest({
+    plan: ephemeralBrokerPlan(),
+    authorityResolver: { resolve: async () => ({ status: "ok", extras: providerAuthority({ brokerPlanDigest }) }) },
+    work: { kind: "provider-capability", request: providerRequest({ brokers: { [broker]: {} } }), host: HOST },
+  });
+}
 
 /** The env names the sandbox redirects so every out-of-project write is visible. */
 const SANDBOXED_ENV = ["TMPDIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "HOME"] as const;

@@ -16,6 +16,7 @@
  */
 
 import path from "node:path";
+import { isFlatSourceLeaf as isFlatLeaf } from "../utils/flat-source-leaf.js";
 import { createHash } from "node:crypto";
 import { readConfinedLeafBuffer } from "../utils/confined-read.js";
 import type { PackActionInputValueV2, WorkspaceOperationsPackV2 } from "../operations-packs/types.js";
@@ -67,12 +68,6 @@ export function declaredProviderPhaseValues<T>(
     if (value !== undefined) declared.push(value);
   }
   return declared;
-}
-
-/** True when a relative path is a bare leaf name; matches the runtime builder. */
-function isFlatLeaf(relative: string): boolean {
-  return relative.length > 0 && !relative.includes("/") && !relative.includes("\\")
-    && relative !== "." && relative !== ".." && !relative.startsWith(".");
 }
 
 /**

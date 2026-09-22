@@ -29,19 +29,13 @@ async function expectState(dir: string, binding: Awaited<ReturnType<typeof stage
 }
 
 describe("handoff crash resumption never duplicates or overwrites", () => {
-  it("resumes a crash between handoff-started and bundle creation", async () => {
+  it.each([
+    { boundary: "before bundle creation", fault: crash, bundles: 0 },
+    { boundary: "after bundle creation", fault: crashAfterStage, bundles: 1 },
+  ])("resumes a crash $boundary idempotently", async ({ fault, bundles }) => {
     const binding = await stageReadyPreparation(root.dir);
-    await expect(handoffPreparation(root.dir, handoffRequest(binding, "ada", { faultsForTest: crash }))).rejects.toThrow("crash");
-    await expectState(root.dir, binding, "handoff-started", 0);
-    const result = await handoffPreparation(root.dir, handoffRequest(binding));
-    expect(result.outcome).toBe("resumed");
-    await expectState(root.dir, binding, "handed-off", 1);
-  });
-
-  it("resumes a crash between bundle creation and handed-off, staging idempotently", async () => {
-    const binding = await stageReadyPreparation(root.dir);
-    await expect(handoffPreparation(root.dir, handoffRequest(binding, "ada", { faultsForTest: crashAfterStage }))).rejects.toThrow("crash");
-    await expectState(root.dir, binding, "handoff-started", 1);
+    await expect(handoffPreparation(root.dir, handoffRequest(binding, "ada", { faultsForTest: fault }))).rejects.toThrow("crash");
+    await expectState(root.dir, binding, "handoff-started", bundles);
     const result = await handoffPreparation(root.dir, handoffRequest(binding));
     expect(result.outcome).toBe("resumed");
     await expectState(root.dir, binding, "handed-off", 1);

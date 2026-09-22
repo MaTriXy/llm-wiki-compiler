@@ -7,13 +7,8 @@
  * instead of aborting the whole search.
  */
 
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeTempRoot } from "./fixtures/temp-root.js";
-import { writePage } from "./fixtures/write-page.js";
-import { pageEntryOf, writePageStore } from "./fixtures/typed-grounding.js";
-import * as providerMod from "../src/utils/provider.js";
+import { describe, expect, it, vi } from "vitest";
+import { useAlphaPageFixture, mockEmbeddingFailure } from "./fixtures/alpha-page.js";
 import { pickSearchRefs } from "../src/search/retrieval.js";
 
 // The fallback's page-selection call (tools present) picks the seeded concept;
@@ -22,26 +17,12 @@ vi.mock("../src/utils/llm.js", () => ({
   callClaude: vi.fn(async () => JSON.stringify({ pages: ["concepts/alpha"], reasoning: "r" })),
 }));
 
-const roots: string[] = [];
-afterEach(async () => {
-  vi.restoreAllMocks();
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
-});
+const seedRootWithPageStore = useAlphaPageFixture("search-embed-degrade", true);
 
 describe("search embedding failure degrades to the fallback", () => {
   it("returns fallback refs and carries the embedding-degraded warning", async () => {
-    const root = await makeTempRoot("search-embed-degrade");
-    roots.push(root);
-    await writeFile(path.join(root, "wiki", "index.md"), "# Index\n");
-    await writePage(path.join(root, "wiki/concepts"), "alpha", { title: "Alpha", summary: "a" }, "ALPHA_BODY fact.");
-    await mkdir(path.join(root, ".llmwiki"), { recursive: true });
-    await writePageStore(root, [pageEntryOf("concepts/alpha", "Alpha", "a", [1, 0])]);
-    const embed = vi.fn(async () => {
-      throw new Error("no embedding credentials");
-    });
-    vi.spyOn(providerMod, "getProvider").mockReturnValue(
-      { embed, embedBatch: embed } as unknown as ReturnType<typeof providerMod.getProvider>,
-    );
+    const root = await seedRootWithPageStore();
+    const embed = mockEmbeddingFailure();
 
     const stdout = vi.spyOn(console, "log").mockImplementation(() => {});
     await expect(pickSearchRefs(root, "what is alpha?")).rejects.toThrow("no embedding credentials");

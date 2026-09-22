@@ -27,6 +27,7 @@
 import { gateDecision } from "./lifecycle-fixture.js";
 import { lstat, mkdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { expectFreshKeyStaging } from "./lifecycle-storage-fixture.js";
 import { describe, expect, it } from "vitest";
 import { useTempRoot } from "../fixtures/temp-root.js";
 import { PREPARATION_PRUNE_REGISTRY, preparationQuarantineUnitPaths } from "../../src/preparations/paths.js";
@@ -206,10 +207,7 @@ describe("a prune registry that cannot be bound degrades prune, not the whole re
     // its own precondition is not pinning the precondition.
     expect((await openPreparationLifecycleNamespace(root.dir, "read")).pruneRegistry.status)
       .toBe("unavailable");
-    expect((await readPreparationKey(root.dir)).status).not.toBe("ok");
-
-    expect((await stagePreparationLocked(root.dir, stageRequest())).status).toBe("staged");
-    expect((await readPreparationKey(root.dir)).status).toBe("ok");
+    await expectFreshKeyStaging(root.dir);
 
     const refusal = { code: "key-healthy" };
     await expect(resetPreparationKeyEpochLocked(root.dir, {

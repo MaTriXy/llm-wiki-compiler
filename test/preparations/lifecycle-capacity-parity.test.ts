@@ -12,6 +12,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { useTempRoot } from "../fixtures/temp-root.js";
 import { scanPreparationInventory } from "../../src/preparations/capacity.js";
+import { plantRegistrySymlink, inventoryWithQuarantineFault } from "./lifecycle-storage-fixture.js";
 import {
   writePruneReceipts,
   writeQuarantineReceipts,
@@ -45,12 +46,7 @@ describe("supplied lifecycle capacity parity", () => {
 
   it("names a quarantine-only physical fault and makes health unavailable", async () => {
     const quarantine = await registry(root.dir, "preparation-quarantine");
-    const outside = path.join(root.dir, "outside");
-    await writeFile(outside, "outside");
-    await symlink(outside, path.join(quarantine, "planted"));
-    const inventory = await scanPreparationInventory(root.dir);
-    expect(inventory.problems.some((problem) =>
-      problem.dimension === "quarantine-storage")).toBe(true);
+    const inventory = await inventoryWithQuarantineFault(root.dir, quarantine);
     expect(inventory.quarantine.health).toBe("unavailable");
   });
 

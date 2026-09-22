@@ -21,7 +21,7 @@
 
 import { describe, expect, it } from "vitest";
 import { readFile, writeFile } from "node:fs/promises";
-import { runCLI } from "./fixtures/run-cli.js";
+import { runCLI, expectCLIJson } from "./fixtures/run-cli.js";
 import { createWiki } from "../src/sdk/wiki.js";
 import { scanPreparationInventory } from "../src/preparations/capacity.js";
 import { emptyWorkspace, initializedWorkspace, planAndSeed } from "./preparation-cli-fixture.js";
@@ -103,8 +103,7 @@ describe("preparation preview through the binary", () => {
     const { planFile, seedFile } = await planAndSeed(cwd);
     const result = await runCLI(
       ["preparation", "preview", planFile, "--seed", seedFile, "--json"], cwd);
-    expect(result.code).toBe(1);
-    expect(envelope(result.stdout)).toMatchObject({
+    expectCLIJson(result, 1, {
       status: "refused", reason: "staging refused: preparation-integrity-key-missing",
     });
     // It kept its promise even while refusing: no key, no manifest, nothing.
@@ -142,8 +141,7 @@ describe("preparation preview through the binary", () => {
     await writeFile(planFile, "{ not json", "utf-8");
     const result = await runCLI(
       ["preparation", "preview", planFile, "--seed", seedFile, "--json"], cwd);
-    expect(result.code).toBe(1);
-    expect(envelope(result.stdout)).toMatchObject({ status: "refused" });
+    expectCLIJson(result, 1, { status: "refused" });
     expect((await scanPreparationInventory(cwd)).manifests.length).toBe(1);
   });
 

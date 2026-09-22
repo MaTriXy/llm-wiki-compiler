@@ -90,6 +90,12 @@ export async function makePreparationKeyUnreadable(root: string): Promise<void> 
 /** The principal every lifecycle fixture operation records. */
 export const LIFECYCLE_ACTOR = ACTOR;
 
+/** Require a real completed sweep, not merely a successful no-op. */
+export async function expectCompletedSweep(root: string, at: string): Promise<void> {
+  const swept = await sweepPreparationOrphansLocked(root, { actor: ACTOR, at, authorization: gateDecision("sweep") });
+  expect(swept.status === "swept" && swept.receipt.kind).toBe("prune-completed");
+}
+
 /**
  * Crash a PRUNE after its plan is durable and return that unit's id.
  *
@@ -104,12 +110,12 @@ export const LIFECYCLE_ACTOR = ACTOR;
  * destroyed the record a resume would otherwise be resolved from.
  */
 export async function pruneStagedThenCrashed(root: string, at: string): Promise<{ runId: string; unitId: string }> {
-  return crashPruneAt(root, at, "afterPlanned");
+  return stageAndCrashPrune(root, at, "afterPlanned");
 }
 
 /** Crash a prune AFTER its first object is staged: the run leaf is then gone. */
 export async function pruneStagedBytesThenCrashed(root: string, at: string): Promise<{ runId: string; unitId: string }> {
-  return crashPruneAt(root, at, "afterStaged");
+  return stageAndCrashPrune(root, at, "afterStaged");
 }
 
 /**
@@ -121,9 +127,9 @@ export async function pruneStagedBytesThenCrashed(root: string, at: string): Pro
  * the eligibility setup, the clock past the retention floor, the derived unit id
  * — is identical, and two copies of it would drift.
  */
-async function crashPruneAt(
-  root: string, at: string, seam: "afterPlanned" | "afterStaged",
-): Promise<{ runId: string; unitId: string }> {
+export async function stageAndCrashPrune(
+  root: string, at: string, seam: "afterPlanned" | "afterStaged" | "afterDeletes",
+): Promise<{ runId: string; unitId: string; binding: PreparationRunBinding }> {
   const { binding } = await stagePreparation(root);
   await driveToFailed(root, binding);
   await expect(prunePreparationRunLocked(root, {
@@ -132,7 +138,7 @@ async function crashPruneAt(
     clock: { now: () => new Date("2026-07-01T00:00:00.000Z") },
     faults: { [seam]: async () => { throw new Error("crash"); } },
   })).rejects.toThrow("crash");
-  return { runId: binding.runId, unitId: pruneUnitIdFor(binding.runId) };
+  return { runId: binding.runId, unitId: pruneUnitIdFor(binding.runId), binding };
 }
 
 /** Crash a sweep after its first object is staged and return that unit's id. */

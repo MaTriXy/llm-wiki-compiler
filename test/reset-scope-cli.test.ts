@@ -15,25 +15,18 @@
  * the unknown-scope refusal, and the lock refusal.
  */
 
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./fixtures/run-cli.js";
-import { tempRootTracker } from "./temp-roots.js";
+import { useFileProject } from "./fixtures/file-project.js";
 
-const tracker = tempRootTracker();
-afterEach(() => tracker.cleanup());
+const createProject = useFileProject("reset-cli-");
 
 /** A project holding one wiki page and a state file. */
 async function project(): Promise<string> {
-  const root = await tracker.create("reset-cli-", { real: true });
-  for (const dir of [path.join("wiki", "concepts"), ".llmwiki"]) {
-    await mkdir(path.join(root, dir), { recursive: true });
-  }
-  await writeFile(path.join(root, "wiki", "concepts", "alpha.md"), "a", "utf8");
-  await writeFile(path.join(root, ".llmwiki", "state.json"), "{}", "utf8");
-  return root;
+  return createProject({ "wiki/concepts/alpha.md": "a", ".llmwiki/state.json": "{}" });
 }
 
 describe("state reset --scope", () => {

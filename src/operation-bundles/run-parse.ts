@@ -7,6 +7,7 @@
  */
 
 import { canonicalBytes } from "../profile/templates/signing/canonical.js";
+import { canonicalTime, warningFields } from "./run-values.js";
 import { parseBoundedUniqueJson } from "../profile/templates/signing/json.js";
 import { MAX_MUTATIONS_PER_BUNDLE, MAX_RUN_BYTES, MAX_RUN_EVIDENCE_BLOB_BYTES, MAX_RUN_TRANSITIONS, MAX_TRANSITION_ENVELOPE_BYTES } from "./constants.js";
 import { assertBundleId, assertOperationRunId, compensationId, type CompensationId, type MutationId } from "./ids.js";
@@ -113,15 +114,6 @@ function parseProjectionObligation(value: unknown) {
   const obj = record(value, "projection obligation");
   exact(obj, ["mutationId", "criticality"]);
   return { mutationId: mutationIdentity(obj.mutationId), criticality: enumValue(obj.criticality, ["required", "optional"] as const, "projection criticality") };
-}
-
-/** Parse one canonical millisecond UTC timestamp. */
-function canonicalTime(value: unknown, label: string): string {
-  const parsed = textValue(value, label, 64);
-  if (!Number.isFinite(Date.parse(parsed)) || new Date(parsed).toISOString() !== parsed) {
-    throw new Error(`${label} must be a canonical ISO timestamp`);
-  }
-  return parsed;
 }
 
 /** Parse a principal independently of its transport configuration source. */
@@ -380,10 +372,7 @@ function parseWarning(value: unknown) {
 
 /** Parse and reconcile the warning counters shared by payload and projection. */
 function parseWarningFields(obj: JsonRecord) {
-  const warning = { code: textValue(obj.code, "warning code", MAX_CODE_BYTES), attempted: count(obj.attempted, "warning attempted"), completed: count(obj.completed, "warning completed"), skipped: count(obj.skipped, "warning skipped"), failed: count(obj.failed, "warning failed") };
-  if (warning.attempted === 0) throw new Error("completion warning requires a positive attempted count");
-  if (warning.attempted !== warning.completed + warning.skipped + warning.failed) throw new Error("completion warning counts are inconsistent");
-  return warning;
+  return warningFields(obj, MAX_CODE_BYTES);
 }
 
 /** Parse one top-level informational notice projection. */

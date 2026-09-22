@@ -32,6 +32,15 @@ function mutated(fn: (pack: any) => void): () => void {
   return () => parseOperationsPack(JSON.stringify(obj));
 }
 
+/** Both ends of a mapping must refuse host-owned reconciliation fields. */
+function expectReservedMappingRefused(field: "targetField" | "ref"): void {
+  for (const reserved of [FINDING_CLASS_FIELD, CURRENT_DIGEST_FIELD, CURRENT_BYTES_FIELD]) {
+    expect(mutated((pack) => {
+      pack.recipes["demo.prepare"].phases[2].body.intents[0].fieldMappings[0][field] = reserved;
+    }), `must refuse ${field} ${reserved}`).toThrow(PackIdentityError);
+  }
+}
+
 const FORBIDDEN_TOP_LEVEL_FIELDS = [
   "postinstallHook", "installHooks", "shellCommand", "credentials", "grants",
   "approvalProof", "absolutePath", "writablePaths", "expression", "storeWriter", "productDispatch",
@@ -189,11 +198,7 @@ describe("operations pack negative sweep", () => {
     // carries the update precondition on `current-digest`/`current-byte-count`.
     // A mapping targeting one would have its authored value silently replaced.
     // Pinned against the DEFINING constants so a rename cannot drift them apart.
-    for (const reserved of [FINDING_CLASS_FIELD, CURRENT_DIGEST_FIELD, CURRENT_BYTES_FIELD]) {
-      expect(mutated((o) => {
-        o.recipes["demo.prepare"].phases[2].body.intents[0].fieldMappings[0].targetField = reserved;
-      }), `must refuse ${reserved}`).toThrow(PackIdentityError);
-    }
+    expectReservedMappingRefused("targetField");
   });
 
   it("refuses a reserved name as a mapping SOURCE ref, not only as a target", () => {
@@ -201,11 +206,7 @@ describe("operations pack negative sweep", () => {
     // the item it passes on, so a mapping SOURCING one reads the pipeline's
     // value in place of the caller's — the same substitution as the target
     // case, one step earlier.
-    for (const reserved of [FINDING_CLASS_FIELD, CURRENT_DIGEST_FIELD, CURRENT_BYTES_FIELD]) {
-      expect(mutated((o) => {
-        o.recipes["demo.prepare"].phases[2].body.intents[0].fieldMappings[0].ref = reserved;
-      }), `must refuse ref ${reserved}`).toThrow(PackIdentityError);
-    }
+    expectReservedMappingRefused("ref");
     // CONTROL: an ordinary slug ref still parses, so the refusal is the
     // RESERVED name and not the ref check itself.
     expect(mutated((o) => {

@@ -21,9 +21,9 @@ import {
   driftingResolver, fakeRegistry, lockIsFree, providerAuthority, providerRequest, stagePreparation,
   type StagedPreparation,
 } from "./attempt-fixture.js";
-import { ephemeralBrokerPlan, snapshotTree } from "./inputs-fixture.js";
+import { snapshotTree } from "./inputs-fixture.js";
 import {
-  ephemeralHostHandlerPlan, ephemeralProviderPlan, ephemeralRequest, ephemeralTwoPhasePlan,
+  ephemeralHostHandlerPlan, ephemeralProviderPlan, ephemeralRequest, ephemeralBrokerRequest, ephemeralTwoPhasePlan,
   HOST, runFixtureRead, withEphemeralSandbox,
 } from "./ephemeral-fixture.js";
 
@@ -181,12 +181,7 @@ describe("executable ephemeral read", () => {
   // so a read surface reported a figure the sealed plan never authorized; the
   // ceiling is only checked at this seam, since nothing downstream sees the plan.
   it("refuses a failed read whose measured cost breached the sealed ceiling", async () => {
-    const brokerPlanDigest = parseSha256Digest(`sha256:${"c".repeat(64)}`);
-    const run = await withEphemeralSandbox(() => runFixtureRead(ephemeralRequest({
-      plan: ephemeralBrokerPlan(),
-      authorityResolver: { resolve: async () => ({ status: "ok", extras: providerAuthority({ brokerPlanDigest }) }) },
-      work: { kind: "provider-capability", request: providerRequest({ brokers: { model: {} } }), host: HOST },
-    }), failedOverCeiling));
+    const run = await withEphemeralSandbox(() => runFixtureRead(ephemeralBrokerRequest("model"), failedOverCeiling));
     expect(run.result).toEqual({ status: "refused", reason: "cost-exceed-sealed-bound" });
     expect(run.residue).toEqual([]);
   });

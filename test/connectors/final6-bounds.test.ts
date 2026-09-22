@@ -98,12 +98,7 @@ describe("Final6 connector identity and selection bounds", () => {
   it("accepts exactly 200 selected candidates", async () => {
     await activateFixtureConnector(root.dir);
     const ids = await plantConnectorCandidateBatch(root.dir, 200);
-    const fetches = { value: 0 };
-
-    const result = await runBoundedFixture(fetches);
-
-    expect(result).toEqual({ kind: "noop", candidateIds: ids });
-    expect(fetches.value).toBe(1);
+    await expectCandidateNoop(ids);
   });
 
   it("keeps a 201-candidate no-op byte-identical while retaining its normal audit", async () => {
@@ -111,14 +106,17 @@ describe("Final6 connector identity and selection bounds", () => {
     await enableRateLimit();
     const ids = await plantConnectorCandidateBatch(root.dir, 201);
     const before = await snapshotCandidateQueue(root.dir);
-    const fetches = { value: 0 };
-
-    const result = await runBoundedFixture(fetches);
-
-    expect(result).toEqual({ kind: "noop", candidateIds: ids });
-    expect(fetches.value).toBe(1);
+    await expectCandidateNoop(ids);
     expect(existsSync(rateStamp())).toBe(true);
     expect((await readEvents(root.dir)).events).toHaveLength(1);
     expect(await snapshotCandidateQueue(root.dir)).toEqual(before);
   });
 });
+
+/** A retained-candidate no-op still performs exactly one connector fetch. */
+async function expectCandidateNoop(ids: string[]): Promise<void> {
+  const fetches = { value: 0 };
+  const result = await runBoundedFixture(fetches);
+  expect(result).toEqual({ kind: "noop", candidateIds: ids });
+  expect(fetches.value).toBe(1);
+}

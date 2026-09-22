@@ -10,6 +10,7 @@
  */
 
 import { canonicalBytes } from "../profile/templates/signing/canonical.js";
+import { RunBudgetErrorBase, budgetCount, budgetLanes } from "../utils/run-budget-arithmetic.js";
 import {
   MAX_EVIDENCE_REFS_PER_RUN, MAX_PHASE_INSTANCES_PER_RUN,
   MAX_PREPARATION_RUN_BYTES, MAX_PREPARATION_TRANSITION_ENVELOPE_BYTES,
@@ -66,12 +67,7 @@ export function preparationRunWriteBudgetClass(type: PreparationTransitionType):
 }
 
 /** Typed pre-staging or runtime refusal with a stable dimension message. */
-export class RunBudgetError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RunBudgetError";
-  }
-}
+export class RunBudgetError extends RunBudgetErrorBase {}
 
 const DIGEST = `sha256:${"f".repeat(64)}`;
 const PHASE = `phi_${"f".repeat(64)}`;
@@ -85,8 +81,7 @@ const AT = "+010000-01-01T00:00:00.000Z";
 
 /** Require one exact nonnegative safe-integer count. */
 function exactCount(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) throw new RunBudgetError(`${label} must be a nonnegative safe integer`);
-  return value;
+  return budgetCount(value, label, RunBudgetError);
 }
 
 /** Compute the complete worst-case transition count, including control moves. */
@@ -172,9 +167,8 @@ export function projectPreparationRunBudget(input: RunBudgetInput): RunBudget {
   const projectedTransitionCount = transitionCount(input);
   const controls = input.controlTransitionAllowance;
   const baseBytes = canonicalBytes(worstCaseRecordBase(input)).byteLength;
-  const ordinary = recordBytesAtTransitionCap(baseBytes, projectedTransitionCount - controls);
-  const total = recordBytesAtTransitionCap(baseBytes, projectedTransitionCount);
-  const controlBytes = total - ordinary;
+  const { ordinary, total, controlBytes } = budgetLanes(baseBytes,
+    { total: projectedTransitionCount, controls }, recordBytesAtTransitionCap);
   if (ordinary > MAX_PREPARATION_RUN_BYTES - PREPARATION_RUN_CONTROL_RESERVE_BYTES) throw new RunBudgetError("projected ordinary run consumes reserved control headroom");
   if (controlBytes > PREPARATION_RUN_CONTROL_RESERVE_BYTES) throw new RunBudgetError("control transition allowance exceeds the 256 KiB control reserve");
   if (total > MAX_PREPARATION_RUN_BYTES) throw new RunBudgetError("projected run exceeds the 4 MiB record cap");

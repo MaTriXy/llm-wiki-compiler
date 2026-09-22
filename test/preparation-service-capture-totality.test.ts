@@ -42,6 +42,7 @@ import { createPreparationService } from "../src/preparations/service.js";
 import type { PreparationPrincipal, PreparationServiceV1 } from "../src/preparations/service.js";
 import { REQUEST_CAPTURE_REFUSAL } from "../src/preparations/service-request-capture.js";
 import { emptyWorkspace } from "./preparation-cli-fixture.js";
+import { accessorRequest } from "./fixtures/accessor-request.js";
 
 /** Every grant any operation charges, so no case is refused for authority. */
 const PRINCIPAL = {
@@ -104,21 +105,6 @@ const DECLARED_REQUEST_SHAPE: Readonly<Record<keyof PreparationServiceV1, "reque
   // so a second capture guards `continuation` one level in.
   reset: "request",
 };
-
-/** A request whose every field is an own accessor that counts its reads. */
-function accessorRequest(fields: Record<string, unknown>): {
-  request: Record<string, unknown>; fired: () => Record<string, number>;
-} {
-  const counts: Record<string, number> = {};
-  const request: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(fields)) {
-    Object.defineProperty(request, key, {
-      enumerable: true, configurable: true,
-      get() { counts[key] = (counts[key] ?? 0) + 1; return value; },
-    });
-  }
-  return { request, fired: () => counts };
-}
 
 /**
  * A superset of every field any operation reads off its request.

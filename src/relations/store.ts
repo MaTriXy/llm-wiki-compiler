@@ -48,8 +48,7 @@ import { randomBytes } from "node:crypto";
 import path from "path";
 import { RELATIONS_FILE, MAX_RELATION_RECORD_BYTES, MAX_RELATION_STORE_BYTES } from "../utils/constants.js";
 import type { OperationBinding } from "../utils/operation-binding.js";
-import { releaseLock } from "../utils/lock.js";
-import { acquireMutationLockBlocking } from "../operation-bundles/lock-gate.js";
+import { withOrdinaryMutationLock as underLock } from "../operation-bundles/with-mutation-lock.js";
 import type { EntityId, ProfilePack, RelationTypeDef } from "../profile/types.js";
 import type { CitationRef, RelationRef } from "./types.js";
 import { RelationEndpointError, RelationStoreFullError } from "./types.js";
@@ -252,16 +251,6 @@ function buildRelationEvent(type: EventType, ref: RelationRef, decision?: string
  */
 async function emitRelationEvent(root: string, event: AppendEventInput): Promise<void> {
   await appendEventLocked(root, event);
-}
-
-/** Run `fn` while holding the project lock (bounded-blocking acquire); release in a finally. */
-async function underLock<T>(root: string, fn: () => Promise<T>): Promise<T> {
-  await acquireMutationLockBlocking(root, "ordinary"); // throws LockBusyError on timeout
-  try {
-    return await fn();
-  } finally {
-    await releaseLock(root);
-  }
 }
 
 /**

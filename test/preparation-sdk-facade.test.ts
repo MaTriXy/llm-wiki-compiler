@@ -21,6 +21,7 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { createWiki } from "../src/sdk/wiki.js";
+import { expectNoRecoveryAuthority } from "./preparation-sdk-fixture.js";
 import type { Wiki } from "../src/sdk/types.js";
 import { emptyWorkspace, initializedWorkspace } from "./preparation-cli-fixture.js";
 import {
@@ -145,10 +146,7 @@ describe("the cancel and recovery results cross a transport unchanged", () => {
     const fixture = await stagedProject("sdkfailclosed");
     try {
       const wiki = createWiki({ root: fixture.root });
-      await expect(wiki.cancelPreparation(fixture.binding.runId))
-        .rejects.toMatchObject({ code: "missing-grant" });
-      await expect(wiki.recoverPreparation(fixture.binding.runId))
-        .rejects.toMatchObject({ code: "missing-grant" });
+      await expectNoRecoveryAuthority(wiki, fixture.binding.runId);
     } finally { await fixture.cleanup(); }
   });
 });

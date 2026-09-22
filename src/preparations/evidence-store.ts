@@ -178,11 +178,7 @@ export async function readPreparationEvidence(
   digest: string,
   maxBytes: number = MAX_PREPARATION_EVIDENCE_OBJECT_BYTES,
 ): Promise<PreparationEvidenceRead> {
-  const clean = assertEvidenceDigest(digest);
-  const opened = await openEvidenceLeaf(root, location, clean);
-  if (opened.kind === "absent") return { status: "absent" };
-  if (opened.kind !== "confirmed") return { status: "unavailable" };
-  return streamVerifyEvidence(opened, clean, maxBytes);
+  return withEvidenceLeaf({ root, location, digest }, (opened, clean) => streamVerifyEvidence(opened, clean, maxBytes));
 }
 
 /** Outcome of one verified byte read-back: the bytes, or a typed refusal. */
@@ -210,11 +206,19 @@ export async function readPreparationEvidenceBytes(
   digest: string,
   maxBytes: number,
 ): Promise<PreparationEvidenceBytesRead> {
-  const clean = assertEvidenceDigest(digest);
-  const opened = await openEvidenceLeaf(root, location, clean);
+  return withEvidenceLeaf({ root, location, digest }, (opened, clean) => bufferVerifyEvidence(opened, clean, maxBytes));
+}
+
+/** Open one validated digest; the verifier owns closing the confirmed handle. */
+async function withEvidenceLeaf<T>(
+  target: { root: string; location: PreparationEvidenceLocation; digest: string },
+  verify: (opened: Extract<Awaited<ReturnType<typeof openConfinedLeaf>>, { kind: "confirmed" }>, digest: string) => Promise<T>,
+): Promise<T | { status: "absent" } | { status: "unavailable" }> {
+  const clean = assertEvidenceDigest(target.digest);
+  const opened = await openEvidenceLeaf(target.root, target.location, clean);
   if (opened.kind === "absent") return { status: "absent" };
   if (opened.kind !== "confirmed") return { status: "unavailable" };
-  return bufferVerifyEvidence(opened, clean, maxBytes);
+  return verify(opened, clean);
 }
 
 /** Open one evidence leaf under the shared confinement discipline. */

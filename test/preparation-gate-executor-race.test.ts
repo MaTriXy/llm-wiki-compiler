@@ -8,14 +8,14 @@
  * quarantine/reset state that became visible in between is never consulted.
  */
 
-import { mkdir, mkdtemp, readdir, rename, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { acquirePreparationMutationLock, RecoveryGateError } from "../src/operation-bundles/lock-gate.js";
 import { releaseLock } from "../src/utils/lock.js";
 import { PREPARATION_QUARANTINE_SEGMENT, preparationPaths } from "../src/preparations/paths.js";
-import { perRunQuarantineUnitId, quarantinePreparationRunLocked } from "../src/preparations/quarantine.js";
+import { crashQuarantine, workspaceFileNames } from "./preparations/crash-fixture.js";
 import { sweepPreparationOrphansLocked } from "../src/preparations/retention.js";
 import { resolvePreparationLifecyclePending } from "../src/preparations/recovery.js";
 import { LIFECYCLE_ACTOR, stagePreparation, tamperRun } from "./preparations/lifecycle-fixture.js";
@@ -42,11 +42,7 @@ async function orphanOne(): Promise<{ workspaceId: string; runId: string }> {
 async function crashedQuarantineUnit(): Promise<string> {
   const { binding } = await stagePreparation(root);
   await tamperRun(root, binding);
-  await expect(quarantinePreparationRunLocked(root, {
-    binding, actor: LIFECYCLE_ACTOR, at: AT, confirmResidualState: true,
-    faults: { afterPlanned: async () => { throw new Error("crash"); } },
-  })).rejects.toThrow("crash");
-  return perRunQuarantineUnitId(binding.runId);
+  return crashQuarantine(root, binding, AT);
 }
 
 describe("the gate and the destructive executor read the same snapshot", () => {
@@ -55,18 +51,7 @@ describe("the gate and the destructive executor read the same snapshot", () => {
     const orphan = await orphanOne();
     const unitId = await crashedQuarantineUnit();
     // A REAL byte witness: every file under the project's preparation store.
-    const files = async (): Promise<string[]> => {
-      const out: string[] = [];
-      const walk = async (dir: string): Promise<void> => {
-        for (const entry of await readdir(dir, { withFileTypes: true })) {
-          const full = path.join(dir, entry.name);
-          if (entry.isDirectory()) await walk(full);
-          else out.push(full.slice(root.length));
-        }
-      };
-      await walk(path.join(root, ".llmwiki", "workspaces"));
-      return out.sort();
-    };
+    const files = () => workspaceFileNames(root);
     const before = await files();
 
     // 2. HIDE the quarantine unit, so the gate's capture cannot see it.

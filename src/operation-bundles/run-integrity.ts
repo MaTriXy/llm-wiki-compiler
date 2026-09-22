@@ -5,7 +5,9 @@
  * constructors for the version-one operation-run chain.
  */
 
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+import { hmacHexEqual } from "../utils/hmac-equal.js";
+import { appendRunAnnotations, successorEnvelope } from "../utils/run-history-projection.js";
 import { canonicalBytes, canonicalDigest } from "../profile/templates/signing/canonical.js";
 import { compensationId, mutationId } from "./ids.js";
 import type { MutationId } from "./ids.js";
@@ -20,7 +22,6 @@ import type {
 
 const OPERATION_KEY_BYTES = 32;
 const KEY_EPOCH_DOMAIN = Buffer.from("llmwiki.operation-run-key-epoch.v1\0", "utf8");
-const HMAC_HEX = /^[0-9a-f]{64}$/;
 
 /** Require exactly the V2 operation-key entropy before cryptographic use. */
 function assertOperationKey(key: Buffer): void {
@@ -50,8 +51,7 @@ function operationRunIntegrity(key: Buffer, run: OperationRunContent | Operation
 
 /** Compare two canonical lowercase HMAC values in constant time. */
 export function operationRunIntegrityMatches(stored: string, expected: string): boolean {
-  if (!HMAC_HEX.test(stored) || !HMAC_HEX.test(expected)) return false;
-  return timingSafeEqual(Buffer.from(stored, "hex"), Buffer.from(expected, "hex"));
+  return hmacHexEqual(stored, expected);
 }
 
 /** Return the exact binding projected from a parsed run. */
@@ -236,10 +236,8 @@ function appendAnnotations(
   supplied: AppendOperationTransitionInput["residualFindings"],
 ) {
   const payload = transition.payload;
-  const completionWarnings = payload.kind === "warning"
-    ? [...run.completionWarnings, { code: payload.code, attempted: payload.attempted, completed: payload.completed, skipped: payload.skipped, failed: payload.failed }]
-    : [...run.completionWarnings];
-  const notices = payload.kind === "notice" ? [...run.notices, { code: payload.code }] : [...run.notices];
+  const { completionWarnings, notices } = appendRunAnnotations(run,
+    payload.kind === "warning" ? payload : undefined, payload.kind === "notice" ? payload : undefined);
   const bound = boundResidualFindings(transition, supplied);
   const residualFindings = bound ?? [...run.residualFindings];
   return { completionWarnings, notices, residualFindings };
@@ -263,11 +261,9 @@ export function appendOperationTransition(run: OperationRunContent | OperationRu
   const { applyOwner: _priorOwner, ...contentWithoutOwner } = content;
   const prior = content.transitions.at(-1);
   if (prior === undefined) throw new Error("operation run has no genesis transition");
-  const transitionContent = {
-    sequence: content.transitions.length, previousHash: prior.contentHash,
-    actor: cloneActor(input.actor), stateBefore: content.state, stateAfter: input.stateAfter,
-    type: input.type, at: input.at, payload: input.payload,
-  };
+  const transitionContent = successorEnvelope(content, prior.contentHash, {
+    actor: cloneActor(input.actor), stateAfter: input.stateAfter, type: input.type, at: input.at, payload: input.payload,
+  });
   const transition = { ...transitionContent, contentHash: operationTransitionHash(transitionContent) };
   const outcomes = appendOutcomes(content, transition);
   const authority = appendAuthority(content, transition);

@@ -28,6 +28,7 @@
 
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { createWiki } from "../src/sdk/wiki.js";
+import { expectNoRecoveryAuthority } from "./preparation-sdk-fixture.js";
 import type { PreparationGrant } from "../src/preparations/service.js";
 import { RESUMABLE_RUN_STATE, RESUME_EDGE_EXISTS } from "../src/preparations/service-resume.js";
 import { preparationRunWriteBudgetClass } from "../src/preparations/run-budget.js";
@@ -87,10 +88,7 @@ describe("a paused run is escapable by a principal holding preparation.run", () 
     // grant list this suite holds already forbids — so what this case adds is the
     // evidence that the principal genuinely lacks them.
     const wiki = pausingPrincipal();
-    await expect(wiki.cancelPreparation(fixture.binding.runId))
-      .rejects.toMatchObject({ code: "missing-grant" });
-    await expect(wiki.recoverPreparation(fixture.binding.runId))
-      .rejects.toMatchObject({ code: "missing-grant" });
+    await expectNoRecoveryAuthority(wiki, fixture.binding.runId);
 
     // And the run is STILL reachable by its own token despite both refusals.
     await wiki.pausePreparation(fixture.binding.runId);

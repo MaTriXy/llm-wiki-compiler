@@ -30,7 +30,7 @@ import {
   type LifecycleClock,
 } from "../../src/preparations/retention.js";
 import {
-  driveToFailed, driveToRecoveryRequired, LIFECYCLE_ACTOR, stagePreparation, sweepStagedThenCrashed, tamperRun,
+  driveToFailed, driveToRecoveryRequired, LIFECYCLE_ACTOR, stagePreparation, stageAndCrashPrune, sweepStagedThenCrashed, tamperRun,
 } from "./lifecycle-fixture.js";
 import type { PreparationRunBinding } from "../../src/preparations/run-types.js";
 
@@ -41,6 +41,15 @@ const WITHIN_FLOOR = clockAt("2026-05-10T00:00:00.000Z");
 
 describe("prune eligibility and prune", () => {
   const root = useTempRoot();
+
+  /** Resume only the existing unit belonging to this run, past the retention floor. */
+  function resumePrune(binding: PreparationRunBinding) {
+    const unitId = pruneUnitIdFor(binding.runId);
+    return prunePreparationRunLocked(root.dir, {
+      authorization: gateDecision("prune", unitId, unitId),
+      target: { kind: "run", binding }, actor: LIFECYCLE_ACTOR, at: AT, clock: AFTER_FLOOR,
+    });
+  }
 
   it("is eligible only for a terminal run past the injectable retention floor", async () => {
     const { binding } = await stagePreparation(root.dir);
@@ -100,7 +109,7 @@ describe("prune eligibility and prune", () => {
     const { binding, runFile, drift } = await prunableRun();
     await expect(pruneWithFault(binding, async () => { throw new Error("crash"); })).rejects.toThrow("crash");
     await drift();
-    await expect(prunePreparationRunLocked(root.dir, { authorization: gateDecision("prune", pruneUnitIdFor(binding.runId), pruneUnitIdFor(binding.runId)), target: { kind: "run" as const, binding }, actor: LIFECYCLE_ACTOR, at: AT, clock: AFTER_FLOOR }))
+    await expect(resumePrune(binding))
       // THE REFUSAL MOVED A LAYER EARLIER, AND MEASUREMENT SAYS THAT IS CORRECT.
       // Drifting the target destroys the unit's own classification -- measured
       // directly, the pending unit goes from operation:"run-prune", complete:true
@@ -121,7 +130,7 @@ describe("prune eligibility and prune", () => {
     const unitRoot = preparationPruneUnitPaths(root.dir, `prn-${createHash("sha256").update(binding.runId).digest("hex").slice(0, 32)}`).unitRoot;
     await expect(lstat(runFile)).rejects.toMatchObject({ code: "ENOENT" });
     expect((await readdir(unitRoot)).some((entry) => entry.startsWith("pending-delete-"))).toBe(true);
-    const receipt = await prunePreparationRunLocked(root.dir, { authorization: gateDecision("prune", pruneUnitIdFor(binding.runId), pruneUnitIdFor(binding.runId)), target: { kind: "run" as const, binding }, actor: LIFECYCLE_ACTOR, at: AT, clock: AFTER_FLOOR });
+    const receipt = await resumePrune(binding);
     expect(receipt.kind).toBe("prune-completed");
     expect((await readdir(unitRoot)).some((entry) => entry.startsWith("pending-delete-"))).toBe(false);
   });
@@ -140,7 +149,7 @@ describe("prune eligibility and prune", () => {
     await rm(unitRoot, { recursive: true, force: true });
     await symlink(outside, unitRoot);
     try {
-      await expect(prunePreparationRunLocked(root.dir, { authorization: gateDecision("prune", pruneUnitIdFor(binding.runId), pruneUnitIdFor(binding.runId)), target: { kind: "run" as const, binding }, actor: LIFECYCLE_ACTOR, at: AT, clock: AFTER_FLOOR }))
+      await expect(resumePrune(binding))
         // REFUSED EARLIER, AND FAIL-CLOSED. Replacing the unit root with a symlink
         // out of the project makes the unit unclassifiable, so the gate's own
         // predicate -- re-run by the driver over its own capture -- refuses on an
@@ -160,15 +169,8 @@ describe("prune eligibility and prune", () => {
   });
 
   it("resumes a prune interrupted after the deletes", async () => {
-    const { binding } = await stagePreparation(root.dir);
-    await driveToFailed(root.dir, binding);
-    await expect(prunePreparationRunLocked(root.dir, {
-      // FRESH: this is the call that crashes, so nothing is pending yet.
-      authorization: gateDecision("prune", pruneUnitIdFor(binding.runId)),
-      target: { kind: "run" as const, binding }, actor: LIFECYCLE_ACTOR, at: AT, clock: AFTER_FLOOR,
-      faults: { afterDeletes: async () => { throw new Error("crash"); } },
-    })).rejects.toThrow();
-    const receipt = await prunePreparationRunLocked(root.dir, { authorization: gateDecision("prune", pruneUnitIdFor(binding.runId), pruneUnitIdFor(binding.runId)), target: { kind: "run" as const, binding }, actor: LIFECYCLE_ACTOR, at: AT, clock: AFTER_FLOOR });
+    const { binding } = await stageAndCrashPrune(root.dir, AT, "afterDeletes");
+    const receipt = await resumePrune(binding);
     expect(receipt.kind).toBe("prune-completed");
   });
 });

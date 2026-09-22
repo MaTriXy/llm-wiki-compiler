@@ -22,6 +22,7 @@
  */
 
 import path from "node:path";
+import { isFlatSourceLeaf as isFlatLeaf } from "../../utils/flat-source-leaf.js";
 import { createHash } from "node:crypto";
 import { readConfinedLeafBuffer } from "../../utils/confined-read.js";
 import type { PlanSourceEvidenceDescriptorV1 } from "../../preparations/plan-types.js";
@@ -53,12 +54,6 @@ function columnsOf(
   return {
     paths: paths.map(String), digests: digests.map(String), byteCounts: byteCounts.map(String),
   };
-}
-
-/** True when a relative path is a bare leaf name — no separators, no dot-segments. */
-function isFlatLeaf(relative: string): boolean {
-  return relative.length > 0 && !relative.includes("/") && !relative.includes("\\")
-    && relative !== "." && relative !== ".." && !relative.startsWith(".");
 }
 
 /**

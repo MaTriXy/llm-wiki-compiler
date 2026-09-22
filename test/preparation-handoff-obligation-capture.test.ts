@@ -36,6 +36,27 @@ import {
 
 const root = useTempRoot();
 
+/** Mutate immediately after the synchronous service boundary, before awaiting its result. */
+function handoffThenMutate(
+  binding: PreparationRunBinding, obligations: PreparationHandoffObligationsV1,
+  leaves: ReturnType<typeof leavesOf>,
+) {
+  expect(leaves.length).toBeGreaterThan(1);
+  const pending = service(root.dir).handoff({ runId: binding.runId, obligations });
+  for (const leaf of leaves) leaf.mutate();
+  return pending;
+}
+
+/** Read the durable result, mapping service names explicitly to the substrate's outcome. */
+async function genesisAfterHandoff(binding: PreparationRunBinding, pending: ReturnType<PreparationServiceV1["handoff"]>) {
+  const outcome = await pending;
+  if (outcome.status === "refused") throw new Error(`refused: ${outcome.reason}`);
+  return readCreatedGenesisRun(root.dir, binding, {
+    outcome: outcome.status, handoffId: outcome.handoffId, bundleId: outcome.bundleId,
+    operationRunId: outcome.operationRunId, bundleManifestDigest: outcome.bundleManifestDigest,
+  });
+}
+
 /** The service a granted host would construct — the run grant is what handoff costs. */
 function service(dir: string): PreparationServiceV1 {
   return createPreparationService({
@@ -168,12 +189,8 @@ describe("the obligation set is captured to its leaves", () => {
     const obligations: PreparationHandoffObligationsV1 = mutableCopy(handoffObligations(binding));
     const original = obligations.authorities.operationRun.controlTransitionAllowance;
     const leaves = leavesOf(obligations);
-    expect(leaves.length).toBeGreaterThan(1);
-
-    const pending = service(root.dir).handoff({ runId: binding.runId, obligations });
-    for (const leaf of leaves) leaf.mutate();
-    const outcome = await pending;
-    if (outcome.status === "refused") throw new Error(`refused: ${outcome.reason}`);
+    const pending = handoffThenMutate(binding, obligations, leaves);
+    const genesis = await genesisAfterHandoff(binding, pending);
 
     // The caller really did change it — without this the case passes against a
     // mutation that silently failed.
@@ -181,10 +198,6 @@ describe("the obligation set is captured to its leaves", () => {
     // The service result and the substrate result carry the same identities under
     // different field names — `status` versus `outcome` — so the reader takes the
     // substrate shape rather than a cast that would hide a real mismatch.
-    const genesis = await readCreatedGenesisRun(root.dir, binding, {
-      outcome: outcome.status, handoffId: outcome.handoffId, bundleId: outcome.bundleId,
-      operationRunId: outcome.operationRunId, bundleManifestDigest: outcome.bundleManifestDigest,
-    });
     expect(genesis.controlTransitionAllowance).toBe(original);
   });
 
@@ -206,15 +219,10 @@ describe("the obligation set is captured to its leaves", () => {
     const pending = service(root.dir).handoff({ runId: binding.runId, obligations: mutated });
     for (const leaf of leavesOf(mutated.preparationEvidence, "preparationEvidence")) leaf.mutate();
     expectMutationLanded(mutated.preparationEvidence, "preparationEvidence");
-    const outcome = await pending;
-    if (outcome.status === "refused") throw new Error(`refused: ${outcome.reason}`);
     // Two different runs digest differently by construction, so the comparison
     // that binds is the STAGED EVIDENCE itself: the bundle must carry the refs
     // as they stood at the boundary, not as the caller later rewrote them.
-    const staged = await readCreatedGenesisRun(root.dir, binding, {
-      outcome: outcome.status, handoffId: outcome.handoffId, bundleId: outcome.bundleId,
-      operationRunId: outcome.operationRunId, bundleManifestDigest: outcome.bundleManifestDigest,
-    });
+    const staged = await genesisAfterHandoff(binding, pending);
     expect(JSON.stringify(staged)).not.toContain("-tampered");
   });
 
@@ -226,17 +234,9 @@ describe("the obligation set is captured to its leaves", () => {
     const binding = await stageReadyPreparation(root.dir);
     const obligations = mutableCopy(handoffObligations(binding));
     const leaves = leavesOf(obligations.compilation, "compilation");
-    expect(leaves.length).toBeGreaterThan(1);
-
-    const pending = service(root.dir).handoff({ runId: binding.runId, obligations });
-    for (const leaf of leaves) leaf.mutate();
+    const pending = handoffThenMutate(binding, obligations, leaves);
     expectMutationLanded(obligations.compilation, "compilation");
-    const outcome = await pending;
-    if (outcome.status === "refused") throw new Error(`refused: ${outcome.reason}`);
-    const staged = await readCreatedGenesisRun(root.dir, binding, {
-      outcome: outcome.status, handoffId: outcome.handoffId, bundleId: outcome.bundleId,
-      operationRunId: outcome.operationRunId, bundleManifestDigest: outcome.bundleManifestDigest,
-    });
+    const staged = await genesisAfterHandoff(binding, pending);
     expect(JSON.stringify(staged)).not.toContain("-tampered");
   });
 
@@ -248,19 +248,11 @@ describe("the obligation set is captured to its leaves", () => {
     const obligations = mutableCopy(handoffObligations(binding));
     const original = obligations.authorities.operationRun.controlTransitionAllowance;
     const leaves = leavesOf(obligations.authorities, "authorities");
-    expect(leaves.length).toBeGreaterThan(1);
-
-    const pending = service(root.dir).handoff({ runId: binding.runId, obligations });
-    for (const leaf of leaves) leaf.mutate();
-    const outcome = await pending;
-    if (outcome.status === "refused") throw new Error(`refused: ${outcome.reason}`);
+    const pending = handoffThenMutate(binding, obligations, leaves);
+    const staged = await genesisAfterHandoff(binding, pending);
     // The caller really did change it — without this the case passes against a
     // mutation that silently failed.
     expect(obligations.authorities.operationRun.controlTransitionAllowance).not.toBe(original);
-    const staged = await readCreatedGenesisRun(root.dir, binding, {
-      outcome: outcome.status, handoffId: outcome.handoffId, bundleId: outcome.bundleId,
-      operationRunId: outcome.operationRunId, bundleManifestDigest: outcome.bundleManifestDigest,
-    });
     expect(staged.controlTransitionAllowance).toBe(original);
   });
 

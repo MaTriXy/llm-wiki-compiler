@@ -44,7 +44,8 @@ import {
 } from "./preparation-destructive-fixture.js";
 import { resolvePreparationLifecyclePending } from "../src/preparations/recovery.js";
 import { MISSING_KEY_CONFIRMATION, resetPreparationKeyEpochLocked } from "../src/preparations/reset.js";
-import { perRunQuarantineUnitId, quarantinePreparationRunLocked } from "../src/preparations/quarantine.js";
+import { perRunQuarantineUnitId } from "../src/preparations/quarantine.js";
+import { crashQuarantine } from "./preparations/crash-fixture.js";
 import { prunePreparationRunLocked } from "../src/preparations/retention.js";
 import {
   preparationPruneUnitPaths, preparationQuarantineUnitPaths,
@@ -67,6 +68,29 @@ const projectRoot = faultableProjectRoot("prep-registry-evidence-");
 let root = "";
 beforeEach(async () => { root = await projectRoot.make(); });
 afterEach(async () => { await projectRoot.remove(root); });
+
+/** Seed two real crashed operations, temporarily hiding the first pending unit to create the second. */
+async function prunableRunBesideCrashedQuarantine(): Promise<{ runId: string; quarantineUnit: string }> {
+  // Stage both before tampering: an invalid run prevents further staging.
+  const prunable = await stagePreparation(root);
+  const quarantined = await stagePreparation(root);
+  await driveToFailed(root, prunable.binding, "2026-01-01T00:00:00.000Z");
+  await tamperRun(root, quarantined.binding);
+  const quarantineUnit = await crashQuarantine(root, quarantined.binding, AT);
+  await withUnitHidden(quarantineRegistryDir(root), quarantineUnit,
+    () => crashPruneOfShared(root, prunable.binding, AT));
+  return { runId: prunable.binding.runId, quarantineUnit };
+}
+
+/** Distinguish attributed incomplete residue from a complete pending observation. */
+async function expectPruneResidueObservation(complete: boolean): Promise<void> {
+  const observed = await resolvePreparationLifecyclePending(root);
+  expect(observed).toMatchObject({ status: "pending", unobservableRegistries: [] });
+  if (observed.status === "pending") {
+    expect(observed.complete).toBe(complete);
+    expect(observed.problemRegistries).toEqual(complete ? [] : ["prune"]);
+  }
+}
 
 /** The quarantine registry's own path, which every fault below targets. */
 function quarantineRoot(): string {
@@ -267,29 +291,6 @@ describe("a faulted quarantine UNIT refuses it too, and nothing attributes a reg
    * Both cases assert `unobservableRegistries` is EMPTY, which is what proves
    * they exercise a different arm rather than re-testing the ones above.
    */
-  async function prunableRunBesideCrashedQuarantine(): Promise<{ runId: string; quarantineUnit: string }> {
-    // BOTH STAGED BEFORE ANY TAMPERING: a tampered run poisons the inventory
-    // and the second staging refuses. This cost two attempts to discover.
-    const prunable = await stagePreparation(root);
-    const quarantined = await stagePreparation(root);
-    await driveToFailed(root, prunable.binding, "2026-01-01T00:00:00.000Z");
-    await tamperRun(root, quarantined.binding);
-    await expect(quarantinePreparationRunLocked(root, {
-      binding: quarantined.binding, actor: LIFECYCLE_ACTOR, at: AT, confirmResidualState: true,
-      faults: { afterPlanned: async () => { throw new Error("crash"); } },
-    })).rejects.toThrow("crash");
-    // ASSEMBLED: the gate refuses a fresh prune while the quarantine unit is
-    // pending, and the driver re-runs that predicate, so the unit is hidden for
-    // the seeding and restored. Both units are real crashed operations.
-    await withUnitHidden(
-      quarantineRegistryDir(root), perRunQuarantineUnitId(quarantined.binding.runId),
-      () => crashPruneOfShared(root, prunable.binding, AT));
-    return {
-      runId: prunable.binding.runId,
-      quarantineUnit: perRunQuarantineUnitId(quarantined.binding.runId),
-    };
-  }
-
   /** Assert the state is unattributed-but-incomplete, then refuse the prune. */
   async function expectIncompleteRefusal(runId: string): Promise<void> {
     await expectIncompleteWithNoAttribution();
@@ -330,10 +331,7 @@ describe("the mirror state: pending unit in ONE registry, fault in the OTHER", (
   it("refuses a quarantine resume while the PRUNE registry cannot be observed", async () => {
     const { binding } = await stagePreparation(root);
     await tamperRun(root, binding);
-    await expect(quarantinePreparationRunLocked(root, {
-      binding, actor: LIFECYCLE_ACTOR, at: AT, confirmResidualState: true,
-      faults: { afterPlanned: async () => { throw new Error("crash"); } },
-    })).rejects.toThrow("crash");
+    await crashQuarantine(root, binding, AT);
     await symlinkRegistry(root, PREPARATION_PRUNE_REGISTRY);
 
     const observed = await resolvePreparationLifecyclePending(root);
@@ -402,12 +400,7 @@ describe("an unretirable unit in its OWN registry must not strand a legitimate r
     // (A unit crashed after PLANNING and then stripped reads `inert` with the
     // observation still complete — a different negative, and one this arm has
     // nothing to fire on at all.)
-    const observed = await resolvePreparationLifecyclePending(root);
-    expect(observed).toMatchObject({ status: "pending", unobservableRegistries: [] });
-    if (observed.status === "pending") {
-      expect(observed.complete).toBe(false);
-      expect(observed.problemRegistries).toEqual(["prune"]);
-    }
+    await expectPruneResidueObservation(false);
 
     expect(await cliPreparationService(root).prune({ runId: resumable.binding.runId }))
       .toMatchObject({ status: "pruned", unitId: resumableUnit, resumed: true });
@@ -433,13 +426,7 @@ describe("an unretirable unit in its OWN registry must not strand a legitimate r
     await driveToFailed(root, resumable.binding, "2026-01-01T00:00:00.000Z");
     const resumableUnit = await crashPruneOfShared(root, resumable.binding, AT);
 
-    const observed = await resolvePreparationLifecyclePending(root);
-    expect(observed).toMatchObject({ status: "pending", unobservableRegistries: [] });
-    if (observed.status === "pending") {
-      // THE DISCRIMINATING ASSERTION between this negative and the one above.
-      expect(observed.complete).toBe(true);
-      expect(observed.problemRegistries).toEqual([]);
-    }
+    await expectPruneResidueObservation(true);
 
     expect(await cliPreparationService(root).prune({ runId: resumable.binding.runId }))
       .toMatchObject({ status: "pruned", unitId: resumableUnit, resumed: true });
@@ -450,23 +437,10 @@ describe("an unretirable unit in its OWN registry must not strand a legitimate r
     // on provenance at all; this is what proves the scoping is a rule rather
     // than an omission. Same two-run shape, same legitimate resumable prune —
     // only the faulted registry differs, and a key reset can live in this one.
-    const resumable = await stagePreparation(root);
-    const quarantined = await stagePreparation(root);
-    await driveToFailed(root, resumable.binding, "2026-01-01T00:00:00.000Z");
-    await tamperRun(root, quarantined.binding);
-    await expect(quarantinePreparationRunLocked(root, {
-      binding: quarantined.binding, actor: LIFECYCLE_ACTOR, at: AT, confirmResidualState: true,
-      faults: { afterPlanned: async () => { throw new Error("crash"); } },
-    })).rejects.toThrow("crash");
-    // Hidden for the seeding, as above: the quarantine unit is pending and the
-    // gate refuses a prune that owns none of it.
-    await withUnitHidden(
-      quarantineRegistryDir(root), perRunQuarantineUnitId(quarantined.binding.runId),
-      () => crashPruneOfShared(root, resumable.binding, AT));
-    await rm(preparationQuarantineUnitPaths(
-      root, perRunQuarantineUnitId(quarantined.binding.runId)).plannedReceiptFile);
+    const { runId, quarantineUnit } = await prunableRunBesideCrashedQuarantine();
+    await rm(preparationQuarantineUnitPaths(root, quarantineUnit).plannedReceiptFile);
 
-    expect(await cliPreparationService(root).prune({ runId: resumable.binding.runId }))
+    expect(await cliPreparationService(root).prune({ runId }))
       .toMatchObject({ status: "refused", reason: expect.stringContaining("could not be read") });
     expect(await manifestCount()).toBe(2);
   });

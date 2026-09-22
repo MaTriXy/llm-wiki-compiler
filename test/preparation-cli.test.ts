@@ -19,7 +19,7 @@ import { runCLI, expectCLIExit } from "./fixtures/run-cli.js";
 
 import {
   emptyWorkspace, expectRefusal, initializedWorkspace, listedStates, onlyManifest,
-  planAndSeed, runStateOf, stageable, stagedRunIn,
+  planAndSeed, runStateOf, stageable, stagedRunIn, listEnvelope,
 } from "./preparation-cli-fixture.js";
 
 describe("preparation CLI is reachable from the built binary", () => {
@@ -63,9 +63,7 @@ describe("preparation CLI is reachable from the built binary", () => {
     // is not a pristine project at all — it is not a project — so it was pinning
     // the silently-clean answer the case below now refuses.
     const cwd = await initializedWorkspace("pristine");
-    const result = await runCLI(["preparation", "list", "--json"], cwd);
-    expectCLIExit(result, 0);
-    const envelope = JSON.parse(result.stdout) as { runs: unknown[]; problems: string[] };
+    const envelope = await listEnvelope(cwd);
     expect(envelope.runs).toEqual([]);
     expect(envelope.problems).toEqual([]);
   });
@@ -77,9 +75,7 @@ describe("preparation CLI is reachable from the built binary", () => {
     // their runs did not exist. Exit stays 0 — nothing failed, and the answer is
     // in the envelope where a consumer can read it.
     const cwd = await emptyWorkspace("not-a-project");
-    const result = await runCLI(["preparation", "list", "--json"], cwd);
-    expectCLIExit(result, 0);
-    const envelope = JSON.parse(result.stdout) as { runs: unknown[]; problems: string[] };
+    const envelope = await listEnvelope(cwd);
     expect(envelope.runs).toEqual([]);
     expect(envelope.problems).toEqual([
       "project-readiness: no .llmwiki store here; run from the project root",
@@ -131,9 +127,7 @@ describe("preparation CLI is reachable from the built binary", () => {
       { recursive: true, force: true });
     await rm(preparationKeyFile(cwd), { force: true });
 
-    const result = await runCLI(["preparation", "list", "--json"], cwd);
-    expectCLIExit(result, 0);
-    const envelope = JSON.parse(result.stdout) as { runs: unknown[]; problems: string[] };
+    const envelope = await listEnvelope(cwd);
     expect(envelope.problems.join(" ")).toMatch(/run-accounting/u);
   });
 
@@ -302,11 +296,9 @@ describe("fail refuses honestly instead of throwing a validator string", () => {
     await writeFile(path.join(cwd, ".llmwiki", "workspaces", binding.workspaceId,
       PREPARATIONS_SEGMENT, binding.preparationId, MANIFEST_FILENAME), "{ corrupt");
 
-    const result = await runCLI(["preparation", "fail", binding.runId, "--json"], cwd);
-    expect(result.code).not.toBe(0);
-    const envelope = JSON.parse(result.stdout) as { reason: string };
-    expect(envelope.reason).toMatch(/not authoritative|may exist/u);
-    expect(envelope.reason).not.toMatch(/no such preparation run/u);
+    const reason = await expectRefusal(["preparation", "fail", binding.runId], cwd);
+    expect(reason).toMatch(/not authoritative|may exist/u);
+    expect(reason).not.toMatch(/no such preparation run/u);
   });
 
   it("`fail --json` emits a PARSEABLE envelope on success and on refusal", async () => {
@@ -323,11 +315,8 @@ describe("fail refuses honestly instead of throwing a validator string", () => {
     expect((JSON.parse(ok.stdout) as { status: string }).status).toBe("failed");
 
     // The refusal path too — an already-terminal run.
-    const again = await runCLI(["preparation", "fail", binding.runId, "--json"], cwd);
-    expect(again.code).not.toBe(0);
-    const refused = JSON.parse(again.stdout) as { status: string; reason: string };
-    expect(refused.status).toBe("refused");
-    expect(refused.reason).toMatch(/already terminal/u);
+    const reason = await expectRefusal(["preparation", "fail", binding.runId], cwd);
+    expect(reason).toMatch(/already terminal/u);
   });
 
   it("REFUSES a state that cannot reach failed, without moving the run", async () => {
@@ -336,13 +325,10 @@ describe("fail refuses honestly instead of throwing a validator string", () => {
     // `refused` arm built for exactly this.
     const { cwd, binding } = await stagedRunIn("failillegal", "cancelling");
 
-    const result = await runCLI(["preparation", "fail", binding.runId, "--json"], cwd);
-    expect(result.code).not.toBe(0);
-    const envelope = JSON.parse(result.stdout) as { status: string; reason: string };
-    expect(envelope.status).toBe("refused");
+    const reason = await expectRefusal(["preparation", "fail", binding.runId], cwd);
     // The run's own state is named, not a validator internal.
-    expect(envelope.reason).toMatch(/cancelling/u);
-    expect(envelope.reason).not.toMatch(/illegal preparation run state edge/u);
+    expect(reason).toMatch(/cancelling/u);
+    expect(reason).not.toMatch(/illegal preparation run state edge/u);
 
     // And it DID NOT MOVE.
     expect(await runStateOf(cwd, binding)).toBe("cancelling");

@@ -12,10 +12,10 @@
  * recovery-required with its bytes byte-identically intact.
  */
 
-import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
-import path from "node:path";
-import os from "node:os";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { beforeEach, describe, expect, it } from "vitest";
+import { useFileProject } from "../fixtures/file-project.js";
+import { journeyTarget, expectPageConflict } from "./page-journey-fixture.js";
 import { approveAndApplyOperationBundleLocked } from "../../src/operation-bundles/executor.js";
 import { readOperationManifest } from "../../src/operation-bundles/manifest-store.js";
 import {
@@ -29,14 +29,10 @@ const V2 = Buffer.from("# note\n\nstage: proposed\nnovelty-score: 0.72\n");
 const STALE = Buffer.from("# note\n\nstage: explored\n");
 
 let root = "";
-beforeEach(async () => { root = await mkdtemp(path.join(os.tmpdir(), "page-update-")); });
-afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); });
+const createProject = useFileProject("page-update-");
+beforeEach(async () => { root = await createProject({}); });
 
-async function seed(bytes: Buffer): Promise<void> {
-  await mkdir(path.join(root, "wiki", DIR), { recursive: true });
-  await writeFile(path.join(root, "wiki", DIR, `${SLUG}.md`), bytes);
-}
-const pagePath = (): string => path.join(root, "wiki", DIR, `${SLUG}.md`);
+const { seed, pagePath } = journeyTarget(() => root, DIR, SLUG);
 
 describe("authored page update — full journey through the executor", () => {
   it("STAGES the digest-state precondition, APPLIES, and changes the unchanged page", async () => {
@@ -60,12 +56,10 @@ describe("authored page update — full journey through the executor", () => {
     // The page changed since the proposal — to neither the precondition nor the
     // postcondition bytes.
     await seed(STALE);
-    const result = await approveAndApplyOperationBundleLocked(root, approveRequest(staged, buildRuntime()));
     // The executor observed the conflict and parked — the update mutation FAILED
     // its effect protocol (a cancel/outage park would not fail the mutation), so
     // nothing was applied.
-    expect(result.state).toBe("recovery-required");
-    expect(result.counters?.mutations).toMatchObject({ applied: 0, failed: 1 });
+    await expectPageConflict(root, staged);
     // The changed bytes stand byte-identically — no blind overwrite.
     expect(await readFile(pagePath())).toEqual(STALE);
   });

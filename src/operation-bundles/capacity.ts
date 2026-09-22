@@ -7,6 +7,7 @@
 
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { authoritativeManifests, hasAuthoritativeRun, capacityViolation, uniqueInventoryBytes as uniqueBytes } from "../utils/inventory-arithmetic.js";
 import { readCatalogStore } from "./catalog-store.js";
 import {
   MAX_ACTIVE_BUNDLE_BYTES, MAX_BUNDLE_PAYLOAD_BYTES, MAX_CATALOG_FILE_BYTES,
@@ -126,25 +127,8 @@ const CAP_ENTRIES: ReadonlyArray<[
 
 /** Require nonnegative exact arithmetic and enforce every inclusive cap. */
 export function assertStageCapacity(projection: StageCapacityProjection): void {
-  for (const [field, limit, dimension] of CAP_ENTRIES) {
-    const value = projection[field];
-    if (!Number.isSafeInteger(value) || value < 0 || value > limit) {
-      throw new StageCapacityError(dimension);
-    }
-  }
-}
-
-/** Count physical bytes once even when a durable hard-link alias remains. */
-function uniqueBytes(leaves: readonly OperationLeafObservation[]): number {
-  const seen = new Set<string>();
-  let bytes = 0;
-  for (const leaf of leaves) {
-    const identity = `${leaf.dev}:${leaf.ino}`;
-    if (seen.has(identity)) continue;
-    seen.add(identity);
-    bytes += leaf.bytes;
-  }
-  return bytes;
+  const dimension = capacityViolation(projection, CAP_ENTRIES);
+  if (dimension !== undefined) throw new StageCapacityError(dimension);
 }
 
 /** Count logical objects, folding `.tmp` and `.writing` into their destination. */
@@ -171,9 +155,7 @@ async function readManifests(
 ): Promise<Map<string, OperationBundleManifest>> {
   const result = new Map<string, OperationBundleManifest>();
   const workspaceByBundle = new Map<BundleId, string>();
-  const authoritative = leaves.filter((leaf) =>
-    leaf.kind === "manifest" && leaf.protocolAlias === undefined);
-  for (const leaf of authoritative) {
+  for (const leaf of authoritativeManifests(leaves)) {
     if (leaf.workspaceId === undefined || leaf.bundleId === undefined) continue;
     const read = await readOperationManifest(root, leaf.workspaceId, leaf.bundleId as BundleId);
     if (read.status === "ok") {
@@ -269,9 +251,7 @@ async function manifestState(
   problems: OperationInventoryProblem[],
 ): Promise<ManifestState> {
   const payloadsComplete = await verifyManifestPayloads(root, manifest, leaves, problems);
-  const runLeaf = leaves.some((leaf) => leaf.kind === "run" &&
-    leaf.workspaceId === manifest.workspaceId && leaf.runId === manifest.runId &&
-    leaf.protocolAlias === undefined);
+  const runLeaf = hasAuthoritativeRun(leaves, manifest);
   if (!payloadsComplete || !runLeaf) {
     return { manifest, complete: false, pending: false };
   }

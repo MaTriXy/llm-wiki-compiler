@@ -40,6 +40,7 @@ vi.mock("node:fs/promises", async () => {
 
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { plantRegistrySymlink, redirectLlmwiki } from "./lifecycle-storage-fixture.js";
 import { enumeratePreparationReferences } from "../../src/preparations/references.js";
 import { withPreparationLifecycleRead } from "../../src/preparations/lifecycle-snapshot/read.js";
 import { scanPreparationInventory } from "../../src/preparations/capacity.js";
@@ -184,9 +185,7 @@ describe("supplied-read consumers agree across every lifecycle state", () => {
     // which yields snapshot PROBLEMS with read.status === "ok" — a different leg.
     // Nothing previously exercised the unavailable-capture branch on either
     // consumer, so the disjunct that handles it was unpinned.
-    const decoy = path.join(root.dir, "llmwiki-decoy");
-    await mkdir(decoy, { recursive: true });
-    await symlink(decoy, path.join(root.dir, ".llmwiki"));
+    await redirectLlmwiki(root.dir);
 
     const observed = await parity(root.dir);
     expect(observed.complete).toBe(false);
@@ -204,9 +203,7 @@ describe("supplied-read consumers agree across every lifecycle state", () => {
     const quarantine = path.join(root.dir, ".llmwiki", "preparation-quarantine");
     await mkdir(quarantine, { recursive: true });
     await mkdir(path.join(root.dir, ".llmwiki", "preparation-prune"), { recursive: true });
-    const outside = path.join(root.dir, "outside");
-    await writeFile(outside, "outside");
-    await symlink(outside, path.join(quarantine, "planted"));
+    await plantRegistrySymlink(root.dir, quarantine);
 
     const observed = await parity(root.dir);
     expect(observed.complete).toBe(false);

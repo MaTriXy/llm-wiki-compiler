@@ -1,6 +1,7 @@
 {
   "$schema": "https://fallow.tools/schema.json",
   "entry": [
+    "scripts/check-fallow-report.mjs",
     "src/core-index.ts",
     "src/compiler-cli.ts",
     "src/sdk/compiler-composition.ts",

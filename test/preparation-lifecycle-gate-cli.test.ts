@@ -36,10 +36,18 @@
 import path from "node:path";
 import { describe, it, expect, beforeEach } from "vitest";
 import { runCLI } from "./fixtures/run-cli.js";
+import type { CLIResult } from "./fixtures/run-cli.js";
 import { listedStates, stageable } from "./preparation-cli-fixture.js";
 import { sweepStagedThenCrashed } from "./preparations/lifecycle-fixture.js";
 
 const CRASHED_AT = "2026-08-06T00:00:00.000Z";
+
+/** A typed gate refusal names the pending unit only on stdout. */
+function expectPendingUnitRefusal(result: CLIResult, unitId: string): void {
+  expect(result.code).not.toBe(0);
+  expect(result.stdout).toContain(unitId);
+  expect(result.stderr).toBe("");
+}
 
 let cwd = "";
 let planFile = "";
@@ -79,9 +87,7 @@ describe("preparation CLI: the lifecycle gate through the binary", () => {
   it("stages again once the unit it refused on is cleared", async () => {
     const unitId = await sweepStagedThenCrashed(cwd, CRASHED_AT);
     const refused = await stageViaCLI();
-    expect(refused.code).not.toBe(0);
-    expect(refused.stdout).toContain(unitId);
-    expect(refused.stderr).toBe("");
+    expectPendingUnitRefusal(refused, unitId);
     await resumeSweep();
     expect((await stageViaCLI()).code).toBe(0);
   });
@@ -117,9 +123,7 @@ describe("preparation CLI: `fail` takes the same gate as `stage`", () => {
     // be failed would pass without the gate ever being reached.
     const unitId = await sweepStagedThenCrashed(cwd, CRASHED_AT);
     const refused = await runCLI(["preparation", "fail", runId], cwd);
-    expect(refused.code).not.toBe(0);
-    expect(refused.stdout).toContain(unitId);
-    expect(refused.stderr).toBe("");
+    expectPendingUnitRefusal(refused, unitId);
     await resumeSweep();
     expect((await runCLI(["preparation", "fail", runId], cwd)).code).toBe(0);
   });

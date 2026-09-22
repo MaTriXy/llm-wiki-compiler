@@ -15,6 +15,8 @@ import {
 import { assertBundleId, assertOperationRunId } from "../operation-bundles/ids.js";
 import { canonicalBytes } from "../profile/templates/signing/canonical.js";
 import { isSignalablePid } from "../utils/lock-owner.js";
+import { canonicalTime, warningFields as readWarningFields } from "../operation-bundles/run-values.js";
+export { canonicalTime } from "../operation-bundles/run-values.js";
 import { parseEffectId, parseSha256Digest } from "../capability-providers/ids.js";
 import {
   assertAttemptId, assertBrokerRequestId, assertGateProofId, assertHandoffId,
@@ -53,15 +55,6 @@ export function runDigest(value: unknown, label: string): Sha256Digest {
   } catch {
     throw new Error(`${label} must be a canonical sha256 digest`);
   }
-}
-
-/** Parse one canonical millisecond UTC timestamp. */
-export function canonicalTime(value: unknown, label: string): string {
-  const parsed = textValue(value, label, 64);
-  if (!Number.isFinite(Date.parse(parsed)) || new Date(parsed).toISOString() !== parsed) {
-    throw new Error(`${label} must be a canonical ISO timestamp`);
-  }
-  return parsed;
 }
 
 /** Parse one run-state member of the closed vocabulary. */
@@ -239,16 +232,12 @@ export function parseCompleteness(value: unknown): CompletenessRecordV1 {
 export function parseWarning(value: unknown): RunCompletionWarningV1 {
   const obj = record(value, "completion warning");
   exact(obj, ["code", "attempted", "completed", "skipped", "failed"]);
-  const warning = {
-    code: textValue(obj.code, "warning code", MAX_CODE_BYTES), attempted: count(obj.attempted, "warning attempted"),
-    completed: count(obj.completed, "warning completed"), skipped: count(obj.skipped, "warning skipped"),
-    failed: count(obj.failed, "warning failed"),
-  };
-  if (warning.attempted === 0) throw new Error("completion warning requires a positive attempted count");
-  if (warning.attempted !== warning.completed + warning.skipped + warning.failed) {
-    throw new Error("completion warning counts are inconsistent");
-  }
-  return warning;
+  return warningFields(obj);
+}
+
+/** Parse the same counted warning fields in standalone records and payloads. */
+function warningFields(obj: JsonRecord): RunCompletionWarningV1 {
+  return readWarningFields(obj, MAX_CODE_BYTES);
 }
 
 /** Parse one fixed-code informational notice. */
@@ -349,16 +338,7 @@ function gatePayload(obj: JsonRecord): PreparationTransitionPayload {
 function warningPayload(obj: JsonRecord): PreparationTransitionPayload {
   exact(obj, ["kind", "code", "attempted", "completed", "skipped", "failed"]);
   if (obj.kind !== "warning") throw new Error("transition payload kind mismatch");
-  const warning = {
-    code: textValue(obj.code, "warning code", MAX_CODE_BYTES), attempted: count(obj.attempted, "warning attempted"),
-    completed: count(obj.completed, "warning completed"), skipped: count(obj.skipped, "warning skipped"),
-    failed: count(obj.failed, "warning failed"),
-  };
-  if (warning.attempted === 0) throw new Error("completion warning requires a positive attempted count");
-  if (warning.attempted !== warning.completed + warning.skipped + warning.failed) {
-    throw new Error("completion warning counts are inconsistent");
-  }
-  return { kind: "warning", ...warning };
+  return { kind: "warning", ...warningFields(obj) };
 }
 
 /** Parse one informational notice payload. */

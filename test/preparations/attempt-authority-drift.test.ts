@@ -22,6 +22,12 @@ let staged: StagedPreparation;
 beforeEach(async () => { staged = await stagePreparation(); });
 afterEach(() => staged.cleanup());
 
+/** Resolve normally at launch and with a different pin at commit. */
+function driftingRequest() {
+  const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
+  return attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
+}
+
 /** Mutate the live run under the lock, simulating a concurrent control move. */
 async function mutateRun(input: AppendPreparationTransitionInput, project: (next: PreparationRunContentV1) => PreparationRunContentV1): Promise<void> {
   await acquireMutationLockBlocking(staged.root, "ordinary");
@@ -62,14 +68,12 @@ describe("preparation attempt authority drift", () => {
   });
 
   it("parks a receiptless phase whose live authority re-resolves differently at commit", async () => {
-    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
-    const request = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
+    const request = driftingRequest();
     expect(await executePhaseAttempt(request)).toEqual({ status: "parked", reason: "authority-drift" });
   });
 
   it("ignores an authority resolver the leg swaps mid-attempt and still parks", async () => {
-    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
-    const input = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
+    const input = driftingRequest();
     (input as { leg: unknown }).leg = async () => {
       (input as { authorityResolver: unknown }).authorityResolver = driftingResolver(providerAuthority(), providerAuthority());
       return succeededLeg();
@@ -78,8 +82,7 @@ describe("preparation attempt authority drift", () => {
   });
 
   it("durably parks a drifted attempt to recovery-required with the owner cleared", async () => {
-    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
-    const request = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
+    const request = driftingRequest();
     expect(await executePhaseAttempt(request)).toEqual({ status: "parked", reason: "authority-drift" });
     const read = await readPreparationRun(staged.root, staged.binding);
     expect(read.status === "ok" && read.run.state).toBe("recovery-required");
@@ -121,8 +124,7 @@ describe("preparation attempt authority drift", () => {
   });
 
   it("ignores a swapped resolve method and still parks on drift", async () => {
-    const drifted = providerAuthority({ providerPinDigest: parseSha256Digest(`sha256:${"f".repeat(64)}`) });
-    const input = attemptRequest(staged, { authorityResolver: driftingResolver(providerAuthority(), drifted) });
+    const input = driftingRequest();
     (input as { leg: unknown }).leg = async () => {
       (input.authorityResolver as { resolve: unknown }).resolve = fixedResolver(providerAuthority()).resolve;
       return succeededLeg();

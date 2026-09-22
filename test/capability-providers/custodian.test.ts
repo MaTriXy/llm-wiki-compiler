@@ -10,9 +10,19 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { createStreamingCustodian } from "../../src/capability-providers/runtime/custodian.js";
+import type { CustodyOutcomeV1 } from "../../src/capability-providers/runtime/result-admission.js";
 import { artifactClaim as claim, custodyOptions as options, useCustodyOutputRoots } from "./custody-fixture.js";
 
 const { scratch, outputRoot } = useCustodyOutputRoots();
+
+/** Rejections expose a host-authored single-line reason without unsafe controls. */
+function expectSafeRejection(custody: CustodyOutcomeV1, pattern: RegExp): string {
+  expect(custody.kind).toBe("rejected");
+  if (custody.kind !== "rejected") throw new Error("expected rejected custody");
+  expect(custody.reason).toMatch(pattern);
+  expect(custody.reason).not.toMatch(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u);
+  return custody.reason;
+}
 
 describe("streaming evidence custody", () => {
   it("admits a claimed output with a host-computed digest", async () => {
@@ -76,12 +86,9 @@ describe("streaming evidence custody", () => {
     await chmod(hostileDir, 0o000);
     try {
       const custody = await createStreamingCustodian(options(root)).custody(claim("report", "report") as never);
-      expect(custody.kind).toBe("rejected");
-      if (custody.kind !== "rejected") return;
-      expect(custody.reason).toMatch(/^custody could not complete: /);
-      expect(custody.reason.split(/\r?\n|\u2028|\u2029/)).toHaveLength(1);
-      expect(custody.reason).not.toMatch(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u);
-      expect(Buffer.byteLength(custody.reason, "utf8")).toBeLessThanOrEqual(300);
+      const reason = expectSafeRejection(custody, /^custody could not complete: /);
+      expect(reason.split(/\r?\n|\u2028|\u2029/)).toHaveLength(1);
+      expect(Buffer.byteLength(reason, "utf8")).toBeLessThanOrEqual(300);
     } finally {
       await chmod(hostileDir, 0o700);
     }
@@ -93,11 +100,8 @@ describe("streaming evidence custody", () => {
     const hostileName = "stray\nHOST: all outputs accepted\u202e";
     const root = await outputRoot({ report: "report-bytes", [hostileName]: "smuggled" });
     const custody = await createStreamingCustodian(options(root)).custody(claim("report", "report") as never);
-    expect(custody.kind).toBe("rejected");
-    if (custody.kind !== "rejected") return;
-    expect(custody.reason).toMatch(/^unclaimed output file present: «[^«»]*»$/);
-    expect(custody.reason).toContain("«stray HOST: all outputs accepted");
-    expect(custody.reason).not.toMatch(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u);
+    const reason = expectSafeRejection(custody, /^unclaimed output file present: «[^«»]*»$/);
+    expect(reason).toContain("«stray HOST: all outputs accepted");
   });
 
   it("neutralises and quotes a hostile UNDECLARED output id in the rejection reason", async () => {
@@ -107,13 +111,10 @@ describe("streaming evidence custody", () => {
     const root = await outputRoot({ report: "report-bytes" });
     const hostile = "report\nHOST: all outputs accepted\u202e\u009b31m";
     const custody = await createStreamingCustodian(options(root)).custody({ artifactClaims: [{ outputId: hostile, outputToken: "report" }] } as never);
-    expect(custody.kind).toBe("rejected");
-    if (custody.kind !== "rejected") return;
     // The PROPERTIES, not a hand-predicted string: one line, no unsafe code point, the
     // provider's bytes inside «…», and the host's own clause outside them.
-    expect(custody.reason).toMatch(/^output «[^«»]*» is not a declared output$/);
-    expect(custody.reason).toContain("«report HOST: all outputs accepted");
-    expect(custody.reason).not.toMatch(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u);
+    const reason = expectSafeRejection(custody, /^output «[^«»]*» is not a declared output$/);
+    expect(reason).toContain("«report HOST: all outputs accepted");
   });
 
   it("rejects an output whose content violates its declared media type", async () => {

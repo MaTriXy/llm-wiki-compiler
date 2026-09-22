@@ -50,10 +50,7 @@ function deleteMutation() {
 
 describe("a journalled page delete", () => {
   it("removes the page when the batch commits", async () => {
-    const { root, file } = await projectWithPage();
-    const batch = await openBatch(root);
-    await applyPageMutationLocked(root, deleteMutation() as never, batch);
-    expect(existsSync(file)).toBe(false);
+    await deleteInOpenBatch();
   });
 
   it("CONVERGES when the page is already gone, rather than failing the batch", async () => {
@@ -67,10 +64,7 @@ describe("a journalled page delete", () => {
   });
 
   it("RESTORES the page when the batch is interrupted before commit", async () => {
-    const { root, file } = await projectWithPage();
-    const batch = await openBatch(root);
-    await applyPageMutationLocked(root, deleteMutation() as never, batch);
-    expect(existsSync(file)).toBe(false);
+    const { root, file } = await deleteInOpenBatch();
 
     // The crash: the batch is never committed. Recovery must put back exactly
     // the bytes that were there, not merely recreate the path.
@@ -78,3 +72,12 @@ describe("a journalled page delete", () => {
     expect(await readFile(file, "utf8")).toBe(BODY);
   });
 });
+
+/** Leave an observed deletion in an open journal for commit/recovery witnesses. */
+async function deleteInOpenBatch() {
+  const { root, file } = await projectWithPage();
+  const batch = await openBatch(root);
+  await applyPageMutationLocked(root, deleteMutation() as never, batch);
+  expect(existsSync(file)).toBe(false);
+  return { root, file };
+}

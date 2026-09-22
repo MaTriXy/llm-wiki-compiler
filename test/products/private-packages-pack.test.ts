@@ -33,7 +33,11 @@ describe("the packed private packages install into an EMPTY consumer and import 
     const out = await mkdtemp(path.join(tmpdir(), "private-pack-out-")); dirs.push(out);
     const consumer = await mkdtemp(path.join(tmpdir(), "private-pack-consumer-")); dirs.push(consumer);
     const packInto = (dir: string): string => {
-      const printed = execFileSync("npm", ["pack", "--silent", "--pack-destination", out], { cwd: dir }).toString();
+      // Global setup already built the compiler packages. Re-running their
+      // prepack hooks here deletes shared chunks while CLI tests import them.
+      const compilerPackage = dir === REPO || ["llmwiki-core", "llmwiki-local-workflows"].includes(path.basename(dir));
+      const flags = compilerPackage ? ["--ignore-scripts"] : [];
+      const printed = execFileSync("npm", ["pack", "--silent", ...flags, "--pack-destination", out], { cwd: dir }).toString();
       return path.join(out, printed.trim().split("\n").pop() as string);
     };
     const dependencies = ["llmwiki-core", "llmwiki-local-workflows", ...PACKAGES];

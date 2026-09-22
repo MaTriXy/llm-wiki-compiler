@@ -33,6 +33,15 @@ function admit(custody: CustodyOutcomeV1, providerResult: Record<string, unknown
   });
 }
 
+/** Check that partial-result detail preserves its host facts within the durable cap. */
+function expectBoundedPartial(result: ReturnType<typeof admit>, pattern: RegExp): string {
+  expect(result.outcome).toBe("partial");
+  if (result.outcome !== "partial") throw new Error("expected partial result");
+  expect(result.detail).toMatch(pattern);
+  expect(Buffer.byteLength(result.detail, "utf8")).toBeLessThanOrEqual(512);
+  return result.detail;
+}
+
 /** Admit a standard single-report success with an exact-matching claim plus extra fields. */
 function admitReport(extra: Record<string, unknown> = {}) {
   const custody: CustodyOutcomeV1 = { kind: "accepted", artifacts: [accepted("report", 100)], scanBytes: 100 };
@@ -117,11 +126,8 @@ describe("provider result admission", () => {
     // detail fits by construction and truncation can only ever cut provider text.
     const custody: CustodyOutcomeV1 = { kind: "accepted", artifacts: [], scanBytes: 0 };
     const result = admit(custody, { outcome: "failed", artifactClaims: [], detail: "編".repeat(400) });
-    expect(result.outcome).toBe("partial");
-    if (result.outcome !== "partial") return;
-    expect(result.detail).toMatch(/^missing required outputs \(1\): report; provider reported failure \(untrusted\): 編/);
-    expect(Buffer.byteLength(result.detail, "utf8")).toBeLessThanOrEqual(512);
-    expect(result.detail).not.toContain("\uFFFD"); // the byte cut never leaves a torn code point
+    const detail = expectBoundedPartial(result, /^missing required outputs \(1\): report; provider reported failure \(untrusted\): 編/);
+    expect(detail).not.toContain("\uFFFD"); // the byte cut never leaves a torn code point
   });
 
   it("keeps the host's missing-output FACT whole under the cap even when a manifest declares 128 outputs of 128-byte ids", () => {
@@ -132,10 +138,7 @@ describe("provider result admission", () => {
       ({ outputId: `${"o".repeat(124)}${String(index).padStart(4, "0")}`, required: true, mediaType: "application/json" }));
     const custody: CustodyOutcomeV1 = { kind: "accepted", artifacts: [], scanBytes: 0 };
     const result = admit(custody, { outcome: "failed", artifactClaims: [], detail: "latexmk failed: reason" }, many);
-    expect(result.outcome).toBe("partial");
-    if (result.outcome !== "partial") return;
-    expect(result.detail).toMatch(/^missing required outputs \(128\): o{124}0000, \+127 more; provider reported failure \(untrusted\): latexmk failed: reason$/);
-    expect(Buffer.byteLength(result.detail, "utf8")).toBeLessThanOrEqual(512);
+    expectBoundedPartial(result, /^missing required outputs \(128\): o{124}0000, \+127 more; provider reported failure \(untrusted\): latexmk failed: reason$/);
   });
 
   it("neutralises and quotes a hostile output id in a duplicate-claim rejection", () => {

@@ -32,7 +32,7 @@ import { resolveHostReadiness } from "./service-readiness.js";
 import { resolvePreparationRun } from "./service-run-lookup.js";
 
 /** The run a control verb will act on, or the reason it will not. */
-export type ControlTargetV1 =
+type ControlTargetV1 =
   | { readonly ok: true; readonly binding: PreparationRunBinding; readonly run: PreparationRunV1 }
   | { readonly ok: false; readonly reason: string };
 
@@ -49,13 +49,23 @@ export type ControlTargetV1 =
  * @param runId - The run id the operation captured in its synchronous prologue.
  * @returns The bound run, or the refusal reason to report unchanged.
  */
-export async function resolveControlTarget(root: string, runId: string): Promise<ControlTargetV1> {
+async function resolveControlTarget(root: string, runId: string): Promise<ControlTargetV1> {
   const ready = await resolveHostReadiness(root);
   if (!ready.ready) return { ok: false, reason: ready.reason ?? "the project is not ready" };
   const resolved = await resolvePreparationRun(root, runId);
   return resolved.ok
     ? { ok: true, binding: resolved.binding, run: resolved.run }
     : { ok: false, reason: resolved.reason };
+}
+
+/** Resolve a captured identity, preserving the refusal before invoking a control's own policy. */
+export async function withControlTarget<T>(
+  root: string, runId: string,
+  apply: (binding: PreparationRunBinding, run: PreparationRunV1) => Promise<T>,
+): Promise<T | { status: "refused"; reason: string }> {
+  const target = await resolveControlTarget(root, runId);
+  if (!target.ok) return { status: "refused", reason: target.reason };
+  return apply(target.binding, target.run);
 }
 
 /**

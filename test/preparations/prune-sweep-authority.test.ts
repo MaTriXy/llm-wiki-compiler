@@ -28,7 +28,7 @@ import {
   type LifecycleClock,
 } from "../../src/preparations/retention.js";
 import { pruneUnitIdFor, sweepUnitIdFor } from "../../src/preparations/prune-delete.js";
-import { driveToFailed, gateDecision, LIFECYCLE_ACTOR, stagePreparation } from "./lifecycle-fixture.js";
+import { driveToFailed, gateDecision, LIFECYCLE_ACTOR, stagePreparation, stageAndCrashPrune } from "./lifecycle-fixture.js";
 
 const AT = "2026-07-20T07:00:00.000Z";
 const AFTER_FLOOR: LifecycleClock = { now: () => new Date("2026-07-01T00:00:00.000Z") };
@@ -104,13 +104,7 @@ describe("prune and sweep authority preconditions", () => {
     // with "holds durable contents with no authenticated plan": a genuine refusal,
     // but a DIFFERENT one, and it would have certified this row while testing
     // another branch. That is the same false-binding this file exists to correct.
-    const { binding } = await stagePreparation(root.dir);
-    await driveToFailed(root.dir, binding);
-    await expect(prunePreparationRunLocked(root.dir, {
-      authorization: gateDecision("prune", pruneUnitIdFor(binding.runId)),
-      target: { kind: "run" as const, binding }, actor: LIFECYCLE_ACTOR, at: AT, clock: AFTER_FLOOR,
-      faults: { afterPlanned: async () => { throw new Error("crash after plan"); } },
-    })).rejects.toThrow(/crash after plan/u);
+    await stageAndCrashPrune(root.dir, AT, "afterPlanned");
     await expect(sweepPreparationOrphansLocked(root.dir, {
       actor: LIFECYCLE_ACTOR, at: AT, authorization: gateDecision("sweep"),
     })).rejects.toThrow(/is an unfinished run-prune operation; complete it before sweeping/u);

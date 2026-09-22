@@ -23,6 +23,7 @@
  */
 
 import { canonicalBytes } from "../profile/templates/signing/canonical.js";
+import { inventoryHasRetainedState } from "../utils/inventory-arithmetic.js";
 import {
   assertStageCapacity, scanPreparationInventory,
   type PreparationInventory, type StageCapacityProjection,
@@ -212,12 +213,10 @@ async function runMissing(root: string, prepared: PreparedStage, keyEpochId: Sha
  * preparation and operation-bundle key epochs are independent trust boundaries
  * that share this empty-epoch shape but never the same key.
  */
-// fallow-ignore-next-line code-duplication
 function assertKeyCompatible(key: PreparationKeyRead, inventory: PreparationInventory): void {
   if (key.status === "unavailable") throw new Error("preparation integrity key is unreadable");
   if (key.status === "ok") return;
-  const epochNotEmpty = Object.values(inventory.epoch).some((value) => value.count !== 0 || value.bytes !== 0 || value.health !== "ok");
-  if (epochNotEmpty || inventory.quarantine.count !== 0 || inventory.quarantine.bytes !== 0) {
+  if (inventoryHasRetainedState(Object.values(inventory.epoch), inventory.quarantine)) {
     throw new Error("preparation integrity key is missing for an active epoch");
   }
 }

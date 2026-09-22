@@ -11,6 +11,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useAlphaPageFixture } from "./fixtures/alpha-page.js";
 import { makeTempRoot } from "./fixtures/temp-root.js";
 import { writePage } from "./fixtures/write-page.js";
 import { chunkOf, mockQueryVector, writeChunkStore } from "./fixtures/typed-grounding.js";
@@ -35,19 +36,16 @@ vi.mock("../src/utils/llm.js", () => ({
   }),
 }));
 
+const alphaRoot = useAlphaPageFixture("hydrated-grounding");
 const roots: string[] = [];
 afterEach(async () => {
-  vi.restoreAllMocks();
   state.onSelect = undefined;
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
 });
 
 /** Seed a bare project (no embedding store → LLM fallback selection) with two live concepts. */
 async function seedRoot(): Promise<string> {
-  const root = await makeTempRoot("hydrated-grounding");
-  roots.push(root);
-  await writeFile(path.join(root, "wiki", "index.md"), "# Index\n");
-  await writePage(path.join(root, "wiki/concepts"), "alpha", { title: "Alpha", summary: "a" }, "ALPHA_BODY fact.");
+  const root = await alphaRoot();
   await writePage(path.join(root, "wiki/concepts"), "ghost", { title: "Ghost", summary: "g" }, "GHOST_BODY fact.");
   return root;
 }

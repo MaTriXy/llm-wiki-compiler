@@ -10,37 +10,26 @@
  * nothing. (`--fix-preview` writing nothing is covered by lint-fix-preview-cli.)
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile, readFile, readdir } from "node:fs/promises";
+import { describe, it, expect, beforeEach } from "vitest";
+import { mkdir, writeFile, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
+import { useCommandProject } from "./fixtures/command-project.js";
 import { lintFixProposeCommand } from "../src/commands/lint-fix-propose.js";
 import reviewApproveCommand from "../src/commands/review-approve.js";
 import { listCandidates } from "../src/compiler/candidates.js";
 
 let root = "";
-let originalCwd = "";
+const project = useCommandProject("fix-propose-");
 const linker = (): string => path.join(root, "wiki", "concepts", "linker.md");
 
 beforeEach(async () => {
-  root = await mkdtemp(path.join(os.tmpdir(), "fix-propose-"));
-  originalCwd = process.cwd();
-  process.chdir(root); // lint + review approve both resolve the project from cwd
+  root = project.root;
   await mkdir(path.join(root, "wiki", "concepts"), { recursive: true });
   // The page carrying the title, under a filename that differs from its slug —
   // the deterministically fixable shape (retarget the link at the real slug).
   await writeFile(path.join(root, "wiki", "concepts", "sdpa.md"),
     '---\ntitle: "Scaled Dot-Product Attention"\n---\nBody.\n');
   await writeFile(linker(), '---\ntitle: "Linker"\n---\nUses [[Scaled Dot-Product Attention]].\n');
-  vi.spyOn(console, "log").mockImplementation(() => {});
-  vi.spyOn(console, "error").mockImplementation(() => {});
-  process.exitCode = 0;
-});
-afterEach(async () => {
-  process.chdir(originalCwd);
-  await rm(root, { recursive: true, force: true });
-  vi.restoreAllMocks();
-  process.exitCode = 0;
 });
 
 describe("lint --fix-propose stages a reviewable fix, applied to land it; a changed target refuses", () => {

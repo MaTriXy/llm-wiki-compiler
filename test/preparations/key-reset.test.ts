@@ -17,7 +17,7 @@ import { randomBytes } from "node:crypto";
 import { chmod, lstat, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PREPARATION_PRUNE_REGISTRY, preparationPaths } from "../../src/preparations/paths.js";
-import { sweepPreparationOrphansLocked } from "../../src/preparations/retention.js";
+import { expectCompletedSweep } from "./lifecycle-fixture.js";
 import { describe, expect, it } from "vitest";
 import { useTempRoot } from "../fixtures/temp-root.js";
 import { readPreparationKey } from "../../src/preparations/key-epoch.js";
@@ -138,8 +138,7 @@ describe("missing-key project reset", () => {
     const staged = await stagePreparation(root.dir);
     expect(staged.binding.runId).toBeTruthy();
     await rm(preparationPaths(root.dir, staged.binding.workspaceId).runFile(staged.binding.runId));
-    const swept = await sweepPreparationOrphansLocked(root.dir, { actor: LIFECYCLE_ACTOR, at: AT, authorization: gateDecision("sweep")});
-    expect(swept.status === "swept" && swept.receipt.kind).toBe("prune-completed");
+    await expectCompletedSweep(root.dir, AT);
   });
 
   it("refuses the reset when a prune unit is an empty symlink rather than a real directory", async () => {

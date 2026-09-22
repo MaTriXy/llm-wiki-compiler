@@ -40,7 +40,7 @@ import { preparationRunActor } from "./principals.js";
 import type { PreparationPrincipal } from "./principals.js";
 import type { PreparationRunBinding, PreparationRunState, PreparationRunV1 } from "./run-types.js";
 import { LEGAL_EDGES } from "./run-validation.js";
-import { appendControlTransitionLocked, resolveControlTarget } from "./service-control-transition.js";
+import { appendControlTransitionLocked, withControlTarget } from "./service-control-transition.js";
 import type { ControlAppendV1 } from "./service-control-transition.js";
 
 /** Request for the `resume` operation. Carries no actor, surface or grant. */
@@ -171,7 +171,5 @@ export async function resumePreparationOperation(
   const captured = capturedRequest<ResumeRequestV1>(request);
   if (captured === null) return { status: "refused", reason: REQUEST_CAPTURE_REFUSAL };
   const runId = captured.runId;
-  const target = await resolveControlTarget(root, runId);
-  if (!target.ok) return { status: "refused", reason: target.reason };
-  return resumeResolved(root, runId, target.binding, target.run, principal);
+  return withControlTarget(root, runId, (binding, run) => resumeResolved(root, runId, binding, run, principal));
 }

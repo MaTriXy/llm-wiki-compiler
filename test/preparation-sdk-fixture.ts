@@ -15,6 +15,12 @@ import type { PreparationGrant } from "../src/preparations/service.js";
 import type { Wiki } from "../src/sdk/types.js";
 import { emptyWorkspace } from "./preparation-cli-fixture.js";
 
+/** Prove a facade lacks both destructive escape grants before testing its permitted route. */
+export async function expectNoRecoveryAuthority(wiki: Wiki, runId: string): Promise<void> {
+  await expect(wiki.cancelPreparation(runId)).rejects.toMatchObject({ code: "missing-grant" });
+  await expect(wiki.recoverPreparation(runId)).rejects.toMatchObject({ code: "missing-grant" });
+}
+
 /** The binding fields these fixtures need from a staged run. */
 export interface StagedBinding {
   readonly workspaceId: string;

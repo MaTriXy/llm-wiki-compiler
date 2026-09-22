@@ -62,6 +62,15 @@ async function readRun(run: StagedPreparation): Promise<Awaited<ReturnType<typeo
   return readPreparationRun(run.root, run.binding);
 }
 
+/** Prove the parked run has a usable operator exit. */
+async function expectAbandonable(run: StagedPreparation): Promise<void> {
+  const abandoned = await abandonPreparationRunLocked(run.root, {
+    binding: run.binding, actor: { id: "operator", surface: "cli" },
+    at: new Date().toISOString(), confirmResidualState: true,
+  });
+  expect(abandoned.state).toBe("abandoned");
+}
+
 describe("a required leg's fault parks the run, recoverably", () => {
   it("leaves the RUN recovery-required, naming the leg fault — never an ownerless running run", async () => {
     const run = await faultedRun();
@@ -111,11 +120,7 @@ describe("a required leg's fault parks the run, recoverably", () => {
     // Abandon requires the RUN to be `recovery-required`; this is the assertion
     // that would have failed on the old ownerless-`running` shape, and it is
     // the one that makes the park a park rather than a wedge.
-    const abandoned = await abandonPreparationRunLocked(run.root, {
-      binding: run.binding, actor: { id: "operator", surface: "cli" },
-      at: new Date().toISOString(), confirmResidualState: true,
-    });
-    expect(abandoned.state).toBe("abandoned");
+    await expectAbandonable(run);
     const read = await readRun(run);
     if (read.status !== "ok") throw new Error(`run ${read.status}`);
     expect(read.run.state, "durably abandoned, not just returned").toBe("abandoned");
@@ -190,11 +195,7 @@ describe("a required leg's fault parks the run, recoverably", () => {
     expect(read.run.state, "parked, never left ownerless-running").toBe("recovery-required");
     expect(read.run.executionOwner).toBeUndefined();
     // THE PROPERTY THAT MATTERS: the operator still has an exit.
-    const abandoned = await abandonPreparationRunLocked(run.root, {
-      binding: run.binding, actor: { id: "operator", surface: "cli" },
-      at: new Date().toISOString(), confirmResidualState: true,
-    });
-    expect(abandoned.state).toBe("abandoned");
+    await expectAbandonable(run);
   }, 30_000);
 
   it("classifies the fault the same way the executor does", async () => {

@@ -12,7 +12,8 @@
  */
 
 import { canonicalBytes } from "../profile/templates/signing/canonical.js";
-import { atomicWrite, AtomicWriteCollisionError, atomicWriteNoReplaceDurable } from "../utils/atomic-write.js";
+import { atomicWrite } from "../utils/atomic-write.js";
+import { authenticatedRunRead, publishRunGenesis } from "../utils/run-store-io.js";
 import { readDurableOperationLeaf } from "../operation-bundles/durable-leaf.js";
 import { MAX_PREPARATION_RUN_BYTES } from "./constants.js";
 import { readPreparationEvidence } from "./evidence-store.js";
@@ -92,13 +93,8 @@ export async function readPreparationRun(root: string, binding: PreparationRunBi
   const key = await readPreparationKey(root);
   if (key.status === "absent") return { status: "unavailable", detail: "key-missing", code: "integrity-key-missing" };
   if (key.status === "unavailable") return { status: "unavailable", detail: "key-unreadable", code: "integrity-key-unreadable" };
-  try {
-    const run = parsePreparationRun(leaf.body, binding);
-    if (!verifyPreparationRunIntegrity(run, key.key, binding)) throw new Error("integrity");
-    return { status: "ok", run };
-  } catch {
-    return { status: "unavailable", detail: "run-invalid", code: "run-integrity-invalid" };
-  }
+  return authenticatedRunRead(() => parsePreparationRun(leaf.body, binding),
+    (run) => verifyPreparationRunIntegrity(run, key.key, binding));
 }
 
 /** Sign, serialize, parse, and authenticate a candidate before touching disk. */
@@ -135,15 +131,10 @@ export async function createPreparationRunLocked(
   const content = createInitialPreparationRun(input), binding = preparationRunBinding(content);
   const prepared = prepareSignedRun(content, key.key, binding, "ordinary");
   const file = preparationPaths(root, binding.workspaceId).runFile(binding.runId);
-  try {
-    await atomicWriteNoReplaceDurable(file, prepared.serialized, { confineRoot: root, exactParent: true, mode: 0o600 });
-  } catch (error) {
-    if (error instanceof AtomicWriteCollisionError) {
-      const collision = await readPreparationRun(root, binding);
-      throw new Error(`preparation run genesis already exists: ${collision.status}`);
-    }
-    throw error;
-  }
+  await publishRunGenesis({ root, file }, prepared.serialized, async () => {
+    const collision = await readPreparationRun(root, binding);
+    return `preparation run genesis already exists: ${collision.status}`;
+  });
   return prepared.parsed;
 }
 

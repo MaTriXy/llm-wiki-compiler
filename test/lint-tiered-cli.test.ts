@@ -11,24 +11,18 @@
  * clause.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./fixtures/run-cli.js";
-import { tempRootTracker } from "./temp-roots.js";
+import { useFileProject } from "./fixtures/file-project.js";
 
-const tracker = tempRootTracker();
-afterEach(() => tracker.cleanup());
+const createProject = useFileProject("tiered-cli-");
 
 /** A wiki with one deterministic failure and one judgement-tier finding. */
 async function mixedProject(): Promise<string> {
-  const root = await tracker.create("tiered-cli-", { real: true });
-  await mkdir(path.join(root, "wiki", "concepts"), { recursive: true });
-  await writeFile(path.join(root, "wiki", "concepts", "alpha.md"), [
+  return createProject({ "wiki/concepts/alpha.md": [
     "---", "title: Alpha", "summary: links to a page that is not there", "confidence: 0.2", "---",
     "", "See [[Missing Page]]. Extra body text keeps the empty-page rule quiet.",
-  ].join("\n"), "utf8");
-  return root;
+  ].join("\n") });
 }
 
 describe("llmwiki lint --tiered separates facts from judgements", () => {

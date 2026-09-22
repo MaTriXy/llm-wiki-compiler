@@ -10,8 +10,7 @@
  */
 
 import path from "node:path";
-import { lstat, opendir, realpath } from "node:fs/promises";
-import { openConfinedLeaf, resolveExpectedReal } from "../utils/confined-read.js";
+import { noteInventoryProblem as problem, durableAlias, verified, walkInventoryDirectory, openInventoryLeaf, recordInventoryLeaf, positiveScanEntryLimit } from "../utils/inventory-scan.js";
 import { assertPreparationId, assertPreparationRunId } from "./ids.js";
 import {
   MAX_PREPARATION_INVENTORY_ENTRIES,
@@ -80,23 +79,6 @@ const LEAF_BYTE_CAPS: Partial<Record<PreparationLeafKind, number>> = {
   run: MAX_PREPARATION_RUN_BYTES,
   cancel: MAX_PREPARATION_RUN_BYTES,
 };
-
-/** Add one stable problem without leaking absolute project paths to callers. */
-function problem(state: ScanState, dimension: string, detail: string, file?: string): void {
-  state.problems.push({ dimension, detail, ...(file === undefined ? {} : { path: path.relative(state.root, file) }) });
-}
-
-/** Split off only the two fixed aliases owned by durable create-only writes. */
-function durableAlias(name: string): { base: string; alias?: "tmp" | "writing" } {
-  if (name.endsWith(".writing")) return { base: name.slice(0, -8), alias: "writing" };
-  if (name.endsWith(".tmp")) return { base: name.slice(0, -4), alias: "tmp" };
-  return { base: name };
-}
-
-/** Convert an unchecked identity segment into a verified value or null. */
-function verified<T>(read: () => T): T | null {
-  try { return read(); } catch { return null; }
-}
 
 /** Classify one preparation-owned regular leaf from validated path segments. */
 function classifyLeaf(relative: string): ClassifiedLeaf {
@@ -172,16 +154,6 @@ function preparationDirectoryPolicy(parts: readonly string[]): DirectoryPolicy {
   return parts.length === 5 && parts[4] === EVIDENCE_SEGMENT ? "descend" : "flag";
 }
 
-/** Require the directory to be literal, in-root, and not a symlink. */
-async function directoryIsConfined(state: ScanState, dir: string): Promise<boolean | "absent"> {
-  const metadata = await lstat(dir).catch((error: NodeJS.ErrnoException) => (error.code === "ENOENT" ? null : error));
-  if (metadata === null) return "absent";
-  if (metadata instanceof Error || !metadata.isDirectory() || metadata.isSymbolicLink()) return false;
-  const expected = await resolveExpectedReal(state.root, dir);
-  if (expected === null) return false;
-  return await realpath(dir).catch(() => null) === expected;
-}
-
 /** Track verified workspace and preparation directory identities for orphan logic. */
 function captureDirectoryIdentity(state: ScanState, relative: string): void {
   const parts = relative.split(path.sep);
@@ -199,19 +171,12 @@ function captureDirectoryIdentity(state: ScanState, relative: string): void {
 
 /** Capture one opened regular file and its protocol-aware classification. */
 async function captureLeaf(state: ScanState, file: string, parent: string): Promise<void> {
-  const opened = await openConfinedLeaf(state.root, file, parent);
-  if (opened.kind !== "confirmed") {
-    problem(state, "leaf-unavailable", `preparation leaf is ${opened.kind}`, file);
-    return;
-  }
+  const opened = await openInventoryLeaf(state, file, parent, "preparation");
+  if (opened === null) return;
   const relativePath = path.relative(state.llmwikiRoot, file);
   const classified = classifyLeaf(relativePath);
   noteLeafCap(state, classified.kind, opened.size, file);
-  state.leaves.push({
-    ...classified, relativePath, logicalRelativePath: logicalPath(relativePath, classified.protocolAlias),
-    bytes: opened.size, dev: opened.dev, ino: opened.ino,
-  });
-  await opened.handle.close().catch(() => {});
+  await recordInventoryLeaf(state.leaves, classified, relativePath, opened);
   if (classified.kind === "unknown") problem(state, "preparation-entry", "unknown preparation leaf", file);
 }
 
@@ -219,12 +184,6 @@ async function captureLeaf(state: ScanState, file: string, parent: string): Prom
 function noteLeafCap(state: ScanState, kind: PreparationLeafKind, bytes: number, file: string): void {
   const cap = LEAF_BYTE_CAPS[kind];
   if (cap !== undefined && bytes > cap) problem(state, `${kind}-bytes`, "preparation leaf exceeds its byte cap", file);
-}
-
-/** Fold a durable alias into the logical object name used for counting. */
-function logicalPath(relative: string, alias: PreparationLeafObservation["protocolAlias"]): string {
-  const suffix = alias === "writing" ? ".writing" : alias === "tmp" ? ".tmp" : "";
-  return suffix === "" ? relative : relative.slice(0, -suffix.length);
 }
 
 /** Consume one unit from the global traversal bound. */
@@ -253,15 +212,6 @@ async function inspectEntry(state: ScanState, entry: { name: string; isDirectory
   problem(state, "preparation-entry", "unsupported preparation entry", child);
 }
 
-/** Inspect bounded entries from one already-confined preparation directory. */
-async function walkEntries(state: ScanState, handle: Awaited<ReturnType<typeof opendir>>, dir: string, depth: number): Promise<void> {
-  for await (const entry of handle) {
-    if (state.exhausted) break;
-    if (!takeEntry(state, dir)) break;
-    await inspectEntry(state, entry, dir, depth);
-  }
-}
-
 /** Traverse until the global entry bound is reached, then fail closed. */
 async function walk(state: ScanState, dir: string, depth: number): Promise<void> {
   if (state.exhausted) return;
@@ -270,27 +220,17 @@ async function walk(state: ScanState, dir: string, depth: number): Promise<void>
     state.exhausted = true;
     return;
   }
-  const confined = await directoryIsConfined(state, dir);
-  if (confined === "absent") return;
-  if (!confined) { problem(state, "directory-unavailable", "preparation directory is unavailable", dir); return; }
-  const handle = await opendir(dir).catch(() => null);
-  if (handle === null) { problem(state, "directory-unavailable", "preparation directory cannot be listed", dir); return; }
-  try {
-    await walkEntries(state, handle, dir, depth);
-  } finally {
-    await handle.close().catch(() => {});
-  }
+  await walkInventoryDirectory(state, { directory: dir, store: "preparation" }, {
+    take: () => !state.exhausted && takeEntry(state, dir),
+    inspect: (entry) => inspectEntry(state, entry, dir, depth),
+  });
 }
 
 /** Return the effective host-capped entry ceiling for one scan request. */
 export function preparationScanEntryLimit(
   options: PreparationScanOptions = {},
 ): number {
-  const requested = options.maxDirectoryEntriesForTest ??
-    MAX_PREPARATION_INVENTORY_ENTRIES;
-  if (!Number.isSafeInteger(requested) || requested < 1) {
-    throw new Error("preparation inventory entry bound must be a positive safe integer");
-  }
+  const requested = positiveScanEntryLimit(options.maxDirectoryEntriesForTest ?? MAX_PREPARATION_INVENTORY_ENTRIES, "preparation");
   return Math.min(requested, MAX_PREPARATION_INVENTORY_ENTRIES);
 }
 

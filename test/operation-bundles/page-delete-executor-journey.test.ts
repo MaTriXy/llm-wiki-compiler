@@ -13,11 +13,10 @@
  *    completed deletion, and a second recovery is idempotent.
  */
 
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import path from "node:path";
-import os from "node:os";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { useFileProject } from "../fixtures/file-project.js";
+import { journeyTarget, expectPageConflict } from "./page-journey-fixture.js";
 import { approveAndApplyOperationBundleLocked } from "../../src/operation-bundles/executor.js";
 import { recoverOperationRunLocked } from "../../src/operation-bundles/recovery.js";
 import { approveRequest, buildRuntime, stagePageDeleteBundle } from "./executor-fixtures.js";
@@ -27,14 +26,10 @@ const SLUG = "doomed";
 const BODY = Buffer.from("# a page slated for deletion\n");
 
 let root = "";
-beforeEach(async () => { root = await mkdtemp(path.join(os.tmpdir(), "page-delete-exec-")); });
-afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); });
+const createProject = useFileProject("page-delete-exec-");
+beforeEach(async () => { root = await createProject({}); });
 
-async function seed(bytes: Buffer): Promise<void> {
-  await mkdir(path.join(root, "wiki", DIR), { recursive: true });
-  await writeFile(path.join(root, "wiki", DIR, `${SLUG}.md`), bytes);
-}
-const pagePath = (): string => path.join(root, "wiki", DIR, `${SLUG}.md`);
+const { seed, pagePath } = journeyTarget(() => root, DIR, SLUG);
 
 describe("authored page delete — full journey through the executor", () => {
   it("APPLIES the delete and removes the page under the correct precondition", async () => {
@@ -49,9 +44,7 @@ describe("authored page delete — full journey through the executor", () => {
     await seed(BODY);
     const staged = await stagePageDeleteBundle(root, DIR, SLUG, BODY); // precondition over BODY
     await seed(Buffer.from("# edited since the delete was proposed\n"));
-    const result = await approveAndApplyOperationBundleLocked(root, approveRequest(staged, buildRuntime()));
-    expect(result.state).toBe("recovery-required");
-    expect(result.counters?.mutations).toMatchObject({ applied: 0, failed: 1 });
+    await expectPageConflict(root, staged);
     expect(existsSync(pagePath()), "a stale delete removed the changed page").toBe(true);
   });
 

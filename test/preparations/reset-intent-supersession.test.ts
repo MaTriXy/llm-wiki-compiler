@@ -33,7 +33,7 @@ import {
 } from "../../src/preparations/reset.js";
 import { resolvePreparationLifecyclePending } from "../../src/preparations/recovery.js";
 import { enumeratePreparationReferences } from "../../src/preparations/references.js";
-import { sweepPreparationOrphansLocked } from "../../src/preparations/retention.js";
+import { expectCompletedSweep } from "./lifecycle-fixture.js";
 import { preparationPaths } from "../../src/preparations/paths.js";
 import { LIFECYCLE_ACTOR, removePreparationKey, stagePreparation } from "./lifecycle-fixture.js";
 import { recordFirstPassIntent } from "./reset-intent-helpers.js";
@@ -85,8 +85,7 @@ describe("healthy-key intent-only supersession", () => {
     // must COMPLETE. Accepting null here would pass on a sweep that found nothing to do,
     // which proves nothing about whether the block was actually lifted.
     await rm(preparationPaths(root.dir, binding.workspaceId).runFile(binding.runId));
-    const swept = await sweepPreparationOrphansLocked(root.dir, { actor: LIFECYCLE_ACTOR, at: AT, authorization: gateDecision("sweep")});
-    expect(swept.status === "swept" && swept.receipt.kind).toBe("prune-completed");
+    await expectCompletedSweep(root.dir, AT);
   });
 
   it("still refuses a new reset when the key is healthy and nothing was superseded", async () => {

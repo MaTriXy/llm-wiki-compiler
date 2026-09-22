@@ -30,6 +30,7 @@ import { describe, expect, it } from "vitest";
 import { readPreparationCancel } from "../src/preparations/cancellation.js";
 import { REQUEST_CAPTURE_REFUSAL } from "../src/preparations/service-request-capture.js";
 import { useTempRoot } from "./fixtures/temp-root.js";
+import { accessorRequest } from "./fixtures/accessor-request.js";
 import { SEED_GATE_ID, gateServiceOn, gatedRun, readGateRun } from "./preparation-gate-fixture.js";
 import { readRun, serviceOn, stagedProject, strandedRun } from "./preparation-recovery-fixture.js";
 import { stageDocuments, stageableProject } from "./preparation-sdk-fixture.js";
@@ -43,26 +44,6 @@ const GRANTS: readonly PreparationGrant[] = [
 
 /** One refusal, as every operation's refused arm renders it. */
 interface RefusalLike { readonly status: string; readonly reason?: string }
-
-/**
- * Build a request whose every named field is an own ACCESSOR counting its reads.
- *
- * `fired()` returns only the fields whose getter actually ran, so the assertion
- * against it is "nothing was read" rather than "these three were not read".
- */
-function accessorRequest(fields: Record<string, unknown>): {
-  request: Record<string, unknown>; fired: () => Record<string, number>;
-} {
-  const counts: Record<string, number> = {};
-  const request: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(fields)) {
-    Object.defineProperty(request, key, {
-      enumerable: true, configurable: true,
-      get() { counts[key] = (counts[key] ?? 0) + 1; return value; },
-    });
-  }
-  return { request, fired: () => counts };
-}
 
 /** The refusal and the untouched-accessor half, which every case shares. */
 function expectRefusedUnread(result: RefusalLike, fired: Record<string, number>): void {

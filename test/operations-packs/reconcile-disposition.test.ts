@@ -81,19 +81,21 @@ describe("reconcile verdicts reach the proposing phase", () => {
 describe("a group dispositions by verdict", () => {
   it("drafts the absent identity and LEAVES the colliding one alone", () => {
     const compared = compare([paper("source-0", "Fresh"), paper("source-1", "Known")], [paper("source-1", "Known")]);
-    const drafts = compileIntents({
-      body: gatedBody("absent"), evidence: compared.items, bounds: BOUNDS,
-      identities: { runId: "prr_t", principal: "pack-runtime", hostTimestamp: "2026-08-17T00:00:00.000Z" },
-    }).drafts;
+    const drafts = absentDrafts(compared.items);
     expect(drafts.map((draft) => draft.sourceItemId)).toEqual(["source-0"]);
   });
 
   it("drafts NOTHING when every proposal collides — the run has nothing to propose", () => {
     const compared = compare([paper("source-1", "Known")], [paper("source-1", "Known")]);
-    const drafts = compileIntents({
-      body: gatedBody("absent"), evidence: compared.items, bounds: BOUNDS,
-      identities: { runId: "prr_t", principal: "pack-runtime", hostTimestamp: "2026-08-17T00:00:00.000Z" },
-    }).drafts;
+    const drafts = absentDrafts(compared.items);
     expect(drafts).toEqual([]);
   });
 });
+
+/** Compile only proposals that reconciliation classified as absent. */
+function absentDrafts(evidence: readonly PackEvidenceItemV1[]) {
+  return compileIntents({
+    body: gatedBody("absent"), evidence, bounds: BOUNDS,
+    identities: { runId: "prr_t", principal: "pack-runtime", hostTimestamp: "2026-08-17T00:00:00.000Z" },
+  }).drafts;
+}

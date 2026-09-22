@@ -43,6 +43,7 @@ import { stagePreparationLocked } from "../../src/preparations/stage.js";
 import { openPreparationLifecycleNamespace } from "../../src/preparations/lifecycle-fs/namespace.js";
 import { withPreparationLifecycleRead } from "../../src/preparations/lifecycle-snapshot/read.js";
 import { stageRequest } from "./store-fixture.js";
+import { inventoryWithQuarantineFault, redirectLlmwiki, expectFreshKeyStaging, scanWithReceiptRace } from "./lifecycle-storage-fixture.js";
 
 /** Plant one retained quarantine byte object under the lifecycle registry. */
 async function retainedQuarantineByte(root: string): Promise<void> {
@@ -127,11 +128,7 @@ describe("the snapshot term the prune ungating relies on", () => {
     });
     const receipt = lifecyclePruneUnitPaths(fixture.namespace, unitId).completedReceiptFile;
 
-    const snapshot = await scanPreparationLifecycle(fixture.namespace, {
-      afterClassificationForTest: async () => { await writeFile(receipt, "x".repeat(9999)); },
-    });
-
-    expect(snapshot.problems).toEqual([]);
+    const snapshot = await scanWithReceiptRace(fixture.namespace, receipt);
     expect(snapshot.storage.quarantine.health).toBe("ok");
     expect(snapshot.storage.prune.health).toBe("unavailable");
     // The conjunct is the sole reason this is false. Removing it is a fail-open.
@@ -176,12 +173,7 @@ describe("lifecycle health projection is not merely decorative", () => {
     // fault reaches epoch health at all.
     const quarantine = path.join(root.dir, ".llmwiki", "preparation-quarantine");
     await mkdir(quarantine, { recursive: true });
-    const outside = path.join(root.dir, "outside");
-    await writeFile(outside, "outside");
-    await symlink(outside, path.join(quarantine, "planted"));
-
-    const inventory = await scanPreparationInventory(root.dir);
-    expect(inventory.problems.some((problem) => problem.dimension === "quarantine-storage")).toBe(true);
+    const inventory = await inventoryWithQuarantineFault(root.dir, quarantine);
     expect(inventory.epoch.manifests.health).toBe("unavailable");
   });
 
@@ -244,9 +236,7 @@ describe("lifecycle health projection is not merely decorative", () => {
     // not updated to match.
     await faultedPruneRegistry(root.dir);
     await expectUnavailablePruneStorage(root.dir);
-    expect((await readPreparationKey(root.dir)).status).not.toBe("ok");
-    expect((await stagePreparationLocked(root.dir, stageRequest())).status).toBe("staged");
-    expect((await readPreparationKey(root.dir)).status).toBe("ok");
+    await expectFreshKeyStaging(root.dir);
   });
 
   it("does not let a prune-only fault become a staging dead end", async () => {
@@ -267,9 +257,7 @@ describe("lifecycle health projection is not merely decorative", () => {
   it("reports an unreadable lifecycle capture as unavailable quarantine health", async () => {
     // The unavailable-read branch constructs its own entry; returning "ok" there
     // was invisible to every existing test.
-    const decoy = path.join(root.dir, "llmwiki-decoy");
-    await mkdir(decoy, { recursive: true });
-    await symlink(decoy, path.join(root.dir, ".llmwiki"));
+    await redirectLlmwiki(root.dir);
 
     const inventory = await scanPreparationInventory(root.dir);
     expect(inventory.problems.some((problem) => problem.dimension === "lifecycle-storage")).toBe(true);
@@ -303,11 +291,7 @@ describe("the sweep driver refuses an unauthoritative prune registry", () => {
     // returned clean, and the driver would derive a new sweep unit and run a
     // two-phase delete against a registry it could not authoritatively observe.
     const { fixture, receipt } = await racedPruneStorage(root.dir);
-    const snapshot = await scanPreparationLifecycle(fixture.namespace, {
-      afterClassificationForTest: async () => { await writeFile(receipt, "x".repeat(9999)); },
-    });
-
-    expect(snapshot.problems).toEqual([]);
+    const snapshot = await scanWithReceiptRace(fixture.namespace, receipt);
     expect(snapshot.storage.prune.health).toBe("unavailable");
     expect(projectPruneRegistryHealth(snapshot).status).toBe("unavailable");
   });
@@ -340,11 +324,7 @@ describe("quarantine storage health reaches its consumers", () => {
     });
     const receipt = lifecycleQuarantineUnitPaths(fixture.namespace, unitId).completedReceiptFile;
 
-    const snapshot = await scanPreparationLifecycle(fixture.namespace, {
-      afterClassificationForTest: async () => { await writeFile(receipt, "x".repeat(9999)); },
-    });
-
-    expect(snapshot.problems).toEqual([]);
+    const snapshot = await scanWithReceiptRace(fixture.namespace, receipt);
     expect(snapshot.storage.quarantine.health).toBe("unavailable");
     expect(snapshot.complete).toBe(false);
     expect(projectLifecyclePending(snapshot).status).toBe("unavailable");

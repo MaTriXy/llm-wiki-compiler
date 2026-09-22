@@ -124,21 +124,14 @@ describe("preparation attempt provider leg", () => {
     expect(received?.launch.launchParentDir).not.toBe("/attacker");
   });
 
-  it("applies the sealed model-token ceiling even when the caller omits brokerMaximums", async () => {
+  it.each([
+    { name: "omitted caller maxima", overrides: {} },
+    { name: "caller maxima above the sealed ceiling", overrides: { operationsPackRequest: { brokerMaximums: { modelTokens: 200, modelCostUsd: 50 } } } },
+  ])("applies sealed token and cost ceilings with $name", async ({ overrides }) => {
     let received: ProviderInvocationRequestV1 | undefined;
     const invoke: ProviderInvokeFn = async (req) => { received = req; return succeeded(req, HOST); };
     // The sealed context seals maximumTokensPerAttempt 100 / maximumCostMicrosPerAttempt 10.
-    await leg(invoke, providerRequest())(sealedCtx());
-    const maxima = (received?.authorityRequest as { operationsPackRequest: { brokerMaximums: { modelTokens: number; modelCostUsd: number } } }).operationsPackRequest.brokerMaximums;
-    expect(maxima.modelTokens).toBe(100);
-    expect(maxima.modelCostUsd).toBe(0.00001);
-  });
-
-  it("intersects a caller model-cost ceiling down to the sealed micro-USD bound", async () => {
-    let received: ProviderInvocationRequestV1 | undefined;
-    const invoke: ProviderInvokeFn = async (req) => { received = req; return succeeded(req, HOST); };
-    const request = providerRequest({ operationsPackRequest: { brokerMaximums: { modelTokens: 200, modelCostUsd: 50 } } });
-    await leg(invoke, request)(sealedCtx());
+    await leg(invoke, providerRequest(overrides))(sealedCtx());
     const maxima = (received?.authorityRequest as { operationsPackRequest: { brokerMaximums: { modelTokens: number; modelCostUsd: number } } }).operationsPackRequest.brokerMaximums;
     expect(maxima.modelTokens).toBe(100);
     expect(maxima.modelCostUsd).toBe(0.00001);

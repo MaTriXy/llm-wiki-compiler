@@ -12,15 +12,13 @@
  * "the option that claims to cover everything" comes to skip something.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./fixtures/run-cli.js";
-import { tempRootTracker } from "./temp-roots.js";
+import { useFileProject } from "./fixtures/file-project.js";
 
-const tracker = tempRootTracker();
-afterEach(() => tracker.cleanup());
+const createProject = useFileProject("reset-scopes-");
 
 /** One representative file per scope, relative to the project root. */
 const SCOPE_FILES: Readonly<Record<string, string>> = {
@@ -33,12 +31,7 @@ const SCOPE_FILES: Readonly<Record<string, string>> = {
 
 /** A project holding EVERY scope's files, so survival is measurable per case. */
 async function fullProject(): Promise<string> {
-  const root = await tracker.create("reset-scopes-", { real: true });
-  for (const file of Object.values(SCOPE_FILES)) {
-    await mkdir(path.dirname(path.join(root, file)), { recursive: true });
-    await writeFile(path.join(root, file), "x", "utf8");
-  }
-  return root;
+  return createProject(Object.fromEntries(Object.values(SCOPE_FILES).map(file => [file, "x"])));
 }
 
 /** The scopes whose files must SURVIVE a reset of `scope`. */

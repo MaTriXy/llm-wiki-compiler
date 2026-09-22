@@ -6,8 +6,8 @@
  */
 
 import path from "node:path";
-import { lstat, opendir, realpath } from "node:fs/promises";
-import { openConfinedLeaf, resolveExpectedReal } from "../utils/confined-read.js";
+import type { Dirent } from "node:fs";
+import { noteInventoryProblem as problem, durableAlias, verified, walkInventoryDirectory, openInventoryLeaf, recordInventoryLeaf, positiveScanEntryLimit } from "../utils/inventory-scan.js";
 import { assertBundleId, assertOperationRunId } from "./ids.js";
 import {
   MAX_CATALOG_FILE_BYTES, MAX_MANIFEST_BYTES, MAX_PAYLOAD_BYTES,
@@ -99,26 +99,6 @@ type LeafClassifier = (
   workspaceId: string,
   parts: readonly string[],
 ) => ClassifiedLeaf | null;
-
-/** Add one stable problem without leaking absolute project paths to callers. */
-function problem(state: ScanState, dimension: string, detail: string, file?: string): void {
-  state.problems.push({
-    dimension, detail,
-    ...(file === undefined ? {} : { path: path.relative(state.root, file) }),
-  });
-}
-
-/** Split off only the two fixed aliases owned by durable create-only writes. */
-function durableAlias(name: string): { base: string; alias?: "tmp" | "writing" } {
-  if (name.endsWith(".writing")) return { base: name.slice(0, -8), alias: "writing" };
-  if (name.endsWith(".tmp")) return { base: name.slice(0, -4), alias: "tmp" };
-  return { base: name };
-}
-
-/** Convert an unchecked identity segment into a verified value or null. */
-function verified<T>(read: () => T): T | null {
-  try { return read(); } catch { return null; }
-}
 
 /** Classify one regular leaf solely from validated literal path segments. */
 function classifyLeaf(relative: string): ClassifiedLeaf {
@@ -232,17 +212,6 @@ function leafCap(kind: OperationLeafKind): number | undefined {
   return LEAF_BYTE_CAPS[kind];
 }
 
-/** Require the directory to be literal, in-root, and not a symlink. */
-async function directoryIsConfined(state: ScanState, dir: string): Promise<boolean | "absent"> {
-  const metadata = await lstat(dir).catch((error: NodeJS.ErrnoException) =>
-    error.code === "ENOENT" ? null : error);
-  if (metadata === null) return "absent";
-  if (metadata instanceof Error || !metadata.isDirectory() || metadata.isSymbolicLink()) return false;
-  const expected = await resolveExpectedReal(state.root, dir);
-  if (expected === null) return false;
-  return await realpath(dir).catch(() => null) === expected;
-}
-
 /** Validate only known directory topology before descending further. */
 function directoryAllowed(relative: string): boolean {
   if (relative === "") return true;
@@ -287,21 +256,13 @@ function projectionDirectoryAllowed(parts: readonly string[]): boolean {
 
 /** Capture one opened regular file and its protocol-aware classification. */
 async function captureLeaf(state: ScanState, file: string, parent: string): Promise<void> {
-  const opened = await openConfinedLeaf(state.root, file, parent);
-  if (opened.kind !== "confirmed") {
-    problem(state, "leaf-unavailable", `operation leaf is ${opened.kind}`, file);
-    return;
-  }
+  const opened = await openInventoryLeaf(state, file, parent, "operation");
+  if (opened === null) return;
   const relativePath = path.relative(state.workspacesRoot, file);
   const classified = classifyLeaf(relativePath);
   noteQuarantineDotEntry(state, relativePath, file);
   noteLeafCap(state, classified.kind, opened.size, file);
-  state.leaves.push({
-    ...classified, relativePath,
-    logicalRelativePath: logicalPath(relativePath, classified.protocolAlias),
-    bytes: opened.size, dev: opened.dev, ino: opened.ino,
-  });
-  await opened.handle.close().catch(() => {});
+  await recordInventoryLeaf(state.leaves, classified, relativePath, opened);
   if (classified.kind === "unknown") problem(state, "operation-entry", "unknown operation leaf", file);
 }
 
@@ -321,11 +282,6 @@ function noteLeafCap(state: ScanState, kind: OperationLeafKind, bytes: number, f
   }
 }
 
-/** Fold a durable alias into the logical object name used for counting. */
-function logicalPath(relative: string, alias: OperationLeafObservation["protocolAlias"]): string {
-  const suffix = alias === "writing" ? ".writing" : alias === "tmp" ? ".tmp" : "";
-  return suffix === "" ? relative : relative.slice(0, -suffix.length);
-}
 
 /** Track verified workspace and bundle directory identities for orphan logic. */
 function captureDirectoryIdentity(state: ScanState, relative: string): void {
@@ -336,20 +292,6 @@ function captureDirectoryIdentity(state: ScanState, relative: string): void {
   const bundleId = verified(() => assertBundleId(parts[2]));
   if (workspaceId !== null && bundleId !== null) {
     state.bundleDirectories.set(`${workspaceId}\0${bundleId}`, { workspaceId, bundleId });
-  }
-}
-
-/** Inspect bounded entries from one already-confined operation directory. */
-async function walkEntries(
-  state: ScanState,
-  handle: Awaited<ReturnType<typeof opendir>>,
-  dir: string,
-  depth: number,
-): Promise<void> {
-  for await (const entry of handle) {
-    if (state.exhausted) break;
-    if (!takeEntry(state, dir)) break;
-    await inspectEntry(state, entry, dir, depth);
   }
 }
 
@@ -365,7 +307,7 @@ function takeEntry(state: ScanState, dir: string): boolean {
 /** Inspect one directory entry without duplicating topology decisions. */
 async function inspectEntry(
   state: ScanState,
-  entry: Awaited<ReturnType<typeof opendir>> extends AsyncIterable<infer T> ? T : never,
+  entry: Dirent,
   dir: string,
   depth: number,
 ): Promise<void> {
@@ -396,22 +338,10 @@ async function walk(state: ScanState, dir: string, depth: number): Promise<void>
     state.exhausted = true;
     return;
   }
-  const confined = await directoryIsConfined(state, dir);
-  if (confined === "absent") return;
-  if (!confined) {
-    problem(state, "directory-unavailable", "operation directory is unavailable", dir);
-    return;
-  }
-  const handle = await opendir(dir).catch(() => null);
-  if (handle === null) {
-    problem(state, "directory-unavailable", "operation directory cannot be listed", dir);
-    return;
-  }
-  try {
-    await walkEntries(state, handle, dir, depth);
-  } finally {
-    await handle.close().catch(() => {});
-  }
+  await walkInventoryDirectory(state, { directory: dir, store: "operation" }, {
+    take: () => !state.exhausted && takeEntry(state, dir),
+    inspect: (entry) => inspectEntry(state, entry, dir, depth),
+  });
 }
 
 /** Inventory every operation-store leaf without creating any path. */
@@ -420,10 +350,7 @@ export async function scanOperationOrphans(
   options: OperationScanOptions = {},
 ): Promise<OperationOrphanScan> {
   const workspacesRoot = path.join(root, ".llmwiki", "workspaces");
-  const requested = options.maxDirectoryEntriesForTest ?? DEFAULT_MAX_ENTRIES;
-  if (!Number.isSafeInteger(requested) || requested < 1) {
-    throw new Error("operation inventory entry bound must be a positive safe integer");
-  }
+  const requested = positiveScanEntryLimit(options.maxDirectoryEntriesForTest ?? DEFAULT_MAX_ENTRIES, "operation");
   const state: ScanState = {
     root: path.resolve(root), workspacesRoot: path.resolve(workspacesRoot),
     maxEntries: requested, entries: 0, exhausted: false, leaves: [],

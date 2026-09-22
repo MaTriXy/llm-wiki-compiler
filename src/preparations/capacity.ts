@@ -17,6 +17,7 @@
  */
 
 import path from "node:path";
+import { authoritativeManifests, hasAuthoritativeRun, capacityViolation, uniqueInventoryBytes as uniqueBytes } from "../utils/inventory-arithmetic.js";
 import {
   MAX_ACTIVE_NONTERMINAL_RUNS, MAX_ACTIVE_PREPARATION_BYTES,
   MAX_ACTIVE_PREPARATIONS_PER_WORKSPACE, MAX_NEW_PREPARATIONS_PER_STAGING_CALL,
@@ -109,23 +110,8 @@ const CAP_ENTRIES: ReadonlyArray<[keyof StageCapacityProjection, number, string]
 
 /** Require nonnegative exact arithmetic and enforce every inclusive cap. */
 export function assertStageCapacity(projection: StageCapacityProjection): void {
-  for (const [field, limit, dimension] of CAP_ENTRIES) {
-    const value = projection[field];
-    if (!Number.isSafeInteger(value) || value < 0 || value > limit) throw new StageCapacityError(dimension);
-  }
-}
-
-/** Count physical bytes once even when a durable hard-link alias remains. */
-function uniqueBytes(leaves: readonly PreparationLeafObservation[]): number {
-  const seen = new Set<string>();
-  let bytes = 0;
-  for (const leaf of leaves) {
-    const identity = `${leaf.dev}:${leaf.ino}`;
-    if (seen.has(identity)) continue;
-    seen.add(identity);
-    bytes += leaf.bytes;
-  }
-  return bytes;
+  const dimension = capacityViolation(projection, CAP_ENTRIES);
+  if (dimension !== undefined) throw new StageCapacityError(dimension);
 }
 
 /** Count logical objects, folding `.tmp` and `.writing` into their destination. */
@@ -143,8 +129,7 @@ async function readManifests(
   root: string, leaves: readonly PreparationLeafObservation[], problems: PreparationInventoryProblem[],
 ): Promise<Map<string, PreparationManifestV1>> {
   const result = new Map<string, PreparationManifestV1>();
-  const authoritative = leaves.filter((leaf) => leaf.kind === "manifest" && leaf.protocolAlias === undefined);
-  for (const leaf of authoritative) {
+  for (const leaf of authoritativeManifests(leaves)) {
     if (leaf.workspaceId === undefined || leaf.preparationId === undefined) continue;
     const read = await readPreparationManifest(root, leaf.workspaceId, leaf.preparationId as PreparationId);
     if (read.status === "ok") result.set(`${leaf.workspaceId}\0${leaf.preparationId}`, read.manifest);
@@ -161,8 +146,7 @@ async function preparationState(
   const evidencePresent = manifest.initialEvidence.every((evidence) => leaves.some((leaf) =>
     leaf.kind === "evidence" && leaf.workspaceId === manifest.workspaceId && leaf.preparationId === manifest.preparationId
     && leaf.protocolAlias === undefined && path.basename(leaf.logicalRelativePath) === evidence.digest.slice("sha256:".length)));
-  const runLeaf = leaves.some((leaf) => leaf.kind === "run" && leaf.workspaceId === manifest.workspaceId
-    && leaf.runId === manifest.runId && leaf.protocolAlias === undefined);
+  const runLeaf = hasAuthoritativeRun(leaves, manifest);
   if (!evidencePresent || !runLeaf) return { manifest, complete: false, nonterminal: false };
   const key = await readPreparationKey(root);
   if (key.status !== "ok") { problems.push({ dimension: "run-state", detail: `preparation key is ${key.status}` }); return { manifest, complete: false, nonterminal: false }; }

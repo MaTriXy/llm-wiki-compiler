@@ -13,18 +13,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { coreTreeFingerprint as fingerprint } from "./fixtures/core-tree-fingerprint.js";
 import { reconcileEvidence } from "../src/operations-packs/handlers/reconcile.js";
 import {
   CURRENT_BYTES_FIELD, CURRENT_DIGEST_FIELD,
 } from "../src/operations-packs/runtime/store-snapshot.js";
 import type { PackEvidenceItemV1 } from "../src/operations-packs/handlers/types.js";
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BOUNDS = { maximumItems: 16, maximumOutputBytes: 65_536 } as const;
 const REF = "author-read-digest";
 const CURRENT_HEX = "d".repeat(64);
@@ -35,16 +30,7 @@ const CURRENT_HEX = "d".repeat(64);
  * prefixed framing so a rename, a new file, or a byte edit all change the digest.
  */
 function coreTreeFingerprint(): string {
-  const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "src"], { cwd: REPO_ROOT });
-  const files = [...new Set(listed.toString("utf8").split("\0").filter((rel) => rel.length > 0))].sort();
-  const hash = createHash("sha256");
-  for (const rel of files) {
-    const bytes = readFileSync(path.join(REPO_ROOT, rel));
-    hash.update(`${rel.length}:${rel}\n${bytes.length}:`);
-    hash.update(bytes);
-    hash.update("\n");
-  }
-  return hash.digest("hex");
+  return fingerprint(true);
 }
 
 /** Exercise the chokepoint for ONE profile's evidence class, asserting stale-refuse + match-admit. */

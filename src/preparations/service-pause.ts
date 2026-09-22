@@ -50,7 +50,7 @@ import type {
   PreparationExecutionOwnerV1, PreparationRunBinding, PreparationRunState, PreparationRunV1,
 } from "./run-types.js";
 import { LEGAL_EDGES } from "./run-validation.js";
-import { appendControlTransitionLocked, resolveControlTarget } from "./service-control-transition.js";
+import { appendControlTransitionLocked, withControlTarget } from "./service-control-transition.js";
 import type { ControlAppendV1 } from "./service-control-transition.js";
 
 /** Request for the `pause` operation. Carries no actor, surface or grant. */
@@ -215,11 +215,9 @@ export async function pausePreparationOperation(
   // HOW, and this operation was written before the capture existed — the
   // totality control caught it as the invariant's first new member.
   //
-  // AHEAD OF THE FIRST AWAIT, which is `resolveControlTarget` below.
+  // AHEAD OF THE FIRST AWAIT inside `withControlTarget` below.
   const captured = capturedRequest<PauseRequestV1>(request);
   if (captured === null) return { status: "refused", reason: REQUEST_CAPTURE_REFUSAL };
   const runId = captured.runId;
-  const target = await resolveControlTarget(root, runId);
-  if (!target.ok) return { status: "refused", reason: target.reason };
-  return pauseResolved(root, runId, target.binding, target.run, principal);
+  return withControlTarget(root, runId, (binding, run) => pauseResolved(root, runId, binding, run, principal));
 }

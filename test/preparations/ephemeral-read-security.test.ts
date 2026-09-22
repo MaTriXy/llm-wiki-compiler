@@ -21,9 +21,8 @@ import { readPreparationEvidence } from "../../src/preparations/evidence-store.j
 import type { ProviderInvokeFn } from "../../src/preparations/attempts/provider.js";
 import type { ProviderInvocationRequestV1 } from "../../src/capability-providers/runtime/invoke.js";
 import { fakeRegistry, PIN, providerAuthority, providerRequest, stagePreparation } from "./attempt-fixture.js";
-import { ephemeralBrokerPlan } from "./inputs-fixture.js";
 import {
-  ephemeralProviderPlan, ephemeralRequest, ephemeralTwoPhasePlan, HOST, runFixtureRead, withEphemeralSandbox,
+  ephemeralProviderPlan, ephemeralRequest, ephemeralBrokerRequest, ephemeralTwoPhasePlan, HOST, runFixtureRead, withEphemeralSandbox,
 } from "./ephemeral-fixture.js";
 
 const HOSTILE_PIN = parseSha256Digest(`sha256:${"e".repeat(64)}`);
@@ -104,12 +103,7 @@ describe("ephemeral read invocation binding", () => {
   });
 
   it("admits the same broker adapters once the sealed phase declares that broker plan", async () => {
-    const brokerPlanDigest = parseSha256Digest(`sha256:${"c".repeat(64)}`);
-    const run = await withEphemeralSandbox(() => runFixtureRead(ephemeralRequest({
-      plan: ephemeralBrokerPlan(),
-      authorityResolver: { resolve: async () => ({ status: "ok", extras: providerAuthority({ brokerPlanDigest }) }) },
-      work: { kind: "provider-capability", request: providerRequest({ brokers: { https: {} } }), host: HOST },
-    }), succeededInvoke));
+    const run = await withEphemeralSandbox(() => runFixtureRead(ephemeralBrokerRequest("https"), succeededInvoke));
     expect(run.result.status).toBe("completed");
     expect(run.residue).toEqual([]);
   });

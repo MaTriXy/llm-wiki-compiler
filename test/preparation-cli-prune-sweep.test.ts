@@ -15,7 +15,7 @@
 import path from "node:path";
 import { chmod, rm } from "node:fs/promises";
 import { describe, it, expect } from "vitest";
-import { runCLI } from "./fixtures/run-cli.js";
+import { runCLI, expectCLIJson } from "./fixtures/run-cli.js";
 import { emptyWorkspace } from "./preparation-cli-fixture.js";
 import { preparationPaths } from "../src/preparations/paths.js";
 import { scanPreparationInventory } from "../src/preparations/capacity.js";
@@ -59,8 +59,7 @@ describe("preparation prune through the binary", () => {
     const { binding } = await stagePreparation(cwd);
     await driveToFailed(cwd, binding, new Date().toISOString());
     const result = await runCLI(["preparation", "prune", binding.runId, "--json"], cwd);
-    expect(result.code).toBe(1);
-    expect(envelope(result.stdout)).toMatchObject({ status: "refused" });
+    expectCLIJson(result, 1, { status: "refused" });
     expect((await scanPreparationInventory(cwd)).manifests.length).toBe(1);
   });
 });

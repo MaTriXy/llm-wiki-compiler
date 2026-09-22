@@ -6,6 +6,7 @@
  */
 
 import { canonicalBytes } from "../profile/templates/signing/canonical.js";
+import { RunBudgetErrorBase, budgetCount, budgetLanes } from "../utils/run-budget-arithmetic.js";
 import { MAX_MUTATIONS_PER_BUNDLE, MAX_RUN_BYTES, MAX_RUN_TRANSITIONS, MAX_TRANSITION_ENVELOPE_BYTES, RUN_CONTROL_RESERVE_BYTES } from "./constants.js";
 import type { OperationTransitionType } from "./run-types.js";
 
@@ -38,12 +39,7 @@ export function operationRunWriteBudgetClass(type: OperationTransitionType): Run
 }
 
 /** Typed pre-staging or runtime refusal with a stable dimension message. */
-export class RunBudgetError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RunBudgetError";
-  }
-}
+export class RunBudgetError extends RunBudgetErrorBase {}
 
 const DIGEST = `sha256:${"f".repeat(64)}`;
 /** Produce a maximal-width synthetic mutation identity for byte budgeting. */
@@ -57,8 +53,7 @@ const EVIDENCE = { digest: DIGEST, byteCount: 262_144, type: CODE, provenance: C
 
 /** Require one exact nonnegative safe-integer count. */
 function exactCount(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) throw new RunBudgetError(`${label} must be a nonnegative safe integer`);
-  return value;
+  return budgetCount(value, label, RunBudgetError);
 }
 
 /** Compute the complete transition count, including the already-durable genesis. */
@@ -135,9 +130,8 @@ export function projectRunBudget(input: RunBudgetInput): RunBudget {
   const projectedTransitionCount = transitionCount(input);
   const controls = exactCount(input.controlTransitionAllowance, "control transition allowance");
   const baseBytes = canonicalBytes(worstCaseRecordBase(input)).byteLength;
-  const ordinary = recordBytesAtTransitionCap(baseBytes, projectedTransitionCount - controls);
-  const total = recordBytesAtTransitionCap(baseBytes, projectedTransitionCount);
-  const controlBytes = total - ordinary;
+  const { ordinary, total, controlBytes } = budgetLanes(baseBytes,
+    { total: projectedTransitionCount, controls }, recordBytesAtTransitionCap);
   if (ordinary > MAX_RUN_BYTES - RUN_CONTROL_RESERVE_BYTES) throw new RunBudgetError("projected ordinary run consumes reserved control headroom");
   if (controlBytes > RUN_CONTROL_RESERVE_BYTES) throw new RunBudgetError("control transition allowance exceeds the 128 KiB control reserve");
   if (total > MAX_RUN_BYTES) throw new RunBudgetError("projected run exceeds the 4 MiB record cap");

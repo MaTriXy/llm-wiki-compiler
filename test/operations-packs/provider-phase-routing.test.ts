@@ -29,7 +29,7 @@ import { assembleRunnerInput } from "../../src/operations-packs/runtime/runner-i
 import type {
   PackProviderInvocationV1, ProviderPhaseExecutorV1,
 } from "../../src/operations-packs/runtime/runner-input.js";
-import type { ProviderInvokeFn } from "../../src/preparations/attempts/provider.js";
+import { completed } from "./completed-provider.js";
 import type { ProviderInvocationRequestV1 } from "../../src/capability-providers/runtime/invoke.js";
 import type { PackRecipeV2 } from "../../src/operations-packs/recipe-types.js";
 import { compilableRecipe, requestWithRecipe } from "./compile-fixture.js";
@@ -42,18 +42,6 @@ afterEach(() => runs.cleanupAll());
 
 /** The provider phase's declared id, and the role the fixture pack declares. */
 const PROVIDER_PHASE_ID = "extract";
-
-const USAGE = { brokerRequestCount: 0, tokenCount: "unobserved" as const, costMicros: "unobserved" as const };
-
-/** An invocation that completes successfully, having produced nothing. */
-const completed: ProviderInvokeFn = async () => ({
-  kind: "completed",
-  admitted: {
-    outcome: "succeeded", acceptedArtifacts: [], receipts: [], usage: USAGE,
-    counts: { declared: 0, acceptedArtifacts: 0, requiredMissing: 0, receipts: 0 },
-    untrusted: { untrusted: true, providerReportedCounts: null, warnings: null, output: null },
-  },
-});
 
 /** The compilable chain plus one independent provider phase. */
 function recipeWithProvider(): PackRecipeV2 {

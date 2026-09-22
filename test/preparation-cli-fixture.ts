@@ -12,7 +12,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect } from "vitest";
-import { runCLI } from "./fixtures/run-cli.js";
+import { runCLI, expectCLIExit } from "./fixtures/run-cli.js";
 
 /** A bare directory — no `.llmwiki`, so the store is genuinely absent. */
 export async function emptyWorkspace(suffix: string): Promise<string> {
@@ -34,12 +34,14 @@ export async function initializedWorkspace(suffix: string): Promise<string> {
 }
 
 /** Write a plan and its matching seed into an existing project. */
-export async function planAndSeed(cwd: string): Promise<{ planFile: string; seedFile: string }> {
+export async function planAndSeed(
+  cwd: string, mutate: (plan: Record<string, unknown>) => void = () => {},
+): Promise<{ planFile: string; seedFile: string }> {
   const { fixturePlan } = await import("./preparations/store-fixture.js");
   const { writeFile } = await import("node:fs/promises");
   const planFile = path.join(cwd, "plan.json");
   const seedFile = path.join(cwd, "seed.json");
-  await writeFile(planFile, JSON.stringify(fixturePlan()));
+  await writeFile(planFile, JSON.stringify(fixturePlan(mutate)));
   await writeFile(seedFile, JSON.stringify({ seed: "initial-input", version: 1 }));
   return { planFile, seedFile };
 }
@@ -47,14 +49,16 @@ export async function planAndSeed(cwd: string): Promise<{ planFile: string; seed
 /** An initialized project with a plan and its matching seed already written. */
 export async function stageable(suffix: string, mutate: (plan: Record<string, unknown>) => void = () => {}) {
   const cwd = await initializedWorkspace(suffix);
-  const { fixturePlan } = await import("./preparations/store-fixture.js");
+  return { cwd, ...await planAndSeed(cwd, mutate) };
+}
+
+/** Write a schema-valid plan without supplying its required seed. */
+export async function planWithoutSeed(cwd: string): Promise<string> {
+  const { validPlan } = await import("./preparations/plan-fixture.js");
   const { writeFile } = await import("node:fs/promises");
-  const path = await import("node:path");
-  const planFile = path.join(cwd, "plan.json");
-  const seedFile = path.join(cwd, "seed.json");
-  await writeFile(planFile, JSON.stringify(fixturePlan(mutate)));
-  await writeFile(seedFile, JSON.stringify({ seed: "initial-input", version: 1 }));
-  return { cwd, planFile, seedFile };
+  const file = path.join(cwd, "plan.json");
+  await writeFile(file, JSON.stringify(validPlan()));
+  return file;
 }
 
 /** The durable manifest of the single preparation in this project. */
@@ -65,6 +69,21 @@ export async function onlyManifest(cwd: string, workspaceId: string): Promise<Re
   const dir = path.join(cwd, ".llmwiki", "workspaces", workspaceId, PREPARATIONS_SEGMENT);
   const [prepId] = await readdir(dir);
   return JSON.parse(await readFile(path.join(dir, prepId!, MANIFEST_FILENAME), "utf8")) as Record<string, unknown>;
+}
+
+/** Stage through the actual CLI and inspect its sole durable manifest. */
+export async function stageManifest(cwd: string, planFile: string, seedFile: string): Promise<Record<string, unknown>> {
+  const staged = await runCLI(["preparation", "stage", planFile, "--seed", seedFile, "--json"], cwd);
+  expectCLIExit(staged, 0);
+  const created = JSON.parse(staged.stdout) as { workspaceId: string };
+  return onlyManifest(cwd, created.workspaceId);
+}
+
+/** Read a successful machine-readable listing through a fresh CLI process. */
+export async function listEnvelope(cwd: string): Promise<{ runs: unknown[]; problems: string[] }> {
+  const result = await runCLI(["preparation", "list", "--json"], cwd);
+  expectCLIExit(result, 0);
+  return JSON.parse(result.stdout) as { runs: unknown[]; problems: string[] };
 }
 
 

@@ -7,7 +7,8 @@
  * authorized against one lifecycle state executed under another and deleted three
  * objects belonging to a run the gate never approved touching.
  */
-import { mkdir, mkdtemp, readdir, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm } from "node:fs/promises";
+import { workspaceFileNames } from "./preparations/crash-fixture.js";
 import path from "node:path";
 import os from "node:os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -27,16 +28,7 @@ afterEach(async () => { if (root) await rm(root, { recursive: true, force: true 
 
 /** Every file under the workspaces tree, by path — the identity witness. */
 async function survivingObjects(): Promise<string[]> {
-  const out: string[] = [];
-  const walk = async (dir: string): Promise<void> => {
-    for (const entry of await readdir(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) await walk(full);
-      else out.push(full.slice(root.length));
-    }
-  };
-  await walk(path.join(root, ".llmwiki", "workspaces"));
-  return out.sort();
+  return workspaceFileNames(root);
 }
 
 describe("prune re-authorizes against its own capture", () => {

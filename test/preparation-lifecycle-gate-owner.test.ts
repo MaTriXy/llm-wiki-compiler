@@ -38,7 +38,7 @@ import {
 import { pruneUnitIdFor } from "../src/preparations/prune-delete.js";
 import { symlinkRegistry, crashPruneOf as crashPruneOfShared, withUnitHidden } from "./preparation-destructive-fixture.js";
 import { resolvePreparationLifecyclePending } from "../src/preparations/recovery.js";
-import { perRunQuarantineUnitId, quarantinePreparationRunLocked } from "../src/preparations/quarantine.js";
+import { crashQuarantine, resetAwaitingContinuation as seedResetContinuation } from "./preparations/crash-fixture.js";
 import { prunePreparationRunLocked, sweepPreparationOrphansLocked } from "../src/preparations/retention.js";
 import type { PreparationRunBinding } from "../src/preparations/run-types.js";
 import { MISSING_KEY_CONFIRMATION, resetPreparationKeyEpochLocked } from "../src/preparations/reset.js";
@@ -65,11 +65,7 @@ async function acquireDestructive(
 
 /** Crash a per-run quarantine of one ALREADY-TAMPERED run; return the unit id. */
 async function crashQuarantineOf(binding: PreparationRunBinding): Promise<string> {
-  await expect(quarantinePreparationRunLocked(root, {
-    binding, actor: LIFECYCLE_ACTOR, at: AT, confirmResidualState: true,
-    faults: { afterPlanned: async () => { throw new Error("crash"); } },
-  })).rejects.toThrow("crash");
-  return perRunQuarantineUnitId(binding.runId);
+  return crashQuarantine(root, binding, AT);
 }
 
 /** Crash a sweep over whatever orphans the project already holds. */
@@ -120,12 +116,7 @@ async function quarantineStagedThenCrashed(): Promise<string> {
 
 /** Record a key reset intent, leaving a `project-key-reset` unit awaiting one. */
 async function resetAwaitingContinuation(): Promise<void> {
-  await stagePreparation(root);
-  await removePreparationKey(root);
-  const recorded = await resetPreparationKeyEpochLocked(root, {
-    actor: LIFECYCLE_ACTOR, at: AT, confirmation: MISSING_KEY_CONFIRMATION,
-  });
-  expect(recorded.status).toBe("intent-recorded");
+  await seedResetContinuation(root, AT);
 }
 
 describe("gate owner rule: an owner resumes its own unit", () => {

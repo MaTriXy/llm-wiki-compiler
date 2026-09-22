@@ -44,6 +44,13 @@ import { removeAdvisoryBestEffort } from "../../src/utils/advisory-file.js";
 describe("custody discard is bounded by provenance, not by path shape", () => {
   const root = useTempRoot();
 
+  /** Discard only minted custody, leaving a symlink's target bytes untouched. */
+  async function expectDiscardPreservesTarget(scratch: string, sentinel: string): Promise<void> {
+    await discardCustody(scratch);
+    expect(existsSync(scratch)).toBe(false);
+    expect(existsSync(path.join(sentinel, "keep"))).toBe(true);
+  }
+
   it("discards a directory it actually minted", async () => {
     // The positive control. Without it every refusal below is satisfied by a
     // function that deletes nothing at all.
@@ -131,11 +138,7 @@ describe("custody discard is bounded by provenance, not by path shape", () => {
     await rm(scratch, { recursive: true, force: true });
     await symlink(sentinel, scratch);
 
-    await discardCustody(scratch);
-
-    // The link is gone; what it pointed at is untouched.
-    expect(existsSync(scratch)).toBe(false);
-    expect(existsSync(path.join(sentinel, "keep"))).toBe(true);
+    await expectDiscardPreservesTarget(scratch, sentinel);
   });
 
   it("does not follow a symlink PLANTED INSIDE a minted directory", async () => {
@@ -148,10 +151,7 @@ describe("custody discard is bounded by provenance, not by path shape", () => {
 
     const scratch = await createCustodyDir();
     await symlink(sentinel, path.join(scratch, "escape")).catch(() => {});
-    await discardCustody(scratch);
-
-    expect(existsSync(scratch)).toBe(false);
-    expect(existsSync(path.join(sentinel, "keep"))).toBe(true);
+    await expectDiscardPreservesTarget(scratch, sentinel);
   });
 });
 
