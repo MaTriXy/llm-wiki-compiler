@@ -15,7 +15,7 @@
  * the pre-validate → apply → record discipline is identical across every kind.
  */
 
-import { hashArtifactBody } from "llmwiki-core/local-workflow-contracts";
+import { hashArtifactBody } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { WorkflowExecutionContext } from "./execution-context.js";
 import { runWriter } from "./execution-context.js";
 import { StageWriteScopeError, WorkflowArtifactChangedError, WorkflowArtifactUnverifiableError } from "./errors.js";
@@ -25,12 +25,12 @@ import {
   WORST_CASE_DECISION,
   type SubmitResult,
 } from "./stage-output-internals.js";
-import type { ArtifactPlannedMutation } from "llmwiki-core/local-workflow-contracts";
-import type { ArtifactMemberFileInput } from "llmwiki-core/local-workflow-contracts";
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
-import type { TrustDecision } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
+import type { ArtifactPlannedMutation } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { ArtifactMemberFileInput } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { TrustDecision } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { productPreparationRef } from "./product-operation-output.js";
 
 /** An artifact output: write `body` as the typed artifact `artifactType/slug`. */

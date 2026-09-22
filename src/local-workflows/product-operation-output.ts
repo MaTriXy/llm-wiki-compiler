@@ -3,13 +3,13 @@
  * @description Authenticates an applied product-operation handoff and records a
  * core-stamped receipt that generic workflow advancement can later reverify.
  */
-import { canonicalDigest } from "llmwiki-core/local-workflow-contracts";
-import { preparationManifestDigest, type PreparationManifestV1 } from "llmwiki-core/local-workflow-contracts";
-import type { PreparationRunV1 } from "llmwiki-core/local-workflow-contracts";
+import { canonicalDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { preparationManifestDigest, type PreparationManifestV1 } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { PreparationRunV1 } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { recordSettledStageOutput, type SubmitResult } from "./stage-output-internals.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { WorkflowExecutionContext } from "./execution-context.js";
 import { runWriter } from "./execution-context.js";
 

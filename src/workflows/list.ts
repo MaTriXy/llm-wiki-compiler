@@ -2,11 +2,11 @@
  * Standard-distribution compatibility entry points for list.
  * Host construction stays here; optional engine operations receive a host.
  */
-export { listWorkflowsWithHost } from "llmwiki-local-workflows";
-export type { WorkflowSummary } from "llmwiki-local-workflows";
-import { listWorkflowsWithHost } from "llmwiki-local-workflows";
+export { listWorkflowsWithHost } from "@atomicstrata/llmwiki-local-workflows";
+export type { WorkflowSummary } from "@atomicstrata/llmwiki-local-workflows";
+import { listWorkflowsWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { WorkflowSummary } from "llmwiki-local-workflows";
+import type { WorkflowSummary } from "@atomicstrata/llmwiki-local-workflows";
 
 
 /**

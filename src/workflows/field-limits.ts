@@ -2,4 +2,4 @@
  * Legacy source-path compatibility for the optional local workflow engine.
  * Forwarding preserves one implementation and shared error constructor identity.
  */
-export { assertActorLabelWithinCap, assertDetailWithinCap, WorkflowFieldTooLongError } from "llmwiki-local-workflows";
+export { assertActorLabelWithinCap, assertDetailWithinCap, WorkflowFieldTooLongError } from "@atomicstrata/llmwiki-local-workflows";

@@ -35,11 +35,11 @@
  * permitted observability).
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { actionLabelForPresentation } from "llmwiki-core/local-workflow-contracts";
-import { effectivePermission, canSatisfyHumanGate, CAPABILITY_ORDER } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { actionLabelForPresentation } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { effectivePermission, canSatisfyHumanGate, CAPABILITY_ORDER } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { validateActionInputs } from "./action-input.js";
-import { parseGate } from "llmwiki-core/local-workflow-contracts";
+import { parseGate } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { lookupAction } from "./actions.js";
 import { ActionDeniedError, ActionInputError, ActionRunWorkflowMismatchError, RunUnavailableError } from "./errors.js";
 import { assertRunOwnership } from "./with-lock.js";
@@ -47,7 +47,7 @@ import { captureActionInputValues } from "./action-input-snapshot.js";
 import {
   nonInteractiveHumanGateIo,
   type HumanGateIo,
-} from "llmwiki-core/local-workflow-contracts";
+} from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { startWorkflowWithHost } from "./start-operation.js";
 import { resumeWorkflowWithHost } from "./resume.js";
 import { advanceWorkflowWithHost } from "./advance.js";
@@ -57,8 +57,8 @@ import { approveGateWithHost, resolveGateChallengeWithHost } from "./gate.js";
 import { submitStageOutputWithHost } from "./stage-output.js";
 import { buildActionStageOutput } from "./action-stage-output.js";
 import type { WorkflowArtifactOrigin } from "./artifact-output.js";
-import type { CapabilityClass, ActionSurface, WorkflowActionDef } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { CapabilityClass, ActionSurface, WorkflowActionDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** The capability a non-`gate` operation requires (`gate` is enforced specially). */
 const REQUIRED_CAPABILITY: Record<"status" | "start" | "resume" | "advance" | "cancel" | "fail" | "submit", CapabilityClass> = {

@@ -11,7 +11,7 @@
  * cap. They bound the few fields a caller writes verbatim onto an audit event.
  */
 
-import { MAX_WORKFLOW_LABEL_CHARS, MAX_WORKFLOW_DETAIL_CHARS } from "llmwiki-core/local-workflow-contracts";
+import { MAX_WORKFLOW_LABEL_CHARS, MAX_WORKFLOW_DETAIL_CHARS } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /**
  * Raised when a caller-controlled, verbatim-recorded run-record field exceeds its

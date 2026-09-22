@@ -16,9 +16,9 @@
 import { RunNotActiveError } from "./errors.js";
 import { assertDetailWithinCap } from "./field-limits.js";
 import { withHostRunLock, isTerminalStatus, commitTerminalEvent } from "./with-lock.js";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { terminalRunWriter, projectWithHost } from "./execution-context.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { TerminalRunWriter } from "./execution-context.js";
 
 /** Return a NEW run with the current stage's log entry (if any) set to `failed`. */

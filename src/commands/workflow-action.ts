@@ -11,7 +11,7 @@
  * file-size budget.
  */
 
-import { output } from "llmwiki-core/compiler-cli";
+import { output } from "@atomicstrata/llmwiki-core/compiler-cli";
 import { listActions, showAction, type ActionDetail } from "../workflows/actions.js";
 import { runAction, type ActionRunResult } from "../workflows/run-action.js";
 import type { RunStatus } from "../workflows/status.js";

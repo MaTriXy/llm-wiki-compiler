@@ -2,13 +2,13 @@
  * Source compatibility exports for host-bound workflow output contracts.
  * Execution helpers belong to the optional engine and require supplied services.
  */
-export { productPreparationRef, recordProductOperationOutputLocked, replayProductOperationOutputLocked } from "llmwiki-local-workflows";
-export type { ProductOperationStageOutput, ProductPreparationRefV1 } from "llmwiki-local-workflows";
+export { productPreparationRef, recordProductOperationOutputLocked, replayProductOperationOutputLocked } from "@atomicstrata/llmwiki-local-workflows";
+export type { ProductOperationStageOutput, ProductPreparationRefV1 } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
-import { assertProductOperationOutputCurrent as verifyOperation, assertProductStageOutputCurrent as verifyStage } from "llmwiki-local-workflows";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { assertProductOperationOutputCurrent as verifyOperation, assertProductStageOutputCurrent as verifyStage } from "@atomicstrata/llmwiki-local-workflows";
 
 type ProductObservations = Pick<LocalWorkflowHost["observations"], "locatePreparation" | "readPreparation" | "operationBundle">;
 

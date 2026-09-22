@@ -2,10 +2,10 @@
  * Standard-distribution compatibility entry points for run-events.
  * Host construction stays here; optional engine operations receive a host.
  */
-export { listRunEventsWithHost } from "llmwiki-local-workflows";
-import { listRunEventsWithHost } from "llmwiki-local-workflows";
+export { listRunEventsWithHost } from "@atomicstrata/llmwiki-local-workflows";
+import { listRunEventsWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { WorkflowEvent } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowEvent } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 
 /**

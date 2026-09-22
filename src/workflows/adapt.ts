@@ -2,12 +2,12 @@
  * Standard compatibility entry points for adapt.
  * The engine receives services; this facade constructs the compiler host.
  */
-export { computeAdaptationPlan, adaptDryRunWithHost, adaptApplyWithHost, mapStageId, AdaptationKeyCollisionError, AdaptDryRunError } from "llmwiki-local-workflows";
-export type { AdaptationPlan } from "llmwiki-local-workflows";
-import { adaptDryRunWithHost, adaptApplyWithHost } from "llmwiki-local-workflows";
+export { computeAdaptationPlan, adaptDryRunWithHost, adaptApplyWithHost, mapStageId, AdaptationKeyCollisionError, AdaptDryRunError } from "@atomicstrata/llmwiki-local-workflows";
+export type { AdaptationPlan } from "@atomicstrata/llmwiki-local-workflows";
+import { adaptDryRunWithHost, adaptApplyWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { AdaptationPlan } from "llmwiki-local-workflows";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { AdaptationPlan } from "@atomicstrata/llmwiki-local-workflows";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 
 /**

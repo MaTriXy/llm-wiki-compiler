@@ -2,13 +2,13 @@
  * Standard compatibility entry points for gate.
  * The engine receives services; this facade constructs the compiler host.
  */
-export { resolveGateChallengeWithHost, approveGateWithHost } from "llmwiki-local-workflows";
-export type { ApproveGateOptions, GateChallengeV1 } from "llmwiki-local-workflows";
-import { resolveGateChallengeWithHost, approveGateWithHost } from "llmwiki-local-workflows";
+export { resolveGateChallengeWithHost, approveGateWithHost } from "@atomicstrata/llmwiki-local-workflows";
+export type { ApproveGateOptions, GateChallengeV1 } from "@atomicstrata/llmwiki-local-workflows";
+import { resolveGateChallengeWithHost, approveGateWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { ApproveGateOptions, GateChallengeV1 } from "llmwiki-local-workflows";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
+import type { ApproveGateOptions, GateChallengeV1 } from "@atomicstrata/llmwiki-local-workflows";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 
 /** Resolve and verify the exact gate challenge shown to an operator. */

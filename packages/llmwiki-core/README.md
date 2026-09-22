@@ -1,10 +1,14 @@
-# llmwiki-core
+# @atomicstrata/llmwiki-core
 
-The engine-free llmwiki knowledge and domain SDK. Choose this package explicitly
-when an application supplies its own orchestration, such as llmflow.
+The engine-free implementation package for llmwiki knowledge and domain services.
+Applications, including llmflow, should import `llm-wiki-compiler` instead.
+This package is publicly downloadable but its direct exports are internal
+composition contracts, not a separately supported consumer API.
+
+Internal composition example for compiler maintainers:
 
 ```js
-import { createWikiCore } from "llmwiki-core";
+import { createWikiCore } from "@atomicstrata/llmwiki-core";
 const wiki = createWikiCore({ root: "/absolute/project/path" });
 ```
 
@@ -15,8 +19,8 @@ reviewed mutations and path confinement still apply; choosing core is not a gran
 
 The standard `llm-wiki-compiler` package remains the compatible CLI and full SDK.
 Its support entries compose this same core instance. The optional
-`llmwiki-local-workflows` engine requires a matching core peer and an explicit
-host constructed through `llmwiki-core/local-workflow-host`.
+`@atomicstrata/llmwiki-local-workflows` engine requires a matching core peer and an explicit
+host constructed through `@atomicstrata/llmwiki-core/local-workflow-host`.
 
 Build from the repository root with `npm run build`. Local installation before
 publication must supply matching tarballs explicitly; no runtime downloading or

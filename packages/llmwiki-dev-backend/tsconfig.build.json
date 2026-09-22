@@ -5,7 +5,7 @@
     "declaration": true,
     "rootDir": "../..",
     "paths": {
-      "llmwiki-core": [
+      "@atomicstrata/llmwiki-core": [
         "../../src/core-index.ts"
       ],
       "llmwiki-dev-backend": [

@@ -20,11 +20,11 @@
  * and fails closed with {@link UnknownActionError}.
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { effectivePermission, SURFACE_HARD_CAP } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { effectivePermission, SURFACE_HARD_CAP } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { UnknownActionError } from "./errors.js";
-import { actionDefForPresentation } from "llmwiki-core/local-workflow-contracts";
-import type { CapabilityClass, ActionSurface, ActionInputField, WorkflowActionDef, ProfilePack } from "llmwiki-core/local-workflow-contracts";
+import { actionDefForPresentation } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { CapabilityClass, ActionSurface, ActionInputField, WorkflowActionDef, ProfilePack } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** The declared {@link ActionSurface} values, derived from the surface-cap keys. */
 const ACTION_SURFACES = Object.keys(SURFACE_HARD_CAP) as ActionSurface[];

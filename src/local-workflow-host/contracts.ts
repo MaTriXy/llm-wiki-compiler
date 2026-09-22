@@ -7,7 +7,7 @@
 import type { BlockingLockOptions } from "../utils/lock.js";
 
 /** Deliberately module-local, never Symbol.for: duplicate core copies must differ. */
-export const LOCAL_WORKFLOW_CORE_INSTANCE = Symbol("llmwiki-core/local-workflow-host");
+export const LOCAL_WORKFLOW_CORE_INSTANCE = Symbol("@atomicstrata/llmwiki-core/local-workflow-host");
 
 declare const transactionBrand: unique symbol;
 

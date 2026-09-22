@@ -5,14 +5,14 @@
  * as the new runtime. The locked entry point deliberately does not reacquire.
  */
 import { createLocalWorkflowHost } from "./host.js";
-import { startWorkflowWithHost, startWorkflowWithServices } from "llmwiki-local-workflows";
-import { mintRunId } from "llmwiki-local-workflows";
-import { writeRunWithCallerHeldLock } from "llmwiki-core/compiler-legacy-workflows";
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-export { UnknownWorkflowError, TooManyActiveRunsError, WorkflowRunStoreUnavailableError } from "llmwiki-local-workflows";
+import { startWorkflowWithHost, startWorkflowWithServices } from "@atomicstrata/llmwiki-local-workflows";
+import { mintRunId } from "@atomicstrata/llmwiki-local-workflows";
+import { writeRunWithCallerHeldLock } from "@atomicstrata/llmwiki-core/compiler-legacy-workflows";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+export { UnknownWorkflowError, TooManyActiveRunsError, WorkflowRunStoreUnavailableError } from "@atomicstrata/llmwiki-local-workflows";
 export { WorkflowInputsTooLargeError } from "./input-snapshot.js";
-export { lookupWorkflowDef } from "llmwiki-core/local-workflow-contracts";
+export { lookupWorkflowDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 const legacyHost = createLocalWorkflowHost();
 

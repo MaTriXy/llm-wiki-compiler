@@ -28,18 +28,18 @@
  *    cancels the run, the drop recorded on the `workflow-adapted` event).
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { workflowDefDigest } from "llmwiki-core/local-workflow-contracts";
-import { lookupWorkflowDef } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { workflowDefDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { lookupWorkflowDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { UnknownWorkflowError } from "./start-operation.js";
 import { appendRunEvent } from "./events.js";
 import { withHostRunLock, isTerminalStatus } from "./with-lock.js";
-import { mapStageId } from "llmwiki-core/local-workflow-contracts";
-export { mapStageId } from "llmwiki-core/local-workflow-contracts";
+import { mapStageId } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+export { mapStageId } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { projectWithHost } from "./execution-context.js";
 import { AdaptationRequiresConfirmError, AlreadyCurrentError, RunNotActiveError } from "./errors.js";
-import type { PendingStageOutput, WorkflowRun, WorkflowEvent } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowDef } from "llmwiki-core/local-workflow-contracts";
+import type { PendingStageOutput, WorkflowRun, WorkflowEvent } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /**
  * Raised when remapping a run's `outputs` keys (or any stage-id-keyed field) onto

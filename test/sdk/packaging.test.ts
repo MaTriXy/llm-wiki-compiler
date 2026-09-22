@@ -39,8 +39,8 @@ function packDistribution(repo: string, destination: string): string[] {
 async function verifyInstalledTypes(repo: string, fixture: string): Promise<void> {
   await writeFile(path.join(fixture, "types.ts"), `
     import { assertProductOperationOutputCurrent, type Wiki, type Sha256Digest as StandardDigest } from "llm-wiki-compiler";
-    import type { WikiCore, Sha256Digest } from "llmwiki-core";
-    import type { LocalWorkflowHost, WorkflowRun, WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
+    import type { WikiCore, Sha256Digest } from "@atomicstrata/llmwiki-core";
+    import type { LocalWorkflowHost, WorkflowRun, WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
     declare const wiki: Wiki;
     declare const digest: Sha256Digest;
     declare const host: LocalWorkflowHost;

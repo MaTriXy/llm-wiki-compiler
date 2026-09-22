@@ -13,15 +13,15 @@
  */
 
 import { appendRunEvent } from "./events.js";
-import { isTrustGate } from "llmwiki-core/local-workflow-contracts";
-import type { isTrustedWriteGranted } from "llmwiki-core/local-workflow-contracts";
+import { isTrustGate } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { isTrustedWriteGranted } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { RunWriter } from "./execution-context.js";
-import { serializeRunWithinCap } from "llmwiki-core/local-workflow-contracts";
-import { AtomicWritePostCommitError } from "llmwiki-core/local-workflow-contracts";
+import { serializeRunWithinCap } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { AtomicWritePostCommitError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { TrustGateRequiresGrantError } from "./errors.js";
-import type { TrustDecision } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun, PendingStageOutput } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
+import type { TrustDecision } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun, PendingStageOutput } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** The result of submitting a stage output. */
 export type SubmitResult =

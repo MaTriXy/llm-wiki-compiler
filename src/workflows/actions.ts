@@ -2,11 +2,11 @@
  * Standard-distribution compatibility entry points for actions.
  * Host construction stays here; optional engine operations receive a host.
  */
-export { lookupAction, listActionsWithHost, showActionWithHost } from "llmwiki-local-workflows";
-export type { ActionSummary, ActionDetail } from "llmwiki-local-workflows";
-import { listActionsWithHost, showActionWithHost } from "llmwiki-local-workflows";
+export { lookupAction, listActionsWithHost, showActionWithHost } from "@atomicstrata/llmwiki-local-workflows";
+export type { ActionSummary, ActionDetail } from "@atomicstrata/llmwiki-local-workflows";
+import { listActionsWithHost, showActionWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { ActionSummary, ActionDetail } from "llmwiki-local-workflows";
+import type { ActionSummary, ActionDetail } from "@atomicstrata/llmwiki-local-workflows";
 
 
 /**

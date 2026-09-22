@@ -2,12 +2,12 @@
  * Standard compatibility entry points for run-action.
  * The engine receives services; this facade constructs the compiler host.
  */
-export { runActionWithHost } from "llmwiki-local-workflows";
-export type { ActionRunResult } from "llmwiki-local-workflows";
-import { runActionWithHost } from "llmwiki-local-workflows";
+export { runActionWithHost } from "@atomicstrata/llmwiki-local-workflows";
+export type { ActionRunResult } from "@atomicstrata/llmwiki-local-workflows";
+import { runActionWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { ActionRunResult } from "llmwiki-local-workflows";
-import type { ActionSurface } from "llmwiki-core/local-workflow-contracts";
+import type { ActionRunResult } from "@atomicstrata/llmwiki-local-workflows";
+import type { ActionSurface } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { nonInteractiveHumanGateIo, type HumanGateIo } from "./human-gate-confirm.js";
 
 

@@ -15,18 +15,18 @@
  * and ALWAYS released in `finally`, mirroring the recover-command pattern.
  */
 
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { workflowDefDigest } from "llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { workflowDefDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { mintRunId, WorkflowRunIdCollisionError } from "./run-policy.js";
 import { isTerminalStatus } from "./with-lock.js";
-import { lookupWorkflowDef } from "llmwiki-core/local-workflow-contracts";
+import { lookupWorkflowDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { currentActorIdentity } from "./actor-identity.js";
 import { snapshotWorkflowInputs } from "./input-snapshot.js";
-import { MAX_MINT_ATTEMPTS, MAX_ACTIVE_WORKFLOW_RUNS, MAX_TOTAL_WORKFLOW_RUNS } from "llmwiki-core/local-workflow-contracts";
-import { WORKFLOW_RUN_SCHEMA_VERSION, type WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowDef } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowProcessAuthorityV1 } from "llmwiki-core/local-workflow-contracts";
+import { MAX_MINT_ATTEMPTS, MAX_ACTIVE_WORKFLOW_RUNS, MAX_TOTAL_WORKFLOW_RUNS } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { WORKFLOW_RUN_SCHEMA_VERSION, type WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowProcessAuthorityV1 } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Raised when a workflow id is not declared in the active profile. */
 export class UnknownWorkflowError extends Error {

@@ -27,18 +27,18 @@
  */
 
 import { appendRunEvent } from "./events.js";
-import { parseGate } from "llmwiki-core/local-workflow-contracts";
+import { parseGate } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { RunWriter } from "./execution-context.js";
 import { UnknownWorkflowError } from "./start-operation.js";
-import { lookupWorkflowDef } from "llmwiki-core/local-workflow-contracts";
+import { lookupWorkflowDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { RunNotActiveError, RunUnavailableError } from "./errors.js";
 import { withHostRunLock, isTerminalStatus } from "./with-lock.js";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { runWriter, projectWithHost } from "./execution-context.js";
 import { assertProductStageOutputCurrent } from "./product-operation-output.js";
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
-import type { StageStatus, WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowDef, WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { StageStatus, WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowDef, WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** The result of advancing a run by one stage. */
 export type AdvanceOutcome = "advanced" | "completed" | "awaiting-gate" | "awaiting-output" | "needs-human-input";

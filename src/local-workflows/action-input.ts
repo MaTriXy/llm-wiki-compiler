@@ -20,14 +20,14 @@
  *  - `string[]` → an array whose every element is a string.
  */
 
-import { parseEntityId } from "llmwiki-core/local-workflow-contracts";
+import { parseEntityId } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { ActionInputError } from "./errors.js";
 import {
   MAX_WORKFLOW_INPUTS_BYTES,
   MAX_WORKFLOW_INPUT_STRING_CHARS,
   MAX_WORKFLOW_INPUT_ARRAY_ITEMS,
-} from "llmwiki-core/local-workflow-contracts";
-import type { EntityId, WorkflowActionDef, ActionInputField } from "llmwiki-core/local-workflow-contracts";
+} from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { EntityId, WorkflowActionDef, ActionInputField } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /**
  * Per-field-type runtime guard: maps each declared input `type` to the predicate

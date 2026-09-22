@@ -5,9 +5,9 @@
  * semantics remain opaque; core understands terminal-disposition rows only.
  */
 
-import type { readLocalWorkflowProcessSource } from "llmwiki-core/local-workflow-contracts";
-import { isSlugSafe } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { readLocalWorkflowProcessSource } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { isSlugSafe } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 const MAX_TERMINAL_DISPOSITIONS = 32;
 const MAX_VERIFIER_IMPLEMENTATIONS = 32;

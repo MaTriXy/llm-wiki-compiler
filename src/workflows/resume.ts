@@ -2,10 +2,10 @@
  * Standard-distribution compatibility entry points for resume.
  * Host construction stays here; optional engine operations receive a host.
  */
-export { resumeWorkflowWithHost } from "llmwiki-local-workflows";
-import { resumeWorkflowWithHost } from "llmwiki-local-workflows";
+export { resumeWorkflowWithHost } from "@atomicstrata/llmwiki-local-workflows";
+import { resumeWorkflowWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 
 /**

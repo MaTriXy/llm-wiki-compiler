@@ -13,11 +13,11 @@
  */
 
 import type { Command } from "commander";
-import { runExitCodeCommand } from "llmwiki-core/compiler-cli";
-import { operationListCommand } from "llmwiki-core/compiler-cli";
-import { operationInspectCommand } from "llmwiki-core/compiler-cli";
-import { operationResumeCommand, operationCompensateCommand } from "llmwiki-core/compiler-cli";
-import { operationCancelCommand } from "llmwiki-core/compiler-cli";
+import { runExitCodeCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { operationListCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { operationInspectCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { operationResumeCommand, operationCompensateCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { operationCancelCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
 
 /** A single `--json` machine-output flag shared by every subcommand. */
 interface JsonOption {

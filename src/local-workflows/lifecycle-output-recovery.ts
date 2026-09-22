@@ -6,12 +6,12 @@
 import type { WorkflowExecutionContext } from "./execution-context.js";
 import { runWriter } from "./execution-context.js";
 import { createHash } from "node:crypto";
-import { canonicalDigest } from "llmwiki-core/local-workflow-contracts";
-import { allowedEvidence } from "llmwiki-core/local-workflow-contracts";
+import { canonicalDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { allowedEvidence } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { StageOutputPendingError } from "./errors.js";
 import { recordSettledStageOutput, type SubmitResult } from "./stage-output-internals.js";
-import type { WorkflowRun, PendingStageOutput } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowStageDef, EntityTypeDef } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun, PendingStageOutput } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef, EntityTypeDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { LifecycleStageOutput } from "./stage-output.js";
 
 /** Hash exactly the bytes the lifecycle writer will put on disk. */

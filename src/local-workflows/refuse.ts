@@ -5,13 +5,13 @@
  * caller supplies evidence and a verifier result; core derives the reason.
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { parseArtifactRef, formatArtifactRef, type ArtifactRef } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { parseArtifactRef, formatArtifactRef, type ArtifactRef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { RunNotActiveError } from "./errors.js";
 import { resolveTerminalDisposition } from "./process-definition.js";
 import { commitTerminalEvent, isTerminalStatus, withHostRunLock } from "./with-lock.js";
 import { terminalRunWriter, projectWithHost } from "./execution-context.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Inputs that select a declared disposition and its retained evidence. */
 export interface RefuseWorkflowOptionsV1 {

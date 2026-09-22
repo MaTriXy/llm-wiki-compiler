@@ -11,7 +11,7 @@ const ctx = useConfinementRoots("wrapper-core-identity");
 
 beforeEach(() => {
   vi.resetModules();
-  vi.doMock("llmwiki-core/local-workflow-host", async importOriginal => {
+  vi.doMock("@atomicstrata/llmwiki-core/local-workflow-host", async importOriginal => {
     const original = await importOriginal<typeof import("../src/local-workflow-host/index.js")>();
     const duplicateModule: string = "../src/local-workflow-host/contracts.js?wrapper-second-core";
     const foreign = await import(duplicateModule);
@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.doUnmock("llmwiki-core/local-workflow-host");
+  vi.doUnmock("@atomicstrata/llmwiki-core/local-workflow-host");
   vi.resetModules();
 });
 

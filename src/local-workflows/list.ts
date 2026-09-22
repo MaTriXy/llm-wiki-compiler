@@ -8,7 +8,7 @@
  * default-profile project (which declares no workflows) yields an empty list.
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** A declared workflow surfaced to the list operation. */
 export interface WorkflowSummary {

@@ -5,10 +5,10 @@
  * process definitions may only pin an id and exact implementation digest.
  */
 
-import { canonicalDigest } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import { WorkflowVerifierError } from "llmwiki-core/local-workflow-contracts";
-export { WorkflowVerifierError } from "llmwiki-core/local-workflow-contracts";
+import { canonicalDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { WorkflowVerifierError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+export { WorkflowVerifierError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Evidence a pinned verifier may inspect; artifact bytes are already healthy. */
 export interface HostVerifierInputV1 {
