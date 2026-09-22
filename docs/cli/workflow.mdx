@@ -112,18 +112,23 @@ declares `projectionFile`. It does not change the run state.
 
 ## When to use the local engine
 
-`llmwiki workflow` is the lightweight tier: it runs one declared workflow in a
-single process, on one machine, under the project lock, with no additional
-infrastructure. It suits a single operator advancing a run from the terminal or
-the SDK, and it remains supported on its existing experimental terms.
+`llmwiki workflow` is the lightweight tier: each invocation runs locally on one
+machine, with mutations serialized by the project lock and no orchestration
+service required. Run records persist under `.llmwiki/` between invocations,
+including while a run waits for human approval. The whole run does not need to
+finish in one process or terminal session. It remains supported on its existing
+experimental terms.
 
 It is not a durable orchestration platform. Reach for your own coordinator,
 built on the standard [SDK](/guides/sdk-packages), when you need:
 
-- runs that survive process restarts or move between machines
-- human decisions that span sessions or involve several people
-- repeated occurrences of the same process on a schedule or trigger
+- automatic work dispatch and worker recovery after process failure
+- distributed execution or managed multi-user approval routing
+- built-in scheduling or event-triggered execution of repeated runs
 - coordination across several projects or services
+
+Persisted local state is not a promise of automatic replay or retry of an
+interrupted action. Inspect the recorded state before taking recovery actions.
 
 That coordinator calls compiler services for retained data and authorized
 effects; it does not gain approval or trusted-write authority by existing. See

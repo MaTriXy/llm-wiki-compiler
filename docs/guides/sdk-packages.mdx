@@ -25,7 +25,7 @@ Scoping does not make them private or establish a security boundary.
 
 The standard package requires both core and the local engine at exact matching
 versions. Existing users do not need to select or construct a host. The engine
-is optional for core-only consumers, not an optional dependency of the standard
+can be omitted in internal core-only composition, but is not an optional dependency of the standard
 distribution. No existing CLI command is removed by choosing the standard package.
 
 ## Engine-free implementation
@@ -77,10 +77,10 @@ Product sequencing, human decisions and revision strategy belong in the external
 coordinator. Existing compiler-local workflows remain supported on their
 experimental terms; they are not silently rerouted through an external coordinator.
 
-The two are tiers, not a migration path. The local engine covers single-process
-execution on one machine. Reach for an external coordinator when you need
-durability across processes, human decisions that span sessions, repeated
-occurrences, or coordination across projects; see
+The two are tiers, not a migration path. The local engine executes locally per
+invocation and retains run state and pending human gates between sessions.
+Reach for an external coordinator for automatic scheduling, worker recovery,
+distributed execution, managed approval routing or cross-project coordination; see
 [When to use the local engine](/cli/workflow#when-to-use-the-local-engine).
 
 ## Distribution requirements

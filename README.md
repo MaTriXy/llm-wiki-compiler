@@ -196,7 +196,7 @@ The [`examples/basic/`](examples/basic/) directory includes a small pre-generate
 | `llmwiki refresh --stale [--dry-run]` | Recompile changed owners of stale pages and clean selected orphaned ownership. |
 | `llmwiki template list\|inspect\|init` | Discover and install validated declarative profile templates. |
 | `llmwiki profile init\|show\|validate\|diff` | Create a minimal profile, inspect it, validate it, or assess profile changes. |
-| `llmwiki workflow ...` | Discover and drive profile-declared workflows, stages, gates, and outputs in a single process on one machine. |
+| `llmwiki workflow ...` | Discover and drive profile-declared workflows, stages, gates, and outputs locally, retaining run state between invocations. |
 | `llmwiki artifact write\|verify` | Write trusted profile-declared artifacts and verify hash-pinned references. |
 | `llmwiki connector list\|run` | Discover first-party connectors and stage external records for review. |
 | `llmwiki review list/show/approve/reject` | Inspect and manage held candidates. |
@@ -286,8 +286,9 @@ See [`docs/guides/sdk.mdx`](docs/guides/sdk.mdx). `llm-wiki-compiler` is the
 supported entry point; its scoped supporting packages are implementation
 dependencies. The local workflow engine and an application's own coordinator
 are two tiers, not a migration path: `llmwiki workflow` runs a profile-declared
-workflow in one process on one machine and remains supported, while a
-coordinator that needs more calls the same SDK without it. See
+workflow through local invocations with persisted state between sessions.
+An external coordinator calls the same SDK without using local workflow
+execution methods; the supporting engine dependency remains installed. See
 [SDK package selection](docs/guides/sdk-packages.mdx),
 [SDK upgrade notes](docs/guides/sdk-upgrade.mdx), and
 [When to use the local engine](docs/cli/workflow.mdx#when-to-use-the-local-engine).

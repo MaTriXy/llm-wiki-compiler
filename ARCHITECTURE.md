@@ -13,7 +13,7 @@ orchestration platform.
 | Base compiler | Ingest sources, compile and query knowledge, link pages, search, lint, export, and view | Commands and their shared services under `src/` |
 | Configurable domain capabilities | Profiles and typed records, relations, retained artifacts, provenance, reviewed mutations, receipts and authority checks | `src/profile`, `artifacts`, `relations`, `trust`, `operation-bundles`, and supporting services |
 | Generic effect services | Execute declared product actions and durable preparations under compiler authority | `src/products`, `preparations`, and their SDK facades |
-| Optional local workflow engine | Run profile-declared workflows in a single process on one machine: the lightweight tier behind the existing experimental workflow commands and SDK methods | `src/local-workflows`, composed by `src/workflows` and the standard SDK |
+| Optional local workflow engine | Run profile-declared workflows through local invocations with persisted run state: the lightweight tier behind the existing experimental workflow commands and SDK methods | `src/local-workflows`, composed by `src/workflows` and the standard SDK |
 | External orchestration | Coordinate a product's overall process, human decisions, revisions, repeated occurrences, and operator workbench | An application's own coordinator, outside this repository |
 | Product implementation | Domain policy, providers, editorial/scientific decisions, product-specific UI and export assembly | Product packages or modules outside compiler core |
 
@@ -75,11 +75,13 @@ coordinator, or declare all workflow-related compiler code obsolete.
 
 The two tiers coexist by design and are not a migration path from one to the
 other. The local engine is the zero-infrastructure tier: it runs a
-profile-declared workflow in one process, under the project lock, with run
-records under `.llmwiki/`. It is the right choice for a single operator on one
-machine. An application that needs durability across processes and restarts,
-human decisions that span sessions, repeated occurrences of the same process,
-or coordination across several projects should supply its own coordinator and
+profile-declared workflow through local invocations, with mutations serialized
+by the project lock and run records retained under `.llmwiki/`. Runs and pending
+human gates persist between invocations; one run can span terminal sessions.
+Persisted state does not imply automatic replay of interrupted actions.
+An application that needs automatic scheduling, worker recovery, distributed
+execution, managed approval routing, or coordination across projects should
+supply its own coordinator and
 call core services; that coordination belongs outside this repository, while
 reusable record and authority mechanisms belong here.
 
@@ -111,7 +113,8 @@ workspace installation and ordered builds; no package publication is needed loca
   It requires a host at construction; it cannot manufacture default authority.
 - `llm-wiki-compiler` remains the standard CLI and `createWiki` SDK. Both packages
   are required exact-version dependencies, preserving existing workflow features.
-  Core-only installation is an explicit alternative, not a changed default.
+  Engine-free composition is an internal implementation capability, not a
+  separately supported consumer installation path.
 
 Core entry points share built chunks, including lock/error identities and a
 module-instance token. Composition rejects a host from a duplicate core instance.
@@ -159,7 +162,7 @@ compatibility exception, not a pattern for adding product-specific fields.
   retained bytes, evidence references, confinement, verification, and authorized
   mutation.
 - Put process sequencing, revision strategy, and human interaction in the
-  application's own coordinator when the local engine's single-process scope
+  application's own coordinator when the local engine's invocation-driven scope
   is not enough.
 - Put domain judgments and provider implementations in product or reusable
   external modules. A compiler profile may declare their data contracts without

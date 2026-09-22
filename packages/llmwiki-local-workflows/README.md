@@ -1,10 +1,10 @@
 # @atomicstrata/llmwiki-local-workflows
 
 The optional compiler-local workflow engine. This preserves llmwiki's existing
-workflow semantics: single-process execution of profile-declared workflows on
-one machine. It is not an external orchestrator and does not aim to become one;
-applications that need durability across processes, human decisions spanning
-sessions, or repeated occurrences supply their own coordinator and call the
+workflow semantics: local execution per invocation, with run records and pending
+human gates retained between sessions. Persisted state does not imply automatic
+replay of interrupted actions. Applications needing automatic scheduling, worker
+recovery, distributed execution or managed approval routing supply a coordinator and call the
 standard `llm-wiki-compiler` SDK without starting local runs.
 
 This publicly downloadable supporting package is not a separately supported
