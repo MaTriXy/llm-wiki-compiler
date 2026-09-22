@@ -37,6 +37,12 @@ jobs:
       - run: npm ci
       - name: Install Linux isolation test dependency
         run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      # An installed binary can still be barred by runner namespace policy.
+      # Surface its stderr before the full suite, using the backend's controls.
+      - name: Verify Linux isolation launch
+        run: >-
+          bwrap --cap-drop ALL --unshare-net --ro-bind / /
+          --dev /dev --proc /proc -- "$(command -v node)" --version
       - run: npm run release:check-docs
       - run: npm run build
       - run: npm test
