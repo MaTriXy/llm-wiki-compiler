@@ -109,3 +109,22 @@ llmwiki workflow cancel <run-id>
 
 `workflow project` writes a derived markdown projection only when the workflow
 declares `projectionFile`. It does not change the run state.
+
+## When to use the local engine
+
+`llmwiki workflow` is the lightweight tier: it runs one declared workflow in a
+single process, on one machine, under the project lock, with no additional
+infrastructure. It suits a single operator advancing a run from the terminal or
+the SDK, and it remains supported on its existing experimental terms.
+
+It is not a durable orchestration platform. Reach for your own coordinator,
+built on the standard [SDK](/guides/sdk-packages), when you need:
+
+- runs that survive process restarts or move between machines
+- human decisions that span sessions or involve several people
+- repeated occurrences of the same process on a schedule or trigger
+- coordination across several projects or services
+
+That coordinator calls compiler services for retained data and authorized
+effects; it does not gain approval or trusted-write authority by existing. See
+[External orchestration and operation authority](/guides/sdk#external-orchestration-and-operation-authority).
