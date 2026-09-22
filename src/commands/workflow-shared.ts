@@ -10,13 +10,13 @@
  * shared logic lives in exactly one place (no duplication, no behavior change).
  */
 
-import { output } from "llmwiki-core/compiler-cli";
-import { processTerminalLineIo } from "llmwiki-core/compiler-cli";
-import { parseInputPairs, parseInputJsonObject } from "llmwiki-core/compiler-cli";
-export { parseJsonObject } from "llmwiki-core/compiler-cli";
+import { output } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { processTerminalLineIo } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { parseInputPairs, parseInputJsonObject } from "@atomicstrata/llmwiki-core/compiler-cli";
+export { parseJsonObject } from "@atomicstrata/llmwiki-core/compiler-cli";
 import type { RunStatus } from "../workflows/status.js";
 import type { WorkflowRun } from "../workflows/types.js";
-import type { TrustDecision } from "llmwiki-core/compiler-cli";
+import type { TrustDecision } from "@atomicstrata/llmwiki-core/compiler-cli";
 import type { HumanGateIo } from "../workflows/human-gate-confirm.js";
 
 /** Options carrying repeatable `--input key=value` strings (one per occurrence). */

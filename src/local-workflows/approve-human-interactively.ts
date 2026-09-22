@@ -3,7 +3,7 @@
  * subject and process TTY token proof to the internal, under-lock approval.
  */
 import { approveGateWithHost, resolveGateChallengeWithHost } from "./gate.js";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { currentActorIdentity } from "./actor-identity.js";
 
 /** Use host-owned terminal proof and bind approval to the exact displayed subject. */

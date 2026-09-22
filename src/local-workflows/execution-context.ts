@@ -3,9 +3,9 @@
  * @description Engine-side binding of an active core transaction to run effects.
  * These helpers carry no independent filesystem or authority implementation.
  */
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowTransaction } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowTransaction } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { terminalRunCandidates } from "./run-policy.js";
 import { maybeAutoProject, projectRun } from "./projection.js";
 

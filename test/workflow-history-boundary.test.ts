@@ -32,13 +32,13 @@ import { installWorkflowProfile } from "./fixtures/workflow-profile.js";
 const ctx = useConfinementRoots("workflow-history");
 
 const PACKAGE_ENTRIES: Record<string, string> = {
-  "llmwiki-core/compiler-cli": "compiler-cli.ts",
-  "llmwiki-core": "core-index.ts",
-  "llmwiki-core/compiler-sdk": "sdk/compiler-composition.ts",
-  "llmwiki-core/compiler-legacy-workflows": "local-workflow-host/legacy-composition.ts",
-  "llmwiki-core/local-workflow-host": "local-workflow-host/index.ts",
-  "llmwiki-core/local-workflow-contracts": "local-workflow-host/shared-contracts.ts",
-  "llmwiki-local-workflows": "local-workflows/index.ts",
+  "@atomicstrata/llmwiki-core/compiler-cli": "compiler-cli.ts",
+  "@atomicstrata/llmwiki-core": "core-index.ts",
+  "@atomicstrata/llmwiki-core/compiler-sdk": "sdk/compiler-composition.ts",
+  "@atomicstrata/llmwiki-core/compiler-legacy-workflows": "local-workflow-host/legacy-composition.ts",
+  "@atomicstrata/llmwiki-core/local-workflow-host": "local-workflow-host/index.ts",
+  "@atomicstrata/llmwiki-core/local-workflow-contracts": "local-workflow-host/shared-contracts.ts",
+  "@atomicstrata/llmwiki-local-workflows": "local-workflows/index.ts",
   "llm-wiki-compiler": "index.ts",
 };
 

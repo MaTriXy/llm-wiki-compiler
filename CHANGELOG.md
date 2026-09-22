@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Split-package development distribution: `llmwiki-core` is engine-free;
-  `llmwiki-local-workflows` takes an explicit core host; the standard
+- Split-package development distribution: `@atomicstrata/llmwiki-core` is engine-free;
+  `@atomicstrata/llmwiki-local-workflows` takes an explicit core host; the standard
   `llm-wiki-compiler` package composes both at matching versions and retains
   existing CLI/SDK entry points. Duplicate-core composition now fails before
   I/O, including standard facade initialization. See the

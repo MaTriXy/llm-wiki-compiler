@@ -15,9 +15,9 @@
  * by-id `status` read), while every MUTATION stays owner-gated elsewhere.
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { RunUnavailableError } from "./errors.js";
-import type { WorkflowEvent } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowEvent } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Read retained events through host history without changing state. */
 export async function listRunEventsWithHost(host: LocalWorkflowHost, root: string, runId: string): Promise<WorkflowEvent[]> {

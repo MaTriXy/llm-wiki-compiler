@@ -22,10 +22,10 @@
 
 import { appendRunEvent } from "./events.js";
 import { resolveCurrentStage } from "./advance.js";
-import { parseGate, type GateKind } from "llmwiki-core/local-workflow-contracts";
+import { parseGate, type GateKind } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { assertActorLabelWithinCap } from "./field-limits.js";
 import type { RunWriter } from "./execution-context.js";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import {
   RunNotActiveError,
   RunUnavailableError,
@@ -37,8 +37,8 @@ import { withHostRunLock, isTerminalStatus } from "./with-lock.js";
 import { runWriter, projectWithHost } from "./execution-context.js";
 import { subjectDigestForGate } from "./subject-gate.js";
 import { SubjectGateVerificationError } from "./approval-subject.js";
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowActorKind, WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowActorKind, WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Who is approving the gate (the security-relevant kind, plus an optional label). */
 export interface ApproveGateOptions {

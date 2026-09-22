@@ -58,19 +58,19 @@
  */
 
 import type { Command } from "commander";
-import { runExitCodeCommand } from "llmwiki-core/compiler-cli";
-import { preparationCancelCommand } from "llmwiki-core/compiler-cli";
-import { preparationListCommand } from "llmwiki-core/compiler-cli";
-import { preparationShowCommand } from "llmwiki-core/compiler-cli";
-import { preparationPauseCommand } from "llmwiki-core/compiler-cli";
-import { preparationResumeCommand } from "llmwiki-core/compiler-cli";
-import { preparationFailCommand } from "llmwiki-core/compiler-cli";
-import { preparationGateCommand } from "llmwiki-core/compiler-cli";
-import { preparationPruneCommand } from "llmwiki-core/compiler-cli";
-import { preparationRecoverCommand } from "llmwiki-core/compiler-cli";
-import { RESET_CONFIRM_DESCRIPTION, RESET_TOKEN_DESCRIPTION, preparationResetCommand } from "llmwiki-core/compiler-cli";
-import { preparationPreviewCommand, preparationStageCommand } from "llmwiki-core/compiler-cli";
-import { preparationSweepCommand } from "llmwiki-core/compiler-cli";
+import { runExitCodeCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationCancelCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationListCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationShowCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationPauseCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationResumeCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationFailCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationGateCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationPruneCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationRecoverCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { RESET_CONFIRM_DESCRIPTION, RESET_TOKEN_DESCRIPTION, preparationResetCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationPreviewCommand, preparationStageCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { preparationSweepCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
 
 /** Register the `preparation` command group on the root program. */
 export function registerPreparationCommands(program: Command): void {

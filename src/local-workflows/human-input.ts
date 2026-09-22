@@ -6,12 +6,12 @@
  * refusing any divergent second submission.
  */
 
-import { canonicalDigest } from "llmwiki-core/local-workflow-contracts";
+import { canonicalDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { currentActorIdentity } from "./actor-identity.js";
 import { appendRunEvent } from "./events.js";
 import { HumanInputValidationError, admitHumanInput } from "./human-input-schema.js";
-import type { HumanInputDescriptorV1 } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { HumanInputDescriptorV1 } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { SubmitResult } from "./stage-output-internals.js";
 import type { WorkflowExecutionContext } from "./execution-context.js";
 import { runWriter } from "./execution-context.js";

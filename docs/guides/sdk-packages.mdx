@@ -7,13 +7,20 @@ The package split described here belongs to the `1.4.0-dev.20260919` development
 candidate. It is not yet an npm release. Use a matching set of built tarballs
 when evaluating it; do not assume the new package names are available from the registry.
 
-## Choose a package
+## Supported entry point
+
+Applications, including llmflow, should install and import `llm-wiki-compiler`.
+The scoped packages below are publicly downloadable implementation dependencies,
+not separately supported consumer APIs. Direct exports are for compiler maintainers.
+Scoping does not make them private or establish a security boundary.
+
+## Internal package responsibilities
 
 | Need | Package | Entry point |
 | --- | --- | --- |
 | Existing CLI or complete SDK | `llm-wiki-compiler` | `createWiki` |
-| Knowledge and domain services without local execution | `llmwiki-core` | `createWikiCore` |
-| Explicit compiler-local workflow composition | `llmwiki-local-workflows` plus matching core | `createLocalWorkflowRuntime` with an explicit host |
+| Knowledge and domain services without local execution | `@atomicstrata/llmwiki-core` | `createWikiCore` |
+| Explicit compiler-local workflow composition | `@atomicstrata/llmwiki-local-workflows` plus matching core | `createLocalWorkflowRuntime` with an explicit host |
 | Product-wide process coordination | External application such as llmflow | Application-owned orchestration |
 
 The standard package requires both core and the local engine at exact matching
@@ -21,12 +28,12 @@ versions. Existing users do not need to select or construct a host. The engine
 is optional for core-only consumers, not an optional dependency of the standard
 distribution. No existing CLI command is removed by choosing the standard package.
 
-## Engine-free applications
+## Engine-free implementation
 
-After installing the candidate core tarball, an application can use:
+For compiler maintainers, internal composition uses:
 
 ```ts
-import { createWikiCore } from "llmwiki-core";
+import { createWikiCore } from "@atomicstrata/llmwiki-core";
 
 const wiki = createWikiCore({ root: "./my-wiki" });
 const status = await wiki.status();
@@ -48,9 +55,9 @@ Core's host enforces confinement, locks, retained-state integrity and compiler
 mutation authority. The engine cannot manufacture a default host or extra grants.
 Host composition is an in-process trust boundary, not a sandbox for untrusted code.
 
-Prefer the standard package unless you need to control this composition. Import
-the host and contracts through `llmwiki-core/local-workflow-host` and
-`llmwiki-core/local-workflow-contracts`, rather than private source paths. Use a
+Applications should use the standard package. For internal composition, import
+the host and contracts through `@atomicstrata/llmwiki-core/local-workflow-host` and
+`@atomicstrata/llmwiki-core/local-workflow-contracts`, rather than private source paths. Use a
 single core module instance: duplicate-core composition is rejected before I/O.
 
 The `compiler-cli`, `compiler-sdk` and `compiler-legacy-workflows` subpaths support
@@ -72,8 +79,28 @@ experimental terms; they are not silently rerouted through llmflow.
 
 ## Distribution requirements
 
+The current root-only release workflow must be upgraded before publishing this
+three-package distribution. Scope ownership and trusted publishing access are
+release prerequisites; the naming change does not establish them.
+
 Build core, then the engine, then the standard facade. Release a matching set:
 publish dependencies before the standard package, and verify fresh installation
 and TypeScript consumption. Do not publish the facade while its exact required
 versions are unavailable. Package ownership and trusted publishing must be set
 up for the new packages before the first registry release.
+
+## Contributing across packages
+
+Use one repository and one PR, including for cross-package changes. Root-level
+`npm ci` links workspace packages; `npm run build` builds core, engine and facade
+in order. Local development requires no publishing. Source directory names are
+unchanged. No new public `core` subpath is introduced.
+
+- Knowledge and authority changes belong in the relevant `src/` subsystem.
+- Local workflow execution belongs in `src/local-workflows/`.
+- Public SDK composition belongs in `src/sdk/` and `src/index.ts`.
+- Shared engine contracts belong in `src/local-workflow-host/`.
+
+Run focused tests for behavior changes. After building, `npm run test:pack`
+checks fresh installation and TypeScript consumption without workspace aliases.
+Package-boundary tests prevent the engine from embedding compiler implementation.

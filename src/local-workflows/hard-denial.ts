@@ -43,12 +43,12 @@
  */
 
 import { StageWriteDeniedError, TrustGateRequiresGrantError, WorkflowArtifactChangedError, WorkflowArtifactUnverifiableError } from "./errors.js";
-import { RelationWriteDeniedError } from "llmwiki-core/local-workflow-contracts";
-import { LifecycleTransitionError } from "llmwiki-core/local-workflow-contracts";
-import { EntityFieldContractError } from "llmwiki-core/local-workflow-contracts";
-import { RelationPreconditionUnmetError } from "llmwiki-core/local-workflow-contracts";
-import { ArtifactPreconditionUnmetError } from "llmwiki-core/local-workflow-contracts";
-import { ArtifactWriteRefusedError, ArtifactWriteDeniedError } from "llmwiki-core/local-workflow-contracts";
+import { RelationWriteDeniedError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { LifecycleTransitionError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { EntityFieldContractError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { RelationPreconditionUnmetError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { ArtifactPreconditionUnmetError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { ArtifactWriteRefusedError, ArtifactWriteDeniedError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /**
  * True when `err` is a HARD DENIAL of a stage-output write — the executor REFUSED

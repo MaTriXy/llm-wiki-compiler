@@ -2,12 +2,12 @@
  * Standard derived-run projection entry point. Rendering lives in the engine;
  * the compiler host retains confined output writing and profile observation.
  */
-export { projectRun, writeProjectionWithHost, maybeAutoProject } from "llmwiki-local-workflows";
-export type { ProjectionResult } from "llmwiki-local-workflows";
-export { confineProjectionPath } from "llmwiki-core/compiler-cli";
-import { writeProjectionWithHost } from "llmwiki-local-workflows";
+export { projectRun, writeProjectionWithHost, maybeAutoProject } from "@atomicstrata/llmwiki-local-workflows";
+export type { ProjectionResult } from "@atomicstrata/llmwiki-local-workflows";
+export { confineProjectionPath } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { writeProjectionWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { ProjectionResult } from "llmwiki-core/local-workflow-contracts";
+import type { ProjectionResult } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 
 /**

@@ -26,7 +26,7 @@
  */
 
 import { ActionInputError } from "./errors.js";
-import type { WorkflowActionDef } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowActionDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { StageOutput } from "./stage-output.js";
 
 /** Require a string-typed normalized input, failing closed when absent/non-string. */

@@ -5,13 +5,13 @@
  * code: it checks retained artifacts, live targets, run authority, and chain root.
  */
 
-import { canonicalDigest } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { parseArtifactRef } from "llmwiki-core/local-workflow-contracts";
+import { canonicalDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { parseArtifactRef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { resolveProcessVerifierPin } from "./process-definition.js";
 import { predecessorChainRoot } from "./verifier-receipt.js";
-import type { SubjectGateDescriptorV1 } from "llmwiki-core/local-workflow-contracts";
-import type { VerifierReceiptV1, WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { SubjectGateDescriptorV1 } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { VerifierReceiptV1, WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** A subject receipt is absent, malformed, stale, or no longer healthy. */
 export class SubjectGateVerificationError extends Error {

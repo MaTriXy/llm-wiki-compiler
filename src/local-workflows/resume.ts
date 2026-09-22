@@ -26,10 +26,10 @@
 import { RunNotActiveError } from "./errors.js";
 import { withHostRunLock, commitRunEvent } from "./with-lock.js";
 import { resolveCurrentStage } from "./advance.js";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { runWriter, projectWithHost } from "./execution-context.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Return a NEW run with the current stage's log entry (if any) set back to `running`. */
 function markCurrentStageRunning(run: WorkflowRun): WorkflowRun {

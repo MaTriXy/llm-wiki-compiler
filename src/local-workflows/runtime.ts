@@ -5,8 +5,8 @@
  * runtime binds the existing operations without a second execution algorithm or
  * persisted run format. Independent package extraction is a separate build step.
  */
-import { assertLocalWorkflowCoreInstance } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import { assertLocalWorkflowCoreInstance } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { startWorkflowWithHost, type StartWorkflowRequest } from "./start-operation.js";
 import { submitStageOutputWithHost, type StageOutput } from "./stage-output.js";
 import type { SubmitStageOutputOptions } from "./artifact-output.js";
@@ -14,15 +14,15 @@ import { cancelWorkflowWithHost } from "./cancel.js";
 import { failWorkflowWithHost } from "./fail.js";
 import { resumeWorkflowWithHost } from "./resume.js";
 import { advanceWorkflowWithHost } from "./advance.js";
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { refuseWorkflowWithHost, type RefuseWorkflowOptionsV1 } from "./refuse.js";
 import { adaptDryRunWithHost, adaptApplyWithHost } from "./adapt.js";
 import { approveGateWithHost, resolveGateChallengeWithHost, type ApproveGateOptions } from "./gate.js";
 import { mintVerifierReceiptWithHost } from "./verifier-receipt.js";
 import type { HostVerifierRegistryV1 } from "./verifier-registry.js";
 import { runActionWithHost } from "./run-action.js";
-import type { ActionSurface } from "llmwiki-core/local-workflow-contracts";
-import type { HumanGateIo } from "llmwiki-core/local-workflow-contracts";
+import type { ActionSurface } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { HumanGateIo } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { approveHumanGateWithHost } from "./approve-human-interactively.js";
 import { listWorkflowsWithHost } from "./list.js";
 import { showWorkflowWithHost } from "./show.js";

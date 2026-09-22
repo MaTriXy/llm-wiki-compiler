@@ -96,12 +96,12 @@
  * {@link WorkflowRun.outputs}.
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowTransaction } from "llmwiki-core/local-workflow-contracts";
-import type { PlanResult } from "llmwiki-core/local-workflow-contracts";
-import type { RelationPlannedMutation, LifecycleTransitionPlannedMutation } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowTransaction } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { PlanResult } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { RelationPlannedMutation, LifecycleTransitionPlannedMutation } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { runWriter } from "./execution-context.js";
-import { parseEntityId } from "llmwiki-core/local-workflow-contracts";
+import { parseEntityId } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { appendRunEvent } from "./events.js";
 import { resolveCurrentStage } from "./advance.js";
 import { maybeAutoProject, projectRun } from "./projection.js";
@@ -130,14 +130,14 @@ import {
 import { applyArtifactOutput } from "./artifact-output.js";
 import { recordHumanInputLocked, type HumanInputStageOutput } from "./human-input.js";
 import { HumanInputValidationError } from "./human-input-schema.js";
-import { deepCaptureData, RuntimeCaptureError } from "llmwiki-core/local-workflow-contracts";
+import { deepCaptureData, RuntimeCaptureError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { ArtifactStageOutput, WorkflowArtifactOrigin, SubmitStageOutputOptions } from "./artifact-output.js";
-import type { TrustDecision } from "llmwiki-core/local-workflow-contracts";
-import type { ApplyResult } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowStageDef } from "llmwiki-core/local-workflow-contracts";
-import type { AppendRelationInput } from "llmwiki-core/local-workflow-contracts";
-import type { EntityId } from "llmwiki-core/local-workflow-contracts";
+import type { TrustDecision } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { ApplyResult } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowStageDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { AppendRelationInput } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { EntityId } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import {
   recordProductOperationOutputLocked, replayProductOperationOutputLocked,
   type ProductOperationStageOutput,

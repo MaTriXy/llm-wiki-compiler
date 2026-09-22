@@ -16,14 +16,14 @@
  * the write decision). The helper just guarantees the lock + fail-closed read.
  */
 
-import type { BlockingLockOptions } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { BlockingLockOptions } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { WorkflowExecutionContext } from "./execution-context.js";
 import { appendRunEvent, appendTerminalEvent } from "./events.js";
 import type { RunWriter, TerminalRunWriter } from "./execution-context.js";
 import { RunOwnerMismatchError, RunUnavailableError } from "./errors.js";
 import { currentActorIdentity } from "./actor-identity.js";
-import type { WorkflowEvent, WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowEvent, WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /**
  * Enforce run OWNERSHIP (M1) — THE single source consulted by EVERY mutating
@@ -135,4 +135,4 @@ export async function commitTerminalEvent(
   return persist(root, committed);
 }
 
-export { isTerminalStatus } from "llmwiki-core/local-workflow-contracts";
+export { isTerminalStatus } from "@atomicstrata/llmwiki-core/local-workflow-contracts";

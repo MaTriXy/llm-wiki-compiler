@@ -5,7 +5,7 @@
  * Bound both the original tree and hook-produced values, and reject non-finite
  * numbers before JSON can silently turn an integrity refusal into a null value.
  */
-import { MAX_WORKFLOW_INPUTS_BYTES, MAX_WORKFLOW_INPUT_DEPTH } from "llmwiki-core/local-workflow-contracts";
+import { MAX_WORKFLOW_INPUTS_BYTES, MAX_WORKFLOW_INPUT_DEPTH } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { assertInputDepthWithinBounds, WorkflowInputBoundsError } from "./input-bounds.js";
 
 /** The public start-input byte-cap error, retained at its original export path. */

@@ -2,11 +2,11 @@
  * @file src/local-workflows/run-policy.ts
  * @description Execution-side run persistence. Passive reads retain their original exports.
  */
-import { WorkflowRunIdError } from "llmwiki-core/local-workflow-contracts";
+import { WorkflowRunIdError } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { randomBytes } from "node:crypto";
-import { isSlugSafe } from "llmwiki-core/local-workflow-contracts";
+import { isSlugSafe } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { appendTerminalEvent } from "./events.js";
-import { type WorkflowEvent, type WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import { type WorkflowEvent, type WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 /**
  * Number of random bytes whose hex suffixes a minted run id. 8 bytes → a 16-hex
  * suffix (64 bits of entropy), so a same-day birthday collision is negligible

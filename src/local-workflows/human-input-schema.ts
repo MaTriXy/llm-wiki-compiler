@@ -7,11 +7,11 @@
  */
 
 import { Buffer } from "node:buffer";
-import { parseArtifactRef } from "llmwiki-core/local-workflow-contracts";
-import { parseEntityId } from "llmwiki-core/local-workflow-contracts";
-import type { EntityId, HumanInputDescriptorV1, HumanInputFieldV1, ProfilePack } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowObservations } from "llmwiki-core/local-workflow-contracts";
+import { parseArtifactRef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { parseEntityId } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { EntityId, HumanInputDescriptorV1, HumanInputFieldV1, ProfilePack } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowObservations } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 type InputObservations = Pick<LocalWorkflowObservations, "artifact" | "entityFrontmatter">;
 

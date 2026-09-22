@@ -7,10 +7,10 @@
  */
 
 import type { Command } from "commander";
-import { reviewListCommand } from "llmwiki-core/compiler-cli";
-import { reviewShowCommand } from "llmwiki-core/compiler-cli";
-import { reviewApproveCommand } from "llmwiki-core/compiler-cli";
-import { reviewRejectCommand } from "llmwiki-core/compiler-cli";
+import { reviewListCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { reviewShowCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { reviewApproveCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { reviewRejectCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
 
 /** Register the `review` command group (`list`, `show`, `approve`, `reject`) on `program`. */
 export function registerReviewCommands(program: Command): void {

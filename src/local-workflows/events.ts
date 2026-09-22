@@ -22,8 +22,8 @@
  * events) so the audit trail degrades GRACEFULLY (never silently), then appends.
  */
 
-import { MAX_WORKFLOW_RUN_EVENTS } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowEvent, WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import { MAX_WORKFLOW_RUN_EVENTS } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowEvent, WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /**
  * Raised when appending an event would exceed {@link MAX_WORKFLOW_RUN_EVENTS}.

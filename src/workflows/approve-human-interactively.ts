@@ -2,10 +2,10 @@
  * Standard-distribution compatibility entry points for approve-human-interactively.
  * Host construction stays here; optional engine operations receive a host.
  */
-export { approveHumanGateWithHost } from "llmwiki-local-workflows";
-import { approveHumanGateWithHost } from "llmwiki-local-workflows";
+export { approveHumanGateWithHost } from "@atomicstrata/llmwiki-local-workflows";
+import { approveHumanGateWithHost } from "@atomicstrata/llmwiki-local-workflows";
 import { createLocalWorkflowHost } from "./host.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 
 

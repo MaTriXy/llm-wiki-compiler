@@ -11,12 +11,12 @@
  * empty), mirroring `start`'s fail-closed lookup.
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { lookupWorkflowDef } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { lookupWorkflowDef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { UnknownWorkflowError } from "./start-operation.js";
 import type {
   HumanInputDescriptorV1, SubjectGateDescriptorV1, WorkflowStageDef,
-} from "llmwiki-core/local-workflow-contracts";
+} from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** One stage's declared contract, surfaced to the `show` operation. */
 export interface WorkflowStageDetail {

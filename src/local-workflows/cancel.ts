@@ -14,9 +14,9 @@
 
 import { RunNotActiveError } from "./errors.js";
 import { withHostRunLock, isTerminalStatus, commitTerminalEvent } from "./with-lock.js";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { terminalRunWriter, projectWithHost } from "./execution-context.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Cancel through the supplied host using the existing terminal transition policy. */
 export async function cancelWorkflowWithHost(host: LocalWorkflowHost, root: string, runId: string): Promise<WorkflowRun> {

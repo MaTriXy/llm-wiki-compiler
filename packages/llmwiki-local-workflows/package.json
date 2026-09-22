@@ -1,8 +1,9 @@
 {
-  "name": "llmwiki-local-workflows",
+  "name": "@atomicstrata/llmwiki-local-workflows",
   "description": "Optional compiler-local workflow engine using explicit llmwiki core services",
   "version": "1.4.0-dev.20260919",
   "type": "module",
+  "publishConfig": { "access": "public" },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -24,6 +25,6 @@
     "./package.json": "./package.json"
   },
   "peerDependencies": {
-    "llmwiki-core": "1.4.0-dev.20260919"
+    "@atomicstrata/llmwiki-core": "1.4.0-dev.20260919"
   }
 }

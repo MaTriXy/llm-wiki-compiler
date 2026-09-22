@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const REPO = path.resolve(import.meta.dirname, "..", "..");
 const PACKAGES = ["llmwiki-dev-backend", "llmwiki-limited-isolation-backend"] as const;
-const ALLOWED_IMPORTS = new Set(["llmwiki-core", "llmwiki-dev-backend", "llmwiki-limited-isolation-backend"]);
+const ALLOWED_IMPORTS = new Set(["@atomicstrata/llmwiki-core", "llmwiki-dev-backend", "llmwiki-limited-isolation-backend"]);
 const dirs: string[] = [];
 afterEach(async () => { for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true }); });
 

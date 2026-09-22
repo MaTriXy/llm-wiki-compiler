@@ -26,13 +26,13 @@
  * @experimental Foundation API — the shape may change in a future minor release.
  */
 
-import { createLocalWorkflowHost } from "llmwiki-core/local-workflow-host";
-import { assertLocalWorkflowCoreInstance } from "llmwiki-core/local-workflow-contracts";
+import { createLocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-host";
+import { assertLocalWorkflowCoreInstance } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { createLocalWorkflowRuntime } from "../workflows/runtime.js";
 import type { ApproveGateOptions } from "../workflows/gate.js";
 import { SdkHumanGateError } from "../workflows/errors.js";
 import type { WikiWorkflow } from "./workflow-types.js";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** The standard facade's optional local workflow methods. */
 export type WorkflowFacadeSlice = WikiWorkflow;

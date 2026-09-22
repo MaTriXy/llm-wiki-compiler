@@ -3,10 +3,10 @@
  * options and presentation together without expanding the main entrypoint.
  */
 import type { Command } from "commander";
-import { nextCommand } from "llmwiki-core/compiler-cli";
-import { contextCommand, type ContextCommandOptions } from "llmwiki-core/compiler-cli";
-import { setVerbose } from "llmwiki-core/compiler-cli";
-import { runExitCodeCommand } from "llmwiki-core/compiler-cli";
+import { nextCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { contextCommand, type ContextCommandOptions } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { setVerbose } from "@atomicstrata/llmwiki-core/compiler-cli";
+import { runExitCodeCommand } from "@atomicstrata/llmwiki-core/compiler-cli";
 
 /** Register advisory commands with the main CLI verbose-option policy. */
 export function registerContextCommands(program: Command, verboseEnabled: (flag?: boolean) => boolean): void {

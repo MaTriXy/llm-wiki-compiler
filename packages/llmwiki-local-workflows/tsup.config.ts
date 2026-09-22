@@ -15,8 +15,8 @@ export default defineConfig({
   clean: true,
   dts: { compilerOptions: {
     rootDir: path.resolve("../../src"),
-    paths: { "llmwiki-core/local-workflow-contracts": [path.resolve("../../src/local-workflow-host/shared-contracts.ts")] },
+    paths: { "@atomicstrata/llmwiki-core/local-workflow-contracts": [path.resolve("../../src/local-workflow-host/shared-contracts.ts")] },
   } },
   tsconfig: "../../tsconfig.json",
-  external: ["llmwiki-core", "llmwiki-core/local-workflow-contracts"],
+  external: ["@atomicstrata/llmwiki-core", "@atomicstrata/llmwiki-core/local-workflow-contracts"],
 });

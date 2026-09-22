@@ -66,8 +66,11 @@ console.log(`${status.pages.total} pages, ${status.sources} sources`);
 
 ### Core versus workflow methods
 
+Applications should import only `llm-wiki-compiler`. Scoped core and engine
+exports are internal composition contracts, not separately supported consumer APIs.
+
 `createWiki` returns the standard `Wiki` facade. `createWikiCore` from
-`llmwiki-core` returns `WikiCore`: knowledge compilation, profiles, domain records,
+`@atomicstrata/llmwiki-core` returns `WikiCore`: knowledge compilation, profiles, domain records,
 artifacts, preparations, product actions and operation proposals, without local
 workflow execution methods. The standard facade includes these core capabilities
 and adds the existing experimental workflow facade. Neither constructor grants
@@ -84,11 +87,11 @@ deliberately exposes no operation apply method. The separately authorized local
 operator inspects and applies the exact proposed manifest:
 
 ```ts
-import { createWikiCore, type RecordIntentV1 } from "llmwiki-core";
+import { createWiki, type RecordIntentV1 } from "llm-wiki-compiler";
 
 // The trusted application host chooses this identity and grant, not a model.
 async function prepareForReview(root: string, intent: RecordIntentV1) {
-  const wiki = createWikiCore({
+  const wiki = createWiki({
     root,
     operations: {
       id: "process-coordinator",

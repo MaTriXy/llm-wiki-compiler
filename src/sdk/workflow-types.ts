@@ -3,8 +3,8 @@
  * Core consumers do not depend on these execution methods.
  */
 import type { ActionSummary, ActionDetail, WorkflowSummary, WorkflowDetail,
-  AdaptationPlan, AdvanceResult, StageOutput, SubmitResult, ActionRunResult } from "llmwiki-local-workflows";
-import type { WorkflowRun, WorkflowActorKind, WorkflowEvent, ProjectionResult } from "llmwiki-core/local-workflow-contracts";
+  AdaptationPlan, AdvanceResult, StageOutput, SubmitResult, ActionRunResult } from "@atomicstrata/llmwiki-local-workflows";
+import type { WorkflowRun, WorkflowActorKind, WorkflowEvent, ProjectionResult } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import type { RunStatus } from "../workflows/status.js";
 
 export interface WikiWorkflow {

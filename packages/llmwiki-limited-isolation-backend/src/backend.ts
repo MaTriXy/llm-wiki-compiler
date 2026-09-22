@@ -14,17 +14,17 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { providerLaunchEnv, resolveProviderEntrypoint } from "llmwiki-core";
+import { providerLaunchEnv, resolveProviderEntrypoint } from "@atomicstrata/llmwiki-core";
 import { mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { launchProviderChannel } from "llmwiki-dev-backend";
 import type {
   ProviderHostBackendV1, ProviderLaunchDescriptorV1 as DevLaunchDescriptorV1,
-} from "llmwiki-core";
+} from "@atomicstrata/llmwiki-core";
 import type {
   ProviderBackendChannelV1 as DevBackendChannelV1,
-} from "llmwiki-core";
+} from "@atomicstrata/llmwiki-core";
 import { bubblewrapArgs, seatbeltProfile } from "./profile.js";
 
 const DEFAULT_MAXIMUM_CAPTURED_STDERR_BYTES = 64 * 1024;

@@ -2,7 +2,7 @@ import { defineConfig } from "tsup";
 
 /**
  * Compiles this private backend package to dist/ so it can be `npm pack`ed into a
- * consumer beside the platform. The platform (`llmwiki-core`) is a PEER and is
+ * consumer beside the platform. The platform (`@atomicstrata/llmwiki-core`) is a PEER and is
  * EXTERNALIZED — never a second bundled copy — and so is the dev backend it builds on.
  */
 export default defineConfig({
@@ -15,5 +15,5 @@ export default defineConfig({
   clean: true,
   dts: true,
   tsconfig: "tsconfig.build.json",
-  external: ["llmwiki-core", "llmwiki-dev-backend"],
+  external: ["@atomicstrata/llmwiki-core", "llmwiki-dev-backend"],
 });

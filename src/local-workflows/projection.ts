@@ -25,11 +25,11 @@
  * leaf-symlink-hardened primitive every `wiki/` writer uses.
  */
 
-import { buildFrontmatter } from "llmwiki-core/local-workflow-contracts";
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import type { WorkflowRun } from "llmwiki-core/local-workflow-contracts";
-import type { ProjectionResult } from "llmwiki-core/local-workflow-contracts";
-export type { ProjectionResult } from "llmwiki-core/local-workflow-contracts";
+import { buildFrontmatter } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import type { ProjectionResult } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+export type { ProjectionResult } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 /** Header marking rendered run text as derived, never authoritative input. */
 const DERIVED_HEADER = "<!-- DERIVED from the workflow run JSON; edits here do NOT affect run state. -->";

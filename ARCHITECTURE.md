@@ -68,10 +68,16 @@ the host or forward to these implementations; they do not duplicate the engine.
 
 ### Package composition
 
-- `llmwiki-core` provides `createWikiCore`, knowledge/domain services, passive
+Applications, including llmflow, use `llm-wiki-compiler` as the supported entry
+point. The scoped packages below are public installation dependencies, but their
+direct exports are internal composition contracts rather than separately
+supported application APIs. Contributors work in one repository with root-level
+workspace installation and ordered builds; no package publication is needed locally.
+
+- `@atomicstrata/llmwiki-core` provides `createWikiCore`, knowledge/domain services, passive
   history, and explicit host contracts. It has no local-engine dependency or
   workflow-execution SDK methods.
-- `llmwiki-local-workflows` provides the engine and requires a matching core peer.
+- `@atomicstrata/llmwiki-local-workflows` provides the engine and requires a matching core peer.
   It requires a host at construction; it cannot manufacture default authority.
 - `llm-wiki-compiler` remains the standard CLI and `createWiki` SDK. Both packages
   are required exact-version dependencies, preserving existing workflow features.

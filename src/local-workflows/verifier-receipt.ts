@@ -5,17 +5,17 @@
  * target, chain, and digest fields; callers can provide only the raw artifact ref.
  */
 
-import type { LocalWorkflowHost } from "llmwiki-core/local-workflow-contracts";
-import { canonicalBytes, canonicalDigest } from "llmwiki-core/local-workflow-contracts";
-import { parseArtifactRef, formatArtifactRef } from "llmwiki-core/local-workflow-contracts";
+import type { LocalWorkflowHost } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { canonicalBytes, canonicalDigest } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
+import { parseArtifactRef, formatArtifactRef } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { resolveProcessVerifierPin } from "./process-definition.js";
 import { withHostRunLock, isTerminalStatus } from "./with-lock.js";
-import { serializeRunWithinCap } from "llmwiki-core/local-workflow-contracts";
+import { serializeRunWithinCap } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 import { RunNotActiveError } from "./errors.js";
 import {
   WorkflowVerifierError, type HostVerifierRegistryV1, type HostVerifierAcceptedV1,
 } from "./verifier-registry.js";
-import type { WorkflowRun, VerifierReceiptV1 } from "llmwiki-core/local-workflow-contracts";
+import type { WorkflowRun, VerifierReceiptV1 } from "@atomicstrata/llmwiki-core/local-workflow-contracts";
 
 const MAX_NORMALIZED_BYTES = 65_536;
 const MAX_BOUND_VALUES = 64;
